@@ -179,3 +179,20 @@ export interface Goal {
   prazo: string;
   criado_em: string;
 }
+
+// Espelha GET /api/relatorio (sifp/services/relatorio_service.py).
+
+export interface RelatorioData {
+  has_data: true;
+  months: string[];
+  months_labels: Record<string, string>;
+  selected_month: string;
+  period_label: string;
+  report_text: string;
+}
+
+export interface RelatorioEmpty {
+  has_data: false;
+}
+
+export type Relatorio = RelatorioData | RelatorioEmpty;

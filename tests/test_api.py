@@ -93,6 +93,20 @@ def test_orcamento_returns_categorias_sugestoes_limites():
     assert "categorias" in body and "sugestoes" in body and "limites" in body
 
 
+def test_relatorio_returns_json_with_has_data_flag():
+    resp = client.get("/api/relatorio")
+    assert resp.status_code == 200
+    assert "has_data" in resp.json()
+
+
+def test_relatorio_accepts_month_query_param():
+    resp = client.get("/api/relatorio?month=2026-06")
+    assert resp.status_code == 200
+    body = resp.json()
+    if body["has_data"]:
+        assert "report_text" in body and isinstance(body["report_text"], str)
+
+
 def test_criar_e_remover_limite_de_orcamento():
     """Usa uma categoria real da lista padrão, mas restaura o estado
     original no final (mesmo se a asserção falhar) — a API roda contra o

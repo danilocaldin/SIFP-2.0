@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/orcamento", label: "Orçamento" },
   { href: "/projecoes", label: "Projeções" },
   { href: "/diagnosticos", label: "Diagnósticos" },
+  { href: "/relatorio", label: "Relatório" },
 ];
 
 export function NavBar() {

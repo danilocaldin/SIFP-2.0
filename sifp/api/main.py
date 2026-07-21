@@ -30,6 +30,7 @@ from sifp.services.formatting import formatar_mes, unescape_currency
 from sifp.services.orcamento_service import OrcamentoService
 from sifp.services.patrimonio_service import PatrimonioService
 from sifp.services.projecoes_service import ProjecoesService
+from sifp.services.relatorio_service import RelatorioService
 from sifp.services.summary_service import SummaryService
 
 init_db()
@@ -45,6 +46,7 @@ dashboard_service = DashboardService(transaction_repo, balance_repo)
 patrimonio_service = PatrimonioService(asset_repo, investment_importer)
 projecoes_service = ProjecoesService(transaction_repo, asset_repo, goal_repo)
 orcamento_service = OrcamentoService(transaction_repo, budget_repo)
+relatorio_service = RelatorioService(transaction_repo, asset_repo, summary_service)
 
 app = FastAPI(title="SIFP API")
 
@@ -175,3 +177,8 @@ def atualizar_progresso_meta(goal_id: int, body: GoalProgressIn):
 def excluir_meta(goal_id: int):
     goal_repo.delete(goal_id)
     return {"ok": True}
+
+
+@app.get("/api/relatorio")
+def relatorio(month: str | None = None):
+    return relatorio_service.build_relatorio(month, formatar_mes)

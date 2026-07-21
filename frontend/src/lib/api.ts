@@ -1,4 +1,4 @@
-import type { Dashboard, Goal, OrcamentoData, Patrimonio, Projecoes, Resumo } from "@/lib/types";
+import type { Dashboard, Goal, OrcamentoData, Patrimonio, Projecoes, Relatorio, Resumo } from "@/lib/types";
 
 // Server Components rodam no processo Node do Next, então este fetch é
 // servidor-para-servidor — nunca passa pelo navegador, não precisa de CORS.
@@ -58,6 +58,16 @@ export async function getMetas(): Promise<Goal[]> {
   const res = await fetch(`${API_URL}/api/metas`, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(`Falha ao buscar /api/metas: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getRelatorio(month?: string): Promise<Relatorio> {
+  const url = new URL(`${API_URL}/api/relatorio`);
+  if (month) url.searchParams.set("month", month);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Falha ao buscar /api/relatorio: ${res.status}`);
   }
   return res.json();
 }
