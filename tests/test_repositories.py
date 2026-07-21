@@ -89,6 +89,27 @@ def test_insert_new_dedups_by_hash(repo):
     assert len(repo.get_all()) == 2
 
 
+def test_get_all_parses_dates_with_and_without_time_in_same_table(repo):
+    """Regressão: o importador de CSV gravava datas como '%Y-%m-%d' (sem
+    hora) enquanto o de Excel grava '%Y-%m-%d %H:%M'. Como a coluna date é
+    TEXT sem tipo fixo, misturar os dois formatos na mesma tabela fazia o
+    pandas (parse_dates em get_all(), que infere o formato a partir da
+    maioria das linhas) devolver NaT pro formato minoritário — corrompendo
+    indicadores calculados a partir dessa transação. Os dois importadores
+    devem gravar sempre o mesmo formato (ver btg_importer.py)."""
+    df = _sample_transactions()
+    df["date"] = ["2026-06-01 07:35", "2026-06-01 07:35"]  # maioria: com hora (formato do Excel)
+    repo.insert_new(df)
+
+    df_sem_hora = _sample_transactions().iloc[[0]].copy()
+    df_sem_hora["date"] = ["2026-06-02"]  # minoria: sem hora (formato do CSV, se não normalizado)
+    df_sem_hora["description"] = ["Padaria"]
+    repo.insert_new(df_sem_hora)
+
+    all_tx = repo.get_all()
+    assert not all_tx["date"].isna().any()
+
+
 def test_bulk_update_marks_human_confirmed_and_source(repo):
     df = _sample_transactions()
     repo.insert_new(df)

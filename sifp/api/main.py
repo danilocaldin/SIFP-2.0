@@ -12,13 +12,16 @@ Rodar com:
     uvicorn sifp.api.main:app --reload --port 8000
 """
 
+import io
 import os
 
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from sifp.importers.btg_importer import BTGImporter
 from sifp.importers.btg_investment_importer import BTGInvestmentImporter
+from sifp.intelligence.categorization import CategorizationService
 from sifp.repositories.asset_repository import AssetRepository
 from sifp.repositories.balance_repository import BalanceRepository
 from sifp.repositories.budget_repository import BudgetRepository
@@ -27,6 +30,7 @@ from sifp.repositories.goal_repository import GoalRepository
 from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services.dashboard_service import DashboardService
 from sifp.services.formatting import formatar_mes, unescape_currency
+from sifp.services.import_service import ImportService
 from sifp.services.orcamento_service import OrcamentoService
 from sifp.services.patrimonio_service import PatrimonioService
 from sifp.services.projecoes_service import ProjecoesService
@@ -41,12 +45,36 @@ asset_repo = AssetRepository()
 budget_repo = BudgetRepository()
 goal_repo = GoalRepository()
 investment_importer = BTGInvestmentImporter()
+# Estado do modelo de ML vive nesta instância (mesmo padrão de
+# st.session_state.categorization no Streamlit) — singleton do processo,
+# recarrega do disco (categorizer_model.joblib) uma vez no boot da API.
+categorization_service = CategorizationService.load()
+import_service = ImportService(
+    importers=[BTGImporter()],
+    categorization=categorization_service,
+    transaction_repo=transaction_repo,
+    balance_repo=balance_repo,
+)
 summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo)
 dashboard_service = DashboardService(transaction_repo, balance_repo)
 patrimonio_service = PatrimonioService(asset_repo, investment_importer)
 projecoes_service = ProjecoesService(transaction_repo, asset_repo, goal_repo)
 orcamento_service = OrcamentoService(transaction_repo, budget_repo)
 relatorio_service = RelatorioService(transaction_repo, asset_repo, summary_service)
+
+
+def _refresh_model() -> str:
+    training_df = transaction_repo.get_training_data()
+    return categorization_service.train(training_df)
+
+
+def _as_file_like(file: UploadFile) -> io.BytesIO:
+    """Importers/ImportService esperam um arquivo com `.name` (mesma
+    interface do UploadedFile do Streamlit) pra decidir o parser pela
+    extensão — UploadFile.file (SpooledTemporaryFile) não garante isso."""
+    file_like = io.BytesIO(file.file.read())
+    file_like.name = file.filename or ""
+    return file_like
 
 app = FastAPI(title="SIFP API")
 
@@ -182,3 +210,35 @@ def excluir_meta(goal_id: int):
 @app.get("/api/relatorio")
 def relatorio(month: str | None = None):
     return relatorio_service.build_relatorio(month, formatar_mes)
+
+
+def _transactions_payload(df) -> list[dict]:
+    """Sanitiza tipos numpy (bool_/float64) que o encoder JSON do FastAPI
+    não serializa nativamente, antes de devolver linhas de transação."""
+    records = df.to_dict("records")
+    for r in records:
+        r["value"] = float(r["value"])
+        r["self_transfer"] = bool(r["self_transfer"])
+    return records
+
+
+@app.post("/api/upload/preview")
+def upload_preview(file: UploadFile):
+    try:
+        df, balances = import_service.parse(_as_file_like(file))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "count": len(df),
+        "balances_count": len(balances),
+        "preview": _transactions_payload(df.head(10)),
+    }
+
+
+@app.post("/api/upload/persist")
+def upload_persist(file: UploadFile):
+    try:
+        summary = import_service.import_and_persist(_as_file_like(file))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return summary

@@ -159,7 +159,13 @@ def _read_btg_csv(uploaded_file) -> tuple[pd.DataFrame, pd.DataFrame]:
     df = df[df["description"] != ""]
     df = df[df["description"].str.lower() != "nan"]
 
-    df["date"] = df["date"].dt.strftime("%Y-%m-%d")
+    # Mesmo formato de string do importador de Excel ("%Y-%m-%d %H:%M") —
+    # a coluna date da tabela transactions é TEXT sem tipo fixo, e o
+    # pandas infere o formato de data a partir da maioria das linhas ao
+    # ler de volta (parse_dates=["date"] em get_all()); se os dois
+    # importadores gravassem formatos diferentes, misturar CSV com Excel
+    # faria as datas do formato minoritário virarem NaT silenciosamente.
+    df["date"] = df["date"].dt.strftime("%Y-%m-%d %H:%M")
     df["self_transfer"] = False
     df = df[["date", "description", "value", "bank_category", "self_transfer"]].reset_index(drop=True)
     empty_balances = pd.DataFrame(columns=["date", "balance"])

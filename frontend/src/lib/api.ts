@@ -1,4 +1,14 @@
-import type { Dashboard, Goal, OrcamentoData, Patrimonio, Projecoes, Relatorio, Resumo } from "@/lib/types";
+import type {
+  Dashboard,
+  Goal,
+  OrcamentoData,
+  Patrimonio,
+  Projecoes,
+  Relatorio,
+  Resumo,
+  UploadPersistSummary,
+  UploadPreview,
+} from "@/lib/types";
 
 // Server Components rodam no processo Node do Next, então este fetch é
 // servidor-para-servidor — nunca passa pelo navegador, não precisa de CORS.
@@ -120,4 +130,20 @@ export async function atualizarProgressoMeta(id: number, valorAcumulado: number)
 export async function excluirMeta(id: number): Promise<void> {
   const res = await fetch(`${PUBLIC_API_URL}/api/metas/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao excluir a meta."));
+}
+
+export async function previewUpload(file: File): Promise<UploadPreview> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${PUBLIC_API_URL}/api/upload/preview`, { method: "POST", body: formData });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao ler o arquivo."));
+  return res.json();
+}
+
+export async function persistUpload(file: File): Promise<UploadPersistSummary> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${PUBLIC_API_URL}/api/upload/persist`, { method: "POST", body: formData });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao importar o arquivo."));
+  return res.json();
 }

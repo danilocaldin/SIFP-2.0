@@ -40,6 +40,12 @@ def test_csv_happy_path(importer, sample_btg_csv_bytes):
     receita = df[df["description"].str.contains("PIX RECEBIDO")].iloc[0]
     assert receita["value"] == pytest.approx(2500.00)
 
+    # mesmo formato de string do importador de Excel ("%Y-%m-%d %H:%M") —
+    # ver comentário em btg_importer.py sobre por que os dois precisam
+    # bater (misturar formatos diferentes na coluna date da tabela
+    # transactions faz o pandas devolver NaT pro formato minoritário).
+    assert all(len(d) == 16 and d[10] == " " for d in df["date"])
+
 
 def test_csv_unsupported_columns_raises(importer):
     bad_csv = b"Col1,Col2\nfoo,bar\n"

@@ -2,10 +2,14 @@
 A lógica em si (SummaryService) já tem sua própria suíte; aqui validamos
 que o contrato HTTP (rota, status, shape do JSON) está correto."""
 
+import io
+
 import pytest
 from fastapi.testclient import TestClient
 
 from sifp.api.main import app
+from sifp.repositories.connection import DEFAULT_DB_PATH, get_connection
+from sifp.repositories.transaction_repository import TransactionRepository, make_tx_hash
 
 client = TestClient(app)
 
@@ -163,3 +167,66 @@ def test_ciclo_completo_de_meta():
 def test_criar_meta_com_dados_invalidos_e_rejeitada():
     resp = client.post("/api/metas", json={"nome": "", "valor_necessario": 100.0, "prazo": "2030-01-01"})
     assert resp.status_code == 400
+
+
+def test_upload_preview_returns_parsed_transactions_without_persisting():
+    csv_content = (
+        "Data;Descrição;Valor\n"
+        "01/06/2026;PIX RECEBIDO JOAO SILVA;2500,00\n"
+        "02/06/2026;SUPERMERCADO PAO DE ACUCAR;-345,67\n"
+    ).encode("utf-8-sig")
+
+    resp = client.post(
+        "/api/upload/preview",
+        files={"file": ("extrato.csv", io.BytesIO(csv_content), "text/csv")},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 2
+    assert len(body["preview"]) == 2
+    assert body["preview"][0]["description"] == "PIX RECEBIDO JOAO SILVA"
+    assert body["preview"][0]["value"] == pytest.approx(2500.0)
+
+    # preview não persiste nada — não deve aparecer no banco real
+    all_tx = TransactionRepository().get_all()
+    assert "PIX RECEBIDO JOAO SILVA" not in all_tx["description"].values
+
+
+def test_upload_preview_rejects_unsupported_file():
+    resp = client.post(
+        "/api/upload/preview",
+        files={"file": ("extrato.pdf", io.BytesIO(b"nao e um csv nem excel"), "application/pdf")},
+    )
+    assert resp.status_code == 400
+
+
+def test_upload_persist_inserts_and_dedupes_without_corrupting_real_data():
+    fake_desc = "[PYTEST] TRANSACAO TEMPORARIA DE TESTE UPLOAD"
+    csv_content = f"Data;Descrição;Valor\n01/01/2000;{fake_desc};-1,23\n".encode("utf-8-sig")
+    # Importador de CSV grava "%Y-%m-%d %H:%M" (mesmo formato do Excel,
+    # sem hora vira 00:00) — ver comentário em btg_importer.py.
+    tx_hash = make_tx_hash("2000-01-01 00:00", fake_desc, -1.23)
+
+    try:
+        resp1 = client.post(
+            "/api/upload/persist",
+            files={"file": ("extrato.csv", io.BytesIO(csv_content), "text/csv")},
+        )
+        assert resp1.status_code == 200
+        assert resp1.json()["inseridas"] == 1
+
+        # reimportar o mesmo extrato não duplica (dedup por tx_hash)
+        resp2 = client.post(
+            "/api/upload/persist",
+            files={"file": ("extrato.csv", io.BytesIO(csv_content), "text/csv")},
+        )
+        assert resp2.json()["inseridas"] == 0
+        assert resp2.json()["ignoradas_duplicadas"] == 1
+    finally:
+        conn = get_connection(DEFAULT_DB_PATH)
+        conn.execute("DELETE FROM transactions WHERE tx_hash = ?", (tx_hash,))
+        conn.commit()
+        conn.close()
+
+    all_tx = TransactionRepository().get_all()
+    assert fake_desc not in all_tx["description"].values

@@ -196,3 +196,26 @@ export interface RelatorioEmpty {
 }
 
 export type Relatorio = RelatorioData | RelatorioEmpty;
+
+// Espelha POST /api/upload/preview e POST /api/upload/persist.
+
+export interface UploadTransactionPreview {
+  date: string;
+  description: string;
+  value: number;
+  bank_category: string;
+  self_transfer: boolean;
+}
+
+export interface UploadPreview {
+  count: number;
+  balances_count: number;
+  preview: UploadTransactionPreview[];
+}
+
+export interface UploadPersistSummary {
+  total_lidas: number;
+  inseridas: number;
+  ignoradas_duplicadas: number;
+  saldos_gravados: number;
+}

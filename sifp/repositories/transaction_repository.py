@@ -45,7 +45,17 @@ class TransactionRepository:
         cur = conn.cursor()
         inserted = 0
         for _, row in df.iterrows():
-            tx_hash = make_tx_hash(row["date"], row["description"], row["value"])
+            # Normaliza pra um único formato de string ("%Y-%m-%d %H:%M")
+            # antes de gravar — a coluna date é TEXT sem tipo fixo, e
+            # get_all() lê de volta com parse_dates (o pandas infere o
+            # formato pela maioria das linhas). Se importadores diferentes
+            # gravassem formatos diferentes, o formato minoritário viraria
+            # NaT silenciosamente e corromperia indicadores calculados a
+            # partir dessa transação. Normalizar aqui, no único ponto de
+            # inserção, protege qualquer importador atual ou futuro
+            # (Inter/Nubank/Santander/XP estão planejados).
+            date_normalized = pd.to_datetime(row["date"]).strftime("%Y-%m-%d %H:%M")
+            tx_hash = make_tx_hash(date_normalized, row["description"], row["value"])
             try:
                 cur.execute(
                     """
@@ -56,7 +66,7 @@ class TransactionRepository:
                     """,
                     (
                         tx_hash,
-                        row["date"],
+                        date_normalized,
                         row["description"],
                         float(row["value"]),
                         row.get("category", CATEGORIA_NAO_CATEGORIZADO),
