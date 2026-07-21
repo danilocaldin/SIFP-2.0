@@ -12,6 +12,8 @@ Rodar com:
     uvicorn sifp.api.main:app --reload --port 8000
 """
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -35,10 +37,13 @@ summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, bud
 
 app = FastAPI(title="SIFP API")
 
-# Dev local apenas: frontend roda em outra origem (porta) que o Streamlit.
+# Origem(s) do frontend, via env var — sem isso, hospedar em outra máquina
+# (ou domínio de produção) exigiria editar código-fonte. CORS_ORIGINS
+# aceita uma lista separada por vírgula; default cobre o dev local.
+_cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
