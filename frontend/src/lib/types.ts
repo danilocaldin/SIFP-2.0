@@ -36,3 +36,55 @@ export interface ResumoEmpty {
 }
 
 export type Resumo = ResumoData | ResumoEmpty;
+
+// Espelha GET /api/dashboard (sifp/services/dashboard_service.py).
+
+export interface CategoryBreakdown {
+  category: string;
+  value_abs: number;
+  pct: number;
+}
+
+export interface MonthlyEvolution {
+  month: string;
+  mes_label: string;
+  Receitas: number;
+  Despesas: number;
+  Saldo: number;
+}
+
+export interface TopExpense {
+  date: string;
+  description: string;
+  category: string;
+  value_abs: number;
+}
+
+export interface TopMerchant {
+  merchant: string;
+  value_abs: number;
+  n_transacoes: number;
+}
+
+export interface DashboardData {
+  has_data: true;
+  months: string[];
+  selected_month: string | null;
+  period_label: string;
+  receitas: number;
+  despesas: number;
+  saldo: number;
+  taxa_poupanca_pct: number;
+  delta: { receitas: number | null; despesas: number | null; saldo: number | null };
+  self_transfer_total: number;
+  by_category: CategoryBreakdown[];
+  monthly_evolution: MonthlyEvolution[];
+  top_expenses: TopExpense[];
+  top_merchants: TopMerchant[];
+}
+
+export interface DashboardEmpty {
+  has_data: false;
+}
+
+export type Dashboard = DashboardData | DashboardEmpty;

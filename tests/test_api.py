@@ -33,3 +33,17 @@ def test_resumo_diagnostics_have_no_leftover_markdown_escaping():
         assert "\\$" not in d["descricao"]
         assert "\\$" not in d["explicacao"]
         assert "\\$" not in d["recomendacao"]
+
+
+def test_dashboard_returns_json_with_has_data_flag():
+    resp = client.get("/api/dashboard")
+    assert resp.status_code == 200
+    assert "has_data" in resp.json()
+
+
+def test_dashboard_accepts_month_query_param():
+    resp = client.get("/api/dashboard?month=2026-06")
+    assert resp.status_code == 200
+    body = resp.json()
+    if body.get("has_data"):
+        assert body["selected_month"] == "2026-06"

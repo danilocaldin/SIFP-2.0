@@ -23,6 +23,7 @@ from sifp.repositories.budget_repository import BudgetRepository
 from sifp.repositories.connection import init_db
 from sifp.repositories.goal_repository import GoalRepository
 from sifp.repositories.transaction_repository import TransactionRepository
+from sifp.services.dashboard_service import DashboardService
 from sifp.services.formatting import formatar_mes, unescape_currency
 from sifp.services.summary_service import SummaryService
 
@@ -34,6 +35,7 @@ asset_repo = AssetRepository()
 budget_repo = BudgetRepository()
 goal_repo = GoalRepository()
 summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo)
+dashboard_service = DashboardService(transaction_repo, balance_repo)
 
 app = FastAPI(title="SIFP API")
 
@@ -77,3 +79,8 @@ def _plain_resumo(resumo: dict) -> dict:
 @app.get("/api/resumo")
 def resumo():
     return _plain_resumo(summary_service.build_resumo(formatar_mes))
+
+
+@app.get("/api/dashboard")
+def dashboard(month: str | None = None):
+    return dashboard_service.build_dashboard(month, formatar_mes)
