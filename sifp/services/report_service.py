@@ -12,6 +12,7 @@ fonte de dados, só reorganizada num documento único.
 import pandas as pd
 
 from sifp.domain.models import Diagnostic
+from sifp.services.formatting import format_brl_number as _num
 from sifp.services.formatting import unescape_currency as _plain
 
 _SEP = "-" * 60
@@ -47,9 +48,9 @@ def generate_text_report(
     lines.append("=" * 60)
 
     lines += _section("Resumo financeiro")
-    lines.append(f"Receitas............... R$ {summary['receitas']:>14,.2f}")
-    lines.append(f"Despesas............... R$ {summary['despesas']:>14,.2f}")
-    lines.append(f"Saldo.................. R$ {summary['saldo']:>14,.2f}")
+    lines.append(f"Receitas............... R$ {_num(summary['receitas']):>14}")
+    lines.append(f"Despesas............... R$ {_num(summary['despesas']):>14}")
+    lines.append(f"Saldo.................. R$ {_num(summary['saldo']):>14}")
     lines.append(f"Taxa de poupança....... {summary['taxa_poupanca']:>17.1f}%")
 
     lines += _section("Gastos por categoria")
@@ -57,7 +58,7 @@ def generate_text_report(
         lines.append("(sem despesas no período)")
     else:
         for _, row in by_cat.iterrows():
-            lines.append(f"  {row['category']:<28} R$ {row['value_abs']:>12,.2f}  ({row['pct']:.0f}%)")
+            lines.append(f"  {row['category']:<28} R$ {_num(row['value_abs']):>12}  ({row['pct']:.0f}%)")
 
     lines += _section("Maiores estabelecimentos")
     if by_merchant.empty:
@@ -65,7 +66,7 @@ def generate_text_report(
     else:
         for _, row in by_merchant.iterrows():
             lines.append(
-                f"  {row['merchant']:<28} R$ {row['value_abs']:>12,.2f}  ({int(row['n_transacoes'])}x)"
+                f"  {row['merchant']:<28} R$ {_num(row['value_abs']):>12}  ({int(row['n_transacoes'])}x)"
             )
 
     lines += _section("Evolução mensal (Receita / Despesa / Saldo)")
@@ -74,8 +75,8 @@ def generate_text_report(
     else:
         for _, row in monthly.iterrows():
             lines.append(
-                f"  {row['month']}   R$ {row['Receitas']:>10,.2f}   "
-                f"R$ {row['Despesas']:>10,.2f}   R$ {row['Saldo']:>10,.2f}"
+                f"  {row['month']}   R$ {_num(row['Receitas']):>10}   "
+                f"R$ {_num(row['Despesas']):>10}   R$ {_num(row['Saldo']):>10}"
             )
 
     lines += _section("Diagnósticos")
@@ -93,18 +94,18 @@ def generate_text_report(
         lines.append("(nenhum ativo importado)")
     else:
         for _, row in asset_positions.iterrows():
-            lines.append(f"  {row['nome']:<32} R$ {row['saldo_liquido']:>12,.2f}  ({row['tipo']})")
+            lines.append(f"  {row['nome']:<32} R$ {_num(row['saldo_liquido']):>12}  ({row['tipo']})")
         total_patrimonio = asset_positions["saldo_liquido"].sum()
-        lines.append(f"  {'TOTAL':<32} R$ {total_patrimonio:>12,.2f}")
+        lines.append(f"  {'TOTAL':<32} R$ {_num(total_patrimonio):>12}")
 
     lines += _section("Dívidas")
     if debt_transactions.empty:
         lines.append("(nenhuma transação categorizada como Dívida no período)")
     else:
         for _, row in debt_transactions.iterrows():
-            lines.append(f"  {row['date']}  {row['description']:<38} R$ {row['value']:>10,.2f}")
+            lines.append(f"  {row['date']}  {row['description']:<38} R$ {_num(row['value']):>10}")
         total_divida = debt_transactions["value"].abs().sum()
-        lines.append(f"  {'TOTAL':<50} R$ {total_divida:>10,.2f}")
+        lines.append(f"  {'TOTAL':<50} R$ {_num(total_divida):>10}")
 
     lines.append("")
     lines.append("=" * 60)

@@ -29,7 +29,7 @@ from sifp.repositories.goal_repository import GoalRepository
 from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services import indicator_service as ind
 from sifp.services import projection_service as proj
-from sifp.services.formatting import formatar_mes
+from sifp.services.formatting import format_brl, format_brl_md, formatar_mes
 from sifp.services.import_service import ImportService
 from sifp.services.report_service import generate_text_report
 from sifp.services.summary_service import SummaryService
@@ -131,7 +131,7 @@ with tab_resumo:
         # ---- Frase-headline: interpreta antes de mostrar números soltos ----
         frases = []
         if patrimonio_total_home > 0:
-            frases.append(f"Seu patrimônio é **R\\$ {patrimonio_total_home:,.2f}**.")
+            frases.append(f"Seu patrimônio é **{format_brl_md(patrimonio_total_home)}**.")
             if resumo["taxa_mes_pct"] is not None:
                 if resumo["benchmark_mes_pct"] is not None:
                     comparacao = "acima" if resumo["taxa_mes_pct"] >= resumo["benchmark_mes_pct"] else "abaixo"
@@ -146,18 +146,18 @@ with tab_resumo:
         if saldo_home >= 0:
             frases.append(
                 f"Em **{latest_label_home}**, você guardou **{taxa_home:.0f}%** da renda "
-                f"(R\\$ {saldo_home:,.2f})."
+                f"({format_brl_md(saldo_home)})."
             )
         else:
             frases.append(
-                f"Em **{latest_label_home}**, você fechou **R\\$ {abs(saldo_home):,.2f} no vermelho**."
+                f"Em **{latest_label_home}**, você fechou **{format_brl_md(abs(saldo_home))} no vermelho**."
             )
         st.markdown(" ".join(frases))
 
         col1, col2, col3 = st.columns(3)
-        col1.metric("Patrimônio total", f"R$ {patrimonio_total_home:,.2f}")
+        col1.metric("Patrimônio total", format_brl(patrimonio_total_home))
         col2.metric(
-            f"Saldo em {latest_label_home}", f"R$ {saldo_home:,.2f}",
+            f"Saldo em {latest_label_home}", format_brl(saldo_home),
             delta=_delta_str(resumo["delta_saldo_pct"]),
         )
         col3.metric("Taxa de poupança", f"{taxa_home:.0f}%")
@@ -177,7 +177,7 @@ with tab_resumo:
             render_fn = SEVERITY_RENDER[severidade_top]
             icon = SEVERITY_ICON[severidade_top]
             impacto = (
-                f"\n\n**Impacto:** R\\$ {abs(top['impacto_financeiro']):,.2f}"
+                f"\n\n**Impacto:** {format_brl_md(abs(top['impacto_financeiro']))}"
                 if top["impacto_financeiro"] is not None else ""
             )
             render_fn(
@@ -191,7 +191,7 @@ with tab_resumo:
         if resumo["saldo_medio_3m"] > 0 and resumo["projecao_12m"] is not None:
             st.caption(
                 f"📈 No ritmo atual, seu patrimônio deve chegar perto de "
-                f"**R\\$ {resumo['projecao_12m']:,.2f}** em 12 meses. Veja a aba 🔮 Projeções para mais detalhes."
+                f"**{format_brl_md(resumo['projecao_12m'])}** em 12 meses. Veja a aba 🔮 Projeções para mais detalhes."
             )
         else:
             st.caption(
@@ -351,6 +351,8 @@ with tab_revisao:
             "aparecer de novo aqui até você de fato escolher uma categoria."
         )
 
+        df_view["value"] = df_view["value"].apply(format_brl)
+
         edited_df = st.data_editor(
             df_view[
                 ["tx_hash", "date", "description", "value", "bank_category",
@@ -360,7 +362,7 @@ with tab_revisao:
                 "tx_hash": None,  # coluna técnica, oculta
                 "date": st.column_config.TextColumn("Data", disabled=True),
                 "description": st.column_config.TextColumn("Descrição", disabled=True, width="large"),
-                "value": st.column_config.NumberColumn("Valor (R$)", disabled=True, format="R$ %.2f"),
+                "value": st.column_config.TextColumn("Valor (R$)", disabled=True),
                 "bank_category": st.column_config.TextColumn(
                     "Categoria BTG", disabled=True, help="Categoria sugerida pelo próprio banco (referência)."
                 ),
@@ -458,28 +460,28 @@ with tab_dashboard:
         periodo_label = _formatar_mes(selected_month) if selected_month != "Todos" else "todo o período importado"
         if saldo >= 0:
             st.markdown(
-                f"Em **{periodo_label}**, você recebeu **R\\$ {receitas:,.2f}**, gastou "
-                f"**R\\$ {despesas:,.2f}** e guardou **R\\$ {saldo:,.2f}** "
+                f"Em **{periodo_label}**, você recebeu **{format_brl_md(receitas)}**, gastou "
+                f"**{format_brl_md(despesas)}** e guardou **{format_brl_md(saldo)}** "
                 f"— uma taxa de poupança de **{taxa_poupanca:.0f}%** da sua renda."
             )
         else:
             st.markdown(
-                f"Em **{periodo_label}**, você recebeu **R\\$ {receitas:,.2f}** mas gastou "
-                f"**R\\$ {despesas:,.2f}** — ficou **R\\$ {abs(saldo):,.2f} no vermelho**."
+                f"Em **{periodo_label}**, você recebeu **{format_brl_md(receitas)}** mas gastou "
+                f"**{format_brl_md(despesas)}** — ficou **{format_brl_md(abs(saldo))} no vermelho**."
             )
 
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Receitas", f"R$ {receitas:,.2f}", delta=_delta_str(delta["receitas"]))
+        col1.metric("Receitas", format_brl(receitas), delta=_delta_str(delta["receitas"]))
         col2.metric(
-            "Despesas", f"R$ {despesas:,.2f}",
+            "Despesas", format_brl(despesas),
             delta=_delta_str(delta["despesas"]), delta_color="inverse",
         )
-        col3.metric("Saldo", f"R$ {saldo:,.2f}", delta=_delta_str(delta["saldo"]))
+        col3.metric("Saldo", format_brl(saldo), delta=_delta_str(delta["saldo"]))
         col4.metric("Taxa de poupança", f"{taxa_poupanca:.0f}%")
 
         if self_transfer_periodo > 0:
             st.caption(
-                f"↔️ R\\$ {self_transfer_periodo:,.2f} foram movimentados entre suas próprias "
+                f"↔️ {format_brl_md(self_transfer_periodo)} foram movimentados entre suas próprias "
                 f"contas neste período (ex: indo para investimentos e voltando) — **não contam** "
                 f"como receita nem despesa acima."
             )
@@ -519,7 +521,7 @@ with tab_dashboard:
 
             if not by_cat.empty:
                 by_cat["label"] = by_cat.apply(
-                    lambda r: f"R$ {r['value_abs']:,.2f} ({r['pct']:.0f}%)", axis=1
+                    lambda r: f"{format_brl(r['value_abs'])} ({r['pct']:.0f}%)", axis=1
                 )
                 fig_cat = px.bar(
                     by_cat, x="value_abs", y="category", orientation="h",
@@ -562,13 +564,15 @@ with tab_dashboard:
             st.markdown("**Maiores gastos individuais do período**")
             top_gastos = ind.top_expenses(df_period_real, n=10)
             if not top_gastos.empty:
+                top_gastos = top_gastos.copy()
+                top_gastos["value_abs"] = top_gastos["value_abs"].apply(format_brl)
                 st.dataframe(
                     top_gastos[["date", "description", "category", "value_abs"]],
                     column_config={
                         "date": st.column_config.TextColumn("Data"),
                         "description": st.column_config.TextColumn("Descrição", width="large"),
                         "category": st.column_config.TextColumn("Categoria"),
-                        "value_abs": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f"),
+                        "value_abs": st.column_config.TextColumn("Valor (R$)"),
                     },
                     hide_index=True,
                     use_container_width=True,
@@ -580,11 +584,13 @@ with tab_dashboard:
             st.markdown("**Onde o dinheiro foi (por estabelecimento)**")
             by_merchant = ind.merchant_concentration(df_period_real, n=10)
             if not by_merchant.empty:
+                by_merchant = by_merchant.copy()
+                by_merchant["value_abs"] = by_merchant["value_abs"].apply(format_brl)
                 st.dataframe(
                     by_merchant,
                     column_config={
                         "merchant": st.column_config.TextColumn("Estabelecimento"),
-                        "value_abs": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f"),
+                        "value_abs": st.column_config.TextColumn("Valor (R$)"),
                         "n_transacoes": st.column_config.NumberColumn("Nº de compras"),
                     },
                     hide_index=True,
@@ -637,8 +643,9 @@ with tab_patrimonio:
         latest_assets["data_referencia"] = latest_assets["data_referencia"].dt.strftime("%Y-%m-%d")
 
         patrimonio_total = latest_assets["saldo_liquido"].sum()
-        st.metric("Patrimônio total (Ativos)", f"R$ {patrimonio_total:,.2f}")
+        st.metric("Patrimônio total (Ativos)", format_brl(patrimonio_total))
 
+        latest_assets["saldo_liquido"] = latest_assets["saldo_liquido"].apply(format_brl)
         st.dataframe(
             latest_assets[
                 ["nome", "tipo", "instituicao", "data_referencia", "saldo_liquido",
@@ -649,7 +656,7 @@ with tab_patrimonio:
                 "tipo": st.column_config.TextColumn("Tipo"),
                 "instituicao": st.column_config.TextColumn("Instituição"),
                 "data_referencia": st.column_config.TextColumn("Data ref."),
-                "saldo_liquido": st.column_config.NumberColumn("Saldo líquido (R$)", format="R$ %.2f"),
+                "saldo_liquido": st.column_config.TextColumn("Saldo líquido (R$)"),
                 "rentabilidade_12m_pct": st.column_config.NumberColumn("Rent. 12m (%)", format="%.2f%%"),
                 "benchmark": st.column_config.TextColumn("Benchmark"),
                 "benchmark_12m_pct": st.column_config.NumberColumn("Benchmark 12m (%)", format="%.2f%%"),
@@ -718,7 +725,7 @@ with tab_orcamento:
         media_sugerida = media_gasto_map.get(categoria_limite)
         if media_sugerida:
             st.caption(
-                f"💡 Você gastou em média R$ {media_sugerida:,.2f}/mês nessa categoria nos "
+                f"💡 Você gastou em média {format_brl_md(media_sugerida)}/mês nessa categoria nos "
                 f"últimos meses — usamos como ponto de partida abaixo, ajuste se quiser."
             )
 
@@ -732,7 +739,7 @@ with tab_orcamento:
             if st.form_submit_button("Salvar limite", type="primary"):
                 if valor_limite > 0:
                     budget_repo.set_limit(categoria_limite, valor_limite)
-                    st.success(f"Limite de {categoria_limite} definido: R$ {valor_limite:,.2f}/mês.")
+                    st.success(f"Limite de {categoria_limite} definido: {format_brl_md(valor_limite)}/mês.")
                     st.rerun()
                 else:
                     st.warning("Informe um valor maior que zero.")
@@ -753,7 +760,7 @@ with tab_orcamento:
                 gasto = gasto_atual.get(row["category"], 0.0)
                 limite = row["limite_mensal"]
                 pct = min(gasto / limite, 1.0) if limite > 0 else 0.0
-                st.write(f"**{row['category']}** — R$ {gasto:,.2f} / R$ {limite:,.2f}")
+                st.write(f"**{row['category']}** — {format_brl_md(gasto)} / {format_brl_md(limite)}")
                 st.progress(pct)
                 if st.button(f"Remover limite de {row['category']}", key=f"rm_budget_{row['category']}"):
                     budget_repo.remove_limit(row["category"])
@@ -782,8 +789,8 @@ with tab_orcamento:
             for _, row in goals_df.iterrows():
                 progresso_pct = min(row["valor_acumulado"] / row["valor_necessario"] * 100, 100.0) if row["valor_necessario"] > 0 else 0.0
                 st.write(
-                    f"**{row['nome']}** — R$ {row['valor_acumulado']:,.2f} / "
-                    f"R$ {row['valor_necessario']:,.2f} ({progresso_pct:.0f}%) — prazo {row['prazo']}"
+                    f"**{row['nome']}** — {format_brl_md(row['valor_acumulado'])} / "
+                    f"{format_brl_md(row['valor_necessario'])} ({progresso_pct:.0f}%) — prazo {row['prazo']}"
                 )
                 st.progress(min(progresso_pct / 100, 1.0))
                 col_novo_valor, col_salvar, col_excluir = st.columns([2, 1, 1])
@@ -834,7 +841,7 @@ with tab_projecoes:
 
         if saldo_medio <= 0:
             st.warning(
-                f"Nos últimos meses seu saldo médio foi **R\\$ {saldo_medio:,.2f}/mês** — no "
+                f"Nos últimos meses seu saldo médio foi **{format_brl_md(saldo_medio)}/mês** — no "
                 f"ritmo atual, seu patrimônio não cresce. Ajustar isso é o primeiro passo antes "
                 f"de projetar crescimento (veja a aba Dashboard para identificar onde cortar)."
             )
@@ -852,9 +859,9 @@ with tab_projecoes:
                 rendimento_nota = ""
             patrimonio_final = projecao.iloc[-1]["patrimonio_projetado"]
             st.markdown(
-                f"No ritmo médio dos últimos 3 meses (**R\\$ {saldo_medio:,.2f}/mês** guardados){rendimento_nota}, "
-                f"seu patrimônio deve ir de **R\\$ {patrimonio_atual_proj:,.2f}** para "
-                f"**R\\$ {patrimonio_final:,.2f}** em {horizonte} meses."
+                f"No ritmo médio dos últimos 3 meses (**{format_brl_md(saldo_medio)}/mês** guardados){rendimento_nota}, "
+                f"seu patrimônio deve ir de **{format_brl_md(patrimonio_atual_proj)}** para "
+                f"**{format_brl_md(patrimonio_final)}** em {horizonte} meses."
             )
 
             hist_networth = ind.net_worth_history(asset_repo.get_all())
@@ -907,7 +914,7 @@ with tab_projecoes:
                     faltante = row["valor_necessario"] - row["valor_acumulado"]
                     st.error(
                         f"🔴 **{row['nome']}** — no ritmo atual de poupança, essa meta não é "
-                        f"atingida (faltam R\\$ {faltante:,.2f} e o saldo médio recente é zero ou "
+                        f"atingida (faltam {format_brl_md(faltante)} e o saldo médio recente é zero ou "
                         f"negativo)."
                     )
                 else:
@@ -971,7 +978,7 @@ with tab_diagnosticos:
                 render_fn = SEVERITY_RENDER[d.severidade]
                 icon = SEVERITY_ICON[d.severidade]
                 impacto = (
-                    f"\n\n**Impacto:** R\\$ {abs(d.impacto_financeiro):,.2f}"
+                    f"\n\n**Impacto:** {format_brl_md(abs(d.impacto_financeiro))}"
                     if d.impacto_financeiro is not None else ""
                 )
                 render_fn(

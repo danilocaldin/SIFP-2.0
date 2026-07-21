@@ -84,9 +84,9 @@ def test_report_contains_summary_values(summary, by_cat, by_merchant, monthly, d
         "Jun/2026", summary, by_cat, by_merchant, monthly, diagnostics, asset_positions, debt_transactions
     )
     assert "RELATÓRIO FINANCEIRO — Jun/2026" in report
-    assert "7,573.64" in report
-    assert "6,863.72" in report
-    assert "709.92" in report
+    assert "7.573,64" in report
+    assert "6.863,72" in report
+    assert "709,92" in report
     assert "9.4%" in report or "9.37" in report or "9.4" in report
 
 
@@ -95,7 +95,7 @@ def test_report_contains_categories(summary, by_cat, by_merchant, monthly, diagn
         "Jun/2026", summary, by_cat, by_merchant, monthly, diagnostics, asset_positions, debt_transactions
     )
     assert "Alimentação" in report
-    assert "2,535.45" in report
+    assert "2.535,45" in report
     assert "Transporte" in report
 
 
@@ -131,7 +131,7 @@ def test_report_contains_patrimonio_total(summary, by_cat, by_merchant, monthly,
         "Jun/2026", summary, by_cat, by_merchant, monthly, diagnostics, asset_positions, debt_transactions
     )
     assert "BTG CDB Plus FIRF CrPr" in report
-    assert "3,006.49" in report
+    assert "3.006,49" in report
 
 
 def test_report_contains_debts(summary, by_cat, by_merchant, monthly, diagnostics, asset_positions, debt_transactions):
@@ -139,7 +139,7 @@ def test_report_contains_debts(summary, by_cat, by_merchant, monthly, diagnostic
         "Jun/2026", summary, by_cat, by_merchant, monthly, diagnostics, asset_positions, debt_transactions
     )
     assert "Max Nelson Caldin" in report
-    assert "200.00" in report
+    assert "200,00" in report
 
 
 def test_report_handles_empty_sections_gracefully(summary, monthly):

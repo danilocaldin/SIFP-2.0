@@ -18,15 +18,13 @@ import pandas as pd
 
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
 from sifp.domain.models import Diagnostic, DiagnosticSeverity
+from sifp.services.formatting import format_brl_md as _brl
 
-
-def _brl(value: float) -> str:
-    """'R\\$ 1.234,56' com o '$' escapado: Streamlit (e qualquer markdown
-    baseado em markdown-it) trata um par de '$' como delimitador de
-    fórmula LaTeX — como as mensagens de diagnóstico costumam citar mais
-    de um valor em R$, sem escapar o texto quebra visivelmente. Formatar
-    aqui, na origem, evita que cada regra nova precise lembrar disso."""
-    return f"R\\$ {value:,.2f}"
+# _brl formata 'R\$ 1.234,56' (padrão brasileiro, '$' escapado): Streamlit
+# (e qualquer markdown baseado em markdown-it) trata um par de '$' como
+# delimitador de fórmula LaTeX — como as mensagens de diagnóstico costumam
+# citar mais de um valor em R$, sem escapar o texto quebra visivelmente.
+# Formatar aqui, na origem, evita que cada regra nova precise lembrar disso.
 
 
 # ---------------------------------------------------------------------
