@@ -1,0 +1,14 @@
+# Subconjunto de requirements.txt usado só pela imagem Docker da API
+# (sifp/api) em produção -- exclui streamlit, plotly, pytest e httpx
+# (usados só pelo app Streamlit e pela suíte de testes, não pela API em
+# runtime), pra manter a imagem de deploy menor e o build mais rápido.
+pandas>=2.2.0
+scikit-learn>=1.4.0
+joblib>=1.4.0
+python-dateutil>=2.9.0
+xlrd>=2.0.1
+openpyxl>=3.1.0
+pdfplumber>=0.11.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9

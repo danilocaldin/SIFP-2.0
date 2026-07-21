@@ -1,0 +1,16 @@
+.git
+.gitignore
+.claude
+frontend
+tests
+app.py
+requirements.txt
+*.db
+*.xls
+*.xlsx
+*.joblib
+*.pdf
+__pycache__
+*.pyc
+.pytest_cache
+node_modules
