@@ -12,20 +12,13 @@ fonte de dados, só reorganizada num documento único.
 import pandas as pd
 
 from sifp.domain.models import Diagnostic
+from sifp.services.formatting import unescape_currency as _plain
 
 _SEP = "-" * 60
 
 
 def _section(title: str) -> list[str]:
     return ["", title.upper(), _SEP]
-
-
-def _plain(text: str) -> str:
-    """Diagnostic.descricao/recomendacao vêm com '\\$' escapado (pensado
-    para o markdown do Streamlit — ver diagnostics._brl). Este relatório
-    é texto puro, sem parser de markdown, então o escape sobraria como
-    uma barra invertida visível no arquivo exportado."""
-    return text.replace("\\$", "$")
 
 
 def generate_text_report(

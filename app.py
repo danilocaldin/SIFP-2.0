@@ -29,8 +29,10 @@ from sifp.repositories.goal_repository import GoalRepository
 from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services import indicator_service as ind
 from sifp.services import projection_service as proj
+from sifp.services.formatting import formatar_mes
 from sifp.services.import_service import ImportService
 from sifp.services.report_service import generate_text_report
+from sifp.services.summary_service import SummaryService
 
 st.set_page_config(
     page_title="Inteligência Financeira Pessoal",
@@ -46,6 +48,7 @@ asset_repo = AssetRepository()
 budget_repo = BudgetRepository()
 goal_repo = GoalRepository()
 investment_importer = BTGInvestmentImporter()
+summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo)
 
 # ---------------------------------------------------------------------
 # Estado da sessão
@@ -79,11 +82,6 @@ COLOR_DESPESA = "#d03b3b"
 COLOR_SALDO = "#2a78d6"
 BLUE_SEQUENTIAL = ["#cde2fb", "#6da7ec", "#2a78d6", "#0d366b"]
 
-MESES_PT = {
-    1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr", 5: "Mai", 6: "Jun",
-    7: "Jul", 8: "Ago", 9: "Set", 10: "Out", 11: "Nov", 12: "Dez",
-}
-
 SEVERITY_ICON = {
     DiagnosticSeverity.CRITICA: "🔴",
     DiagnosticSeverity.ALTA: "🟠",
@@ -98,43 +96,11 @@ SEVERITY_RENDER = {
 }
 
 
-def _formatar_mes(periodo_str: str) -> str:
-    """'2026-06' -> 'Jun/2026'"""
-    ano, mes = periodo_str.split("-")
-    return f"{MESES_PT[int(mes)]}/{ano}"
+_formatar_mes = formatar_mes
 
 
 def _delta_str(pct: float | None) -> str | None:
     return None if pct is None else f"{pct:+.0f}% vs mês anterior"
-
-
-def _diagnostics_for_month(all_tx_full: pd.DataFrame, all_tx_real: pd.DataFrame, month: str, month_label: str):
-    """Roda o motor de diagnósticos (Módulo 10) para um mês específico.
-    Compartilhada pelas abas Resumo, Diagnósticos e Relatório para que as
-    três sempre leiam exatamente os mesmos critérios."""
-    monthly = ind.monthly_evolution(all_tx_real)
-    period_df = all_tx_real[all_tx_real["month"] == month]
-    summary = ind.period_summary(period_df)
-    by_cat = ind.category_breakdown(period_df)
-    latest_assets = asset_repo.get_latest_positions()
-    patrimonio_total = float(latest_assets["saldo_liquido"].sum()) if not latest_assets.empty else 0.0
-    despesa_media_mensal = float(monthly["Despesas"].mean()) if not monthly.empty else 0.0
-
-    return diag.run_diagnostics(
-        monthly=monthly,
-        latest_summary=summary,
-        latest_period_label=month_label,
-        latest_by_cat=by_cat,
-        all_tx=all_tx_full,
-        patrimonio_total=patrimonio_total,
-        despesa_media_mensal=despesa_media_mensal,
-        budget_limits=budget_repo.get_limits_dict(),
-        goals=goal_repo.get_all(),
-        latest_assets=latest_assets,
-        category_trend_df=ind.category_trend(all_tx_real),
-        weekend_stats=ind.weekend_vs_weekday_spending(all_tx_real),
-        balance_stats=ind.average_balance(balance_repo.get_all()),
-    )
 
 
 st.title("💰 Inteligência Financeira Pessoal")
@@ -154,61 +120,28 @@ st.caption("Upload de extratos • Categorização automática (regras + Machine
 with tab_resumo:
     st.subheader("Como você está agora")
 
-    all_tx_home = transaction_repo.get_all()
+    resumo = summary_service.build_resumo(_formatar_mes)
 
-    if all_tx_home.empty:
+    if not resumo["has_data"]:
         st.info("Ainda não há dados importados. Comece pela aba **Upload**.")
     else:
-        all_tx_home["date"] = pd.to_datetime(all_tx_home["date"])
-        all_tx_home["month"] = all_tx_home["date"].dt.to_period("M").astype(str)
-        all_tx_home_real = ind.exclude_self_transfers(all_tx_home)
-
-        monthly_home = ind.monthly_evolution(all_tx_home_real)
-        latest_month_home = monthly_home.iloc[-1]["month"]
-        latest_label_home = _formatar_mes(latest_month_home)
-        latest_df_home = all_tx_home_real[all_tx_home_real["month"] == latest_month_home]
-        summary_home = ind.period_summary(latest_df_home)
-
-        months_sorted_home = sorted(all_tx_home_real["month"].unique())
-        prev_summary_home = None
-        idx_home = months_sorted_home.index(latest_month_home)
-        if idx_home > 0:
-            df_prev_home = all_tx_home_real[all_tx_home_real["month"] == months_sorted_home[idx_home - 1]]
-            prev_summary_home = ind.period_summary(df_prev_home)
-        delta_home = ind.month_over_month_delta(summary_home, prev_summary_home)
-
-        latest_assets_home = asset_repo.get_latest_positions()
-        patrimonio_total_home = (
-            float(latest_assets_home["saldo_liquido"].sum()) if not latest_assets_home.empty else 0.0
-        )
-
-        # Rentabilidade real do mês (não a variação bruta do saldo entre
-        # snapshots) — esse fundo recebe aportes/resgates com frequência, e a
-        # variação bruta do saldo mistura "rendeu" com "você colocou/tirou
-        # dinheiro", o que soa como um desempenho de investimento que não
-        # existiu. Rentabilidade de cota já isola esse efeito.
-        taxa_mes_home = proj.weighted_avg_rentabilidade(latest_assets_home, campo="rentabilidade_mes_pct")
-        benchmarks_home = latest_assets_home["benchmark"].dropna().unique() if not latest_assets_home.empty else []
-        benchmark_mes_home = (
-            proj.weighted_avg_rentabilidade(latest_assets_home, campo="benchmark_mes_pct")
-            if len(benchmarks_home) == 1 else None
-        )
+        saldo_home, taxa_home = resumo["saldo"], resumo["taxa_poupanca_pct"]
+        patrimonio_total_home, latest_label_home = resumo["patrimonio_total"], resumo["mes_label"]
 
         # ---- Frase-headline: interpreta antes de mostrar números soltos ----
-        saldo_home, taxa_home = summary_home["saldo"], summary_home["taxa_poupanca"]
         frases = []
         if patrimonio_total_home > 0:
             frases.append(f"Seu patrimônio é **R\\$ {patrimonio_total_home:,.2f}**.")
-            if taxa_mes_home is not None:
-                if benchmark_mes_home is not None:
-                    comparacao = "acima" if taxa_mes_home >= benchmark_mes_home else "abaixo"
+            if resumo["taxa_mes_pct"] is not None:
+                if resumo["benchmark_mes_pct"] is not None:
+                    comparacao = "acima" if resumo["taxa_mes_pct"] >= resumo["benchmark_mes_pct"] else "abaixo"
                     frases.append(
-                        f"Seus investimentos renderam **{taxa_mes_home:.2f}%** em {latest_label_home} "
-                        f"— **{comparacao}** de {benchmarks_home[0]} ({benchmark_mes_home:.2f}%)."
+                        f"Seus investimentos renderam **{resumo['taxa_mes_pct']:.2f}%** em {latest_label_home} "
+                        f"— **{comparacao}** de {resumo['benchmark_nome']} ({resumo['benchmark_mes_pct']:.2f}%)."
                     )
                 else:
                     frases.append(
-                        f"Seus investimentos renderam **{taxa_mes_home:.2f}%** em {latest_label_home}."
+                        f"Seus investimentos renderam **{resumo['taxa_mes_pct']:.2f}%** em {latest_label_home}."
                     )
         if saldo_home >= 0:
             frases.append(
@@ -225,16 +158,14 @@ with tab_resumo:
         col1.metric("Patrimônio total", f"R$ {patrimonio_total_home:,.2f}")
         col2.metric(
             f"Saldo em {latest_label_home}", f"R$ {saldo_home:,.2f}",
-            delta=_delta_str(delta_home["saldo"]),
+            delta=_delta_str(resumo["delta_saldo_pct"]),
         )
         col3.metric("Taxa de poupança", f"{taxa_home:.0f}%")
 
         st.divider()
         st.markdown("**O que mais importa agora**")
 
-        diagnostics_home = _diagnostics_for_month(
-            all_tx_home, all_tx_home_real, latest_month_home, latest_label_home
-        )
+        diagnostics_home = resumo["diagnostics"]
         if not diagnostics_home:
             st.success(
                 "✅ Nada pedindo atenção agora — suas finanças estão dentro dos "
@@ -242,33 +173,25 @@ with tab_resumo:
             )
         else:
             top = diagnostics_home[0]  # run_diagnostics já devolve ordenado por prioridade
-            render_fn = SEVERITY_RENDER[top.severidade]
-            icon = SEVERITY_ICON[top.severidade]
+            severidade_top = DiagnosticSeverity(top["severidade"])
+            render_fn = SEVERITY_RENDER[severidade_top]
+            icon = SEVERITY_ICON[severidade_top]
             impacto = (
-                f"\n\n**Impacto:** R\\$ {abs(top.impacto_financeiro):,.2f}"
-                if top.impacto_financeiro is not None else ""
+                f"\n\n**Impacto:** R\\$ {abs(top['impacto_financeiro']):,.2f}"
+                if top["impacto_financeiro"] is not None else ""
             )
             render_fn(
-                f"{icon} **{top.titulo}**\n\n{top.descricao}\n\n"
-                f"*Recomendação:* {top.recomendacao}{impacto}"
+                f"{icon} **{top['titulo']}**\n\n{top['descricao']}\n\n"
+                f"*Recomendação:* {top['recomendacao']}{impacto}"
             )
             restantes = len(diagnostics_home) - 1
             if restantes > 0:
                 st.caption(f"+ {restantes} outro(s) ponto(s) de atenção na aba 🩺 Diagnósticos.")
 
-        saldo_medio_home = proj.average_monthly_saldo(monthly_home, janela=3)
-        if saldo_medio_home > 0:
-            taxa_home_proj = proj.weighted_avg_rentabilidade(latest_assets_home)
-            if taxa_home_proj is not None:
-                proj_12m_home = proj.project_patrimonio_com_rendimento(
-                    patrimonio_total_home, saldo_medio_home, taxa_home_proj, meses=12
-                )
-            else:
-                proj_12m_home = proj.project_patrimonio(patrimonio_total_home, saldo_medio_home, meses=12)
-            patrimonio_12m_home = proj_12m_home.iloc[-1]["patrimonio_projetado"]
+        if resumo["saldo_medio_3m"] > 0 and resumo["projecao_12m"] is not None:
             st.caption(
                 f"📈 No ritmo atual, seu patrimônio deve chegar perto de "
-                f"**R\\$ {patrimonio_12m_home:,.2f}** em 12 meses. Veja a aba 🔮 Projeções para mais detalhes."
+                f"**R\\$ {resumo['projecao_12m']:,.2f}** em 12 meses. Veja a aba 🔮 Projeções para mais detalhes."
             )
         else:
             st.caption(
@@ -1022,7 +945,7 @@ with tab_diagnosticos:
         latest_month = monthly_diag.iloc[-1]["month"]
         latest_month_label = _formatar_mes(latest_month)
 
-        diagnostics = _diagnostics_for_month(all_tx_diag, all_tx_diag_real, latest_month, latest_month_label)
+        diagnostics = summary_service.diagnostics_for_month(all_tx_diag, all_tx_diag_real, latest_month, latest_month_label)
 
         if not diagnostics:
             st.success(
@@ -1094,7 +1017,7 @@ with tab_relatorio:
         monthly_rel = ind.monthly_evolution(all_tx_rel_real)
         latest_assets_rel = asset_repo.get_latest_positions()
 
-        diagnostics_rel = _diagnostics_for_month(all_tx_rel, all_tx_rel_real, selected_month_rel, period_label_rel)
+        diagnostics_rel = summary_service.diagnostics_for_month(all_tx_rel, all_tx_rel_real, selected_month_rel, period_label_rel)
 
         debt_transactions_rel = period_df_rel[period_df_rel["category"] == "Dívida"]
 

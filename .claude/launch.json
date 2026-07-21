@@ -6,6 +6,12 @@
       "runtimeExecutable": "streamlit",
       "runtimeArgs": ["run", "app.py", "--server.headless", "true"],
       "port": 8501
+    },
+    {
+      "name": "sifp-api",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "sifp.api.main:app", "--port", "8000"],
+      "port": 8000
     }
   ]
 }
