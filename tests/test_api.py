@@ -72,3 +72,14 @@ def test_patrimonio_import_rejects_unparseable_pdf():
         files={"file": ("extrato.pdf", b"isso nao e um pdf valido", "application/pdf")},
     )
     assert resp.status_code == 400
+
+
+def test_projecoes_returns_json_with_has_data_flag():
+    resp = client.get("/api/projecoes")
+    assert resp.status_code == 200
+    assert "has_data" in resp.json()
+
+
+def test_projecoes_rejects_invalid_horizonte():
+    resp = client.get("/api/projecoes?horizonte=7")
+    assert resp.status_code == 400

@@ -119,3 +119,39 @@ export interface PatrimonioEmpty {
 }
 
 export type Patrimonio = PatrimonioData | PatrimonioEmpty;
+
+// Espelha GET /api/projecoes (sifp/services/projecoes_service.py).
+
+export interface ProjectionChartPoint {
+  data: string;
+  patrimonio: number;
+  tipo: "historico" | "projecao";
+}
+
+export interface GoalProjection {
+  id: number;
+  nome: string;
+  valor_necessario: number;
+  valor_acumulado: number;
+  prazo: string;
+  eta_meses: number | null;
+  data_prevista: string | null;
+  dentro_do_prazo: boolean | null;
+}
+
+export interface ProjecoesData {
+  has_data: true;
+  saldo_medio_3m: number;
+  patrimonio_atual: number;
+  taxa_rentabilidade_12m: number | null;
+  horizonte: number;
+  patrimonio_final: number | null;
+  chart: ProjectionChartPoint[];
+  goals: GoalProjection[];
+}
+
+export interface ProjecoesEmpty {
+  has_data: false;
+}
+
+export type Projecoes = ProjecoesData | ProjecoesEmpty;

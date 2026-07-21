@@ -27,6 +27,7 @@ from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services.dashboard_service import DashboardService
 from sifp.services.formatting import formatar_mes, unescape_currency
 from sifp.services.patrimonio_service import PatrimonioService
+from sifp.services.projecoes_service import ProjecoesService
 from sifp.services.summary_service import SummaryService
 
 init_db()
@@ -40,6 +41,7 @@ investment_importer = BTGInvestmentImporter()
 summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo)
 dashboard_service = DashboardService(transaction_repo, balance_repo)
 patrimonio_service = PatrimonioService(asset_repo, investment_importer)
+projecoes_service = ProjecoesService(transaction_repo, asset_repo, goal_repo)
 
 app = FastAPI(title="SIFP API")
 
@@ -104,3 +106,10 @@ def patrimonio_import(file: UploadFile):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"inserted": n}
+
+
+@app.get("/api/projecoes")
+def projecoes(horizonte: int = 12):
+    if horizonte not in (6, 12, 24):
+        raise HTTPException(status_code=400, detail="horizonte deve ser 6, 12 ou 24.")
+    return projecoes_service.build_projecoes(horizonte)

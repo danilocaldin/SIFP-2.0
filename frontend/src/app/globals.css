@@ -78,6 +78,7 @@
   --chart-saldo: #2a78d6;
   --chart-receita: #008300;
   --chart-despesa: #e34948;
+  --chart-projecao: #e87ba4;
   --chart-grid: #e1e0d9;
   --chart-axis: #898781;
   /* Rampa sequencial azul (magnitude), do menor pro maior valor. */
@@ -125,6 +126,7 @@
   --chart-saldo: #3987e5;
   --chart-receita: #008300;
   --chart-despesa: #e66767;
+  --chart-projecao: #d55181;
   --chart-grid: #2c2c2a;
   --chart-axis: #898781;
   /* Superfície escura: evita os passos mais escuros da rampa (somem no fundo). */

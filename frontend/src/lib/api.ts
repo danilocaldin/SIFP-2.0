@@ -1,4 +1,4 @@
-import type { Dashboard, Patrimonio, Resumo } from "@/lib/types";
+import type { Dashboard, Patrimonio, Projecoes, Resumo } from "@/lib/types";
 
 // Server Components rodam no processo Node do Next, então este fetch é
 // servidor-para-servidor — nunca passa pelo navegador, não precisa de CORS.
@@ -32,6 +32,16 @@ export async function getPatrimonio(): Promise<Patrimonio> {
   const res = await fetch(`${API_URL}/api/patrimonio`, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(`Falha ao buscar /api/patrimonio: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getProjecoes(horizonte: number = 12): Promise<Projecoes> {
+  const url = new URL(`${API_URL}/api/projecoes`);
+  url.searchParams.set("horizonte", String(horizonte));
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Falha ao buscar /api/projecoes: ${res.status}`);
   }
   return res.json();
 }
