@@ -6,10 +6,16 @@ banco hoje é SQLite — trocar por PostgreSQL no futuro (Módulo 5) significa
 mexer só aqui e nos repositories, nunca em services/intelligence/UI.
 """
 
+import os
 import sqlite3
 from pathlib import Path
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "financas.db"
+_LOCAL_DB_PATH = Path(__file__).resolve().parents[2] / "financas.db"
+
+# SIFP_DB_PATH permite apontar pro caminho de um volume persistente em
+# produção (ex: Railway) sem mexer em nenhum call site — todo repository
+# já usa DEFAULT_DB_PATH como valor padrão do parâmetro db_path.
+DEFAULT_DB_PATH = Path(os.environ["SIFP_DB_PATH"]) if os.environ.get("SIFP_DB_PATH") else _LOCAL_DB_PATH
 
 # Migrações leves: cada entrada é (coluna, DDL). Aplicadas apenas se a
 # coluna ainda não existir, então bancos antigos ganham as colunas novas
