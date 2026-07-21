@@ -230,3 +230,92 @@ def test_upload_persist_inserts_and_dedupes_without_corrupting_real_data():
 
     all_tx = TransactionRepository().get_all()
     assert fake_desc not in all_tx["description"].values
+
+
+def test_revisao_returns_json_with_has_data_flag():
+    resp = client.get("/api/revisao")
+    assert resp.status_code == 200
+    assert "has_data" in resp.json()
+
+
+def test_revisao_lote_marks_pending_establishment_as_confirmed():
+    fake_desc = "[PYTEST] ESTABELECIMENTO TEMPORARIO REVISAO LOTE"
+    csv_content = f"Data;Descrição;Valor\n01/01/2000;{fake_desc};-9,99\n".encode("utf-8-sig")
+    tx_hash = make_tx_hash("2000-01-01 00:00", fake_desc, -9.99)
+
+    try:
+        resp_upload = client.post(
+            "/api/upload/persist",
+            files={"file": ("extrato.csv", io.BytesIO(csv_content), "text/csv")},
+        )
+        assert resp_upload.json()["inseridas"] == 1
+
+        # o modelo de ML real (já treinado) prevê ALGUMA categoria pra
+        # qualquer texto, mesmo sem sentido (não tem opção "não sei") —
+        # força "Não categorizado" direto no banco pra testar o endpoint
+        # de lote isoladamente do que o classificador decidiu prever.
+        conn_setup = get_connection(DEFAULT_DB_PATH)
+        conn_setup.execute(
+            "UPDATE transactions SET category = 'Não categorizado' WHERE tx_hash = ?", (tx_hash,)
+        )
+        conn_setup.commit()
+        conn_setup.close()
+
+        resp_lote = client.post("/api/revisao/lote", json={"description": fake_desc, "category": "Mercado"})
+        assert resp_lote.status_code == 200
+        assert resp_lote.json()["atualizadas"] == 1
+
+        all_tx = TransactionRepository().get_all()
+        row = all_tx[all_tx["tx_hash"] == tx_hash].iloc[0]
+        assert row["category"] == "Mercado"
+        assert row["human_confirmed"] == 1
+    finally:
+        conn = get_connection(DEFAULT_DB_PATH)
+        conn.execute("DELETE FROM transactions WHERE tx_hash = ?", (tx_hash,))
+        conn.commit()
+        conn.close()
+        # re-treina sem a linha de teste, pra não deixar o modelo salvo em
+        # disco (categorizer_model.joblib) contaminado com um exemplo falso
+        client.post("/api/revisao/retreinar")
+
+    all_tx_final = TransactionRepository().get_all()
+    assert fake_desc not in all_tx_final["description"].values
+
+
+def test_revisao_lote_sem_pendencia_retorna_404():
+    resp = client.post("/api/revisao/lote", json={"description": "Descricao Que Nao Existe Nunca", "category": "Mercado"})
+    assert resp.status_code == 404
+
+
+def test_revisao_confirmar_atualiza_categoria_por_tx_hash():
+    fake_desc = "[PYTEST] TRANSACAO TEMPORARIA REVISAO CONFIRMAR"
+    csv_content = f"Data;Descrição;Valor\n01/01/2000;{fake_desc};-4,56\n".encode("utf-8-sig")
+    tx_hash = make_tx_hash("2000-01-01 00:00", fake_desc, -4.56)
+
+    try:
+        resp_upload = client.post(
+            "/api/upload/persist",
+            files={"file": ("extrato.csv", io.BytesIO(csv_content), "text/csv")},
+        )
+        assert resp_upload.json()["inseridas"] == 1
+
+        resp_confirmar = client.post(
+            "/api/revisao/confirmar", json={"updates": [{"tx_hash": tx_hash, "category": "Lazer"}]}
+        )
+        assert resp_confirmar.status_code == 200
+        body = resp_confirmar.json()
+        assert body["confirmadas"] == 1
+        assert body["ainda_pendentes"] == 0
+
+        all_tx = TransactionRepository().get_all()
+        row = all_tx[all_tx["tx_hash"] == tx_hash].iloc[0]
+        assert row["category"] == "Lazer"
+    finally:
+        conn = get_connection(DEFAULT_DB_PATH)
+        conn.execute("DELETE FROM transactions WHERE tx_hash = ?", (tx_hash,))
+        conn.commit()
+        conn.close()
+        client.post("/api/revisao/retreinar")
+
+    all_tx_final = TransactionRepository().get_all()
+    assert fake_desc not in all_tx_final["description"].values

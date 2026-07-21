@@ -6,6 +6,7 @@ import type {
   Projecoes,
   Relatorio,
   Resumo,
+  Revisao,
   UploadPersistSummary,
   UploadPreview,
 } from "@/lib/types";
@@ -68,6 +69,14 @@ export async function getMetas(): Promise<Goal[]> {
   const res = await fetch(`${API_URL}/api/metas`, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(`Falha ao buscar /api/metas: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getRevisao(): Promise<Revisao> {
+  const res = await fetch(`${API_URL}/api/revisao`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Falha ao buscar /api/revisao: ${res.status}`);
   }
   return res.json();
 }
@@ -145,5 +154,36 @@ export async function persistUpload(file: File): Promise<UploadPersistSummary> {
   formData.append("file", file);
   const res = await fetch(`${PUBLIC_API_URL}/api/upload/persist`, { method: "POST", body: formData });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao importar o arquivo."));
+  return res.json();
+}
+
+export async function aplicarCategoriaEmLote(
+  description: string,
+  category: string
+): Promise<{ atualizadas: number; mensagem_treino: string }> {
+  const res = await fetch(`${PUBLIC_API_URL}/api/revisao/lote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ description, category }),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao aplicar categoria em lote."));
+  return res.json();
+}
+
+export async function confirmarRevisao(
+  updates: { tx_hash: string; category: string }[]
+): Promise<{ confirmadas: number; ainda_pendentes: number; mensagem_treino: string }> {
+  const res = await fetch(`${PUBLIC_API_URL}/api/revisao/confirmar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ updates }),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao confirmar a revisão."));
+  return res.json();
+}
+
+export async function retreinarModelo(): Promise<{ mensagem: string }> {
+  const res = await fetch(`${PUBLIC_API_URL}/api/revisao/retreinar`, { method: "POST" });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao re-treinar o modelo."));
   return res.json();
 }

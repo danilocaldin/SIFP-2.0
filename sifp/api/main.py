@@ -19,6 +19,7 @@ from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
 from sifp.importers.btg_importer import BTGImporter
 from sifp.importers.btg_investment_importer import BTGInvestmentImporter
 from sifp.intelligence.categorization import CategorizationService
@@ -35,6 +36,7 @@ from sifp.services.orcamento_service import OrcamentoService
 from sifp.services.patrimonio_service import PatrimonioService
 from sifp.services.projecoes_service import ProjecoesService
 from sifp.services.relatorio_service import RelatorioService
+from sifp.services.revisao_service import RevisaoService
 from sifp.services.summary_service import SummaryService
 
 init_db()
@@ -61,6 +63,7 @@ patrimonio_service = PatrimonioService(asset_repo, investment_importer)
 projecoes_service = ProjecoesService(transaction_repo, asset_repo, goal_repo)
 orcamento_service = OrcamentoService(transaction_repo, budget_repo)
 relatorio_service = RelatorioService(transaction_repo, asset_repo, summary_service)
+revisao_service = RevisaoService(transaction_repo)
 
 
 def _refresh_model() -> str:
@@ -242,3 +245,49 @@ def upload_persist(file: UploadFile):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return summary
+
+
+@app.get("/api/revisao")
+def revisao():
+    return revisao_service.build_revisao()
+
+
+class RevisaoLoteIn(BaseModel):
+    description: str
+    category: str
+
+
+@app.post("/api/revisao/lote")
+def revisao_lote(body: RevisaoLoteIn):
+    n = revisao_service.bulk_apply_by_description(body.description, body.category)
+    if n == 0:
+        raise HTTPException(status_code=404, detail="Nenhuma transação pendente encontrada com essa descrição.")
+    msg = _refresh_model()
+    return {"atualizadas": n, "mensagem_treino": msg}
+
+
+class RevisaoUpdate(BaseModel):
+    tx_hash: str
+    category: str
+
+
+class RevisaoConfirmarIn(BaseModel):
+    updates: list[RevisaoUpdate]
+
+
+@app.post("/api/revisao/confirmar")
+def revisao_confirmar(body: RevisaoConfirmarIn):
+    updates = [(u.tx_hash, u.category) for u in body.updates]
+    transaction_repo.bulk_update_categories(updates)
+    msg = _refresh_model()
+    n_pending = sum(1 for _, c in updates if c == CATEGORIA_NAO_CATEGORIZADO)
+    return {
+        "confirmadas": len(updates) - n_pending,
+        "ainda_pendentes": n_pending,
+        "mensagem_treino": msg,
+    }
+
+
+@app.post("/api/revisao/retreinar")
+def revisao_retreinar():
+    return {"mensagem": _refresh_model()}

@@ -219,3 +219,36 @@ export interface UploadPersistSummary {
   ignoradas_duplicadas: number;
   saldos_gravados: number;
 }
+
+// Espelha GET /api/revisao (sifp/services/revisao_service.py).
+
+export interface RevisaoTransaction {
+  tx_hash: string;
+  date: string;
+  description: string;
+  value: number;
+  bank_category: string;
+  situacao: string;
+  category: string;
+  confidence: number;
+}
+
+export interface RevisaoLotePendente {
+  descricao: string;
+  quantidade: number;
+}
+
+export interface RevisaoData {
+  has_data: true;
+  total: number;
+  categorias: string[];
+  categoria_nao_categorizada: string;
+  transactions: RevisaoTransaction[];
+  lote_pendentes: RevisaoLotePendente[];
+}
+
+export interface RevisaoEmpty {
+  has_data: false;
+}
+
+export type Revisao = RevisaoData | RevisaoEmpty;
