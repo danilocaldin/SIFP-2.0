@@ -1,0 +1,26 @@
+# Dados reais e artefatos gerados — nunca versionar (dados financeiros pessoais)
+financas.db
+*.db
+categorizer_model.joblib
+
+# Extratos originais enviados pelo usuário (CSV/XLS/XLSX/PDF do BTG)
+*.xls
+*.xlsx
+Extrato_*.csv
+0042*.pdf
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Outros arquivos soltos no diretório, não fazem parte do projeto
+Claude Setup.exe
+files.zip
+
+# Config local do Claude Code (por máquina, pode conter caminhos/nomes de
+# arquivo locais — não é código do projeto)
+.claude/settings.local.json
