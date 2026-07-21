@@ -88,3 +88,34 @@ export interface DashboardEmpty {
 }
 
 export type Dashboard = DashboardData | DashboardEmpty;
+
+// Espelha GET /api/patrimonio (sifp/services/patrimonio_service.py).
+
+export interface AssetPosition {
+  nome: string;
+  tipo: string;
+  instituicao: string;
+  data_referencia: string;
+  saldo_liquido: number;
+  rentabilidade_12m_pct: number | null;
+  benchmark: string | null;
+  benchmark_12m_pct: number | null;
+}
+
+export interface NetWorthPoint {
+  data_referencia: string;
+  patrimonio_total: number;
+}
+
+export interface PatrimonioData {
+  has_data: true;
+  patrimonio_total: number;
+  assets: AssetPosition[];
+  net_worth_history: NetWorthPoint[];
+}
+
+export interface PatrimonioEmpty {
+  has_data: false;
+}
+
+export type Patrimonio = PatrimonioData | PatrimonioEmpty;

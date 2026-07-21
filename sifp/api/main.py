@@ -14,9 +14,10 @@ Rodar com:
 
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+from sifp.importers.btg_investment_importer import BTGInvestmentImporter
 from sifp.repositories.asset_repository import AssetRepository
 from sifp.repositories.balance_repository import BalanceRepository
 from sifp.repositories.budget_repository import BudgetRepository
@@ -25,6 +26,7 @@ from sifp.repositories.goal_repository import GoalRepository
 from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services.dashboard_service import DashboardService
 from sifp.services.formatting import formatar_mes, unescape_currency
+from sifp.services.patrimonio_service import PatrimonioService
 from sifp.services.summary_service import SummaryService
 
 init_db()
@@ -34,8 +36,10 @@ balance_repo = BalanceRepository()
 asset_repo = AssetRepository()
 budget_repo = BudgetRepository()
 goal_repo = GoalRepository()
+investment_importer = BTGInvestmentImporter()
 summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo)
 dashboard_service = DashboardService(transaction_repo, balance_repo)
+patrimonio_service = PatrimonioService(asset_repo, investment_importer)
 
 app = FastAPI(title="SIFP API")
 
@@ -84,3 +88,19 @@ def resumo():
 @app.get("/api/dashboard")
 def dashboard(month: str | None = None):
     return dashboard_service.build_dashboard(month, formatar_mes)
+
+
+@app.get("/api/patrimonio")
+def patrimonio():
+    return patrimonio_service.build_patrimonio()
+
+
+@app.post("/api/patrimonio/import")
+def patrimonio_import(file: UploadFile):
+    if not investment_importer.supports(file.filename or ""):
+        raise HTTPException(status_code=400, detail="Envie um arquivo PDF do extrato de investimento.")
+    try:
+        n = patrimonio_service.import_pdf(file.file)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"inserted": n}
