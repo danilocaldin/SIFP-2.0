@@ -1,4 +1,4 @@
-import type { Dashboard, Patrimonio, Projecoes, Resumo } from "@/lib/types";
+import type { Dashboard, Goal, OrcamentoData, Patrimonio, Projecoes, Resumo } from "@/lib/types";
 
 // Server Components rodam no processo Node do Next, então este fetch é
 // servidor-para-servidor — nunca passa pelo navegador, não precisa de CORS.
@@ -44,4 +44,70 @@ export async function getProjecoes(horizonte: number = 12): Promise<Projecoes> {
     throw new Error(`Falha ao buscar /api/projecoes: ${res.status}`);
   }
   return res.json();
+}
+
+export async function getOrcamento(): Promise<OrcamentoData> {
+  const res = await fetch(`${API_URL}/api/orcamento`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Falha ao buscar /api/orcamento: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getMetas(): Promise<Goal[]> {
+  const res = await fetch(`${API_URL}/api/metas`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Falha ao buscar /api/metas: ${res.status}`);
+  }
+  return res.json();
+}
+
+// --- Mutações: chamadas do navegador (Client Components), usam PUBLIC_API_URL ---
+
+async function parseErrorDetail(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json();
+    return body.detail ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function criarLimite(category: string, valor: number): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}/api/orcamento/limites`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ category, valor }),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao salvar o limite."));
+}
+
+export async function removerLimite(category: string): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}/api/orcamento/limites/${encodeURIComponent(category)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao remover o limite."));
+}
+
+export async function criarMeta(nome: string, valorNecessario: number, prazo: string): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}/api/metas`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nome, valor_necessario: valorNecessario, prazo }),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao criar a meta."));
+}
+
+export async function atualizarProgressoMeta(id: number, valorAcumulado: number): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}/api/metas/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ valor_acumulado: valorAcumulado }),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao atualizar a meta."));
+}
+
+export async function excluirMeta(id: number): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}/api/metas/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao excluir a meta."));
 }

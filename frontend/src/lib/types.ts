@@ -155,3 +155,27 @@ export interface ProjecoesEmpty {
 }
 
 export type Projecoes = ProjecoesData | ProjecoesEmpty;
+
+// Espelha GET /api/orcamento (sifp/services/orcamento_service.py) e
+// GET /api/metas (CRUD direto sobre GoalRepository).
+
+export interface BudgetLimit {
+  category: string;
+  limite_mensal: number;
+  gasto_atual: number;
+}
+
+export interface OrcamentoData {
+  categorias: string[];
+  sugestoes: Record<string, number>;
+  limites: BudgetLimit[];
+}
+
+export interface Goal {
+  id: number;
+  nome: string;
+  valor_necessario: number;
+  valor_acumulado: number;
+  prazo: string;
+  criado_em: string;
+}

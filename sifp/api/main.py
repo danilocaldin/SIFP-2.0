@@ -16,6 +16,7 @@ import os
 
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from sifp.importers.btg_investment_importer import BTGInvestmentImporter
 from sifp.repositories.asset_repository import AssetRepository
@@ -26,6 +27,7 @@ from sifp.repositories.goal_repository import GoalRepository
 from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services.dashboard_service import DashboardService
 from sifp.services.formatting import formatar_mes, unescape_currency
+from sifp.services.orcamento_service import OrcamentoService
 from sifp.services.patrimonio_service import PatrimonioService
 from sifp.services.projecoes_service import ProjecoesService
 from sifp.services.summary_service import SummaryService
@@ -42,6 +44,7 @@ summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, bud
 dashboard_service = DashboardService(transaction_repo, balance_repo)
 patrimonio_service = PatrimonioService(asset_repo, investment_importer)
 projecoes_service = ProjecoesService(transaction_repo, asset_repo, goal_repo)
+orcamento_service = OrcamentoService(transaction_repo, budget_repo)
 
 app = FastAPI(title="SIFP API")
 
@@ -113,3 +116,62 @@ def projecoes(horizonte: int = 12):
     if horizonte not in (6, 12, 24):
         raise HTTPException(status_code=400, detail="horizonte deve ser 6, 12 ou 24.")
     return projecoes_service.build_projecoes(horizonte)
+
+
+class LimiteIn(BaseModel):
+    category: str
+    valor: float
+
+
+@app.get("/api/orcamento")
+def orcamento():
+    return orcamento_service.build_orcamento()
+
+
+@app.post("/api/orcamento/limites")
+def criar_limite(body: LimiteIn):
+    if body.valor <= 0:
+        raise HTTPException(status_code=400, detail="Informe um valor maior que zero.")
+    budget_repo.set_limit(body.category, body.valor)
+    return {"ok": True}
+
+
+@app.delete("/api/orcamento/limites/{category}")
+def remover_limite(category: str):
+    budget_repo.remove_limit(category)
+    return {"ok": True}
+
+
+class GoalIn(BaseModel):
+    nome: str
+    valor_necessario: float
+    prazo: str  # "YYYY-MM-DD"
+
+
+class GoalProgressIn(BaseModel):
+    valor_acumulado: float
+
+
+@app.get("/api/metas")
+def listar_metas():
+    return goal_repo.get_all().to_dict("records")
+
+
+@app.post("/api/metas")
+def criar_meta(body: GoalIn):
+    if not body.nome or body.valor_necessario <= 0:
+        raise HTTPException(status_code=400, detail="Preencha o nome e um valor maior que zero.")
+    goal_id = goal_repo.create(body.nome, body.valor_necessario, body.prazo)
+    return {"id": goal_id}
+
+
+@app.patch("/api/metas/{goal_id}")
+def atualizar_progresso_meta(goal_id: int, body: GoalProgressIn):
+    goal_repo.update_progress(goal_id, body.valor_acumulado)
+    return {"ok": True}
+
+
+@app.delete("/api/metas/{goal_id}")
+def excluir_meta(goal_id: int):
+    goal_repo.delete(goal_id)
+    return {"ok": True}
