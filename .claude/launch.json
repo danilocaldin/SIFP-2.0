@@ -12,6 +12,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "uvicorn", "sifp.api.main:app", "--port", "8000"],
       "port": 8000
+    },
+    {
+      "name": "sifp-frontend",
+      "runtimeExecutable": "C:\\Users\\User\\Documents\\Danilo\\Danilo\\SIFP - Claude\\dev-frontend.bat",
+      "runtimeArgs": [],
+      "port": 3000
     }
   ]
 }
