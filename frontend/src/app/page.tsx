@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { DiagnosticCard } from "@/components/diagnostic-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { getResumo } from "@/lib/api";
@@ -105,7 +106,11 @@ export default async function Home() {
             <DiagnosticCard diagnostic={topDiagnostic} />
             {outrosDiagnosticos > 0 && (
               <p className="text-sm text-muted-foreground">
-                + {outrosDiagnosticos} outro(s) ponto(s) de atenção na aba Diagnósticos.
+                +{" "}
+                <Link href="/diagnosticos" className="underline underline-offset-2 hover:text-foreground">
+                  {outrosDiagnosticos} outro(s) ponto(s) de atenção
+                </Link>
+                .
               </p>
             )}
           </div>
