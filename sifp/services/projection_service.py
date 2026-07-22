@@ -23,6 +23,26 @@ def average_monthly_saldo(monthly: pd.DataFrame, janela: int = 3) -> float:
     return float(recent["Saldo"].mean())
 
 
+def saldo_range(monthly: pd.DataFrame, janela: int = 3) -> dict:
+    """Pior, média e melhor saldo mensal observado na janela recente —
+    usados pra desenhar não só uma linha de projeção, mas uma faixa entre
+    "se o pior mês recente virar a regra" e "se o melhor virar a regra".
+
+    Deliberadamente usa o mínimo/máximo OBSERVADO em vez de um intervalo
+    estatístico (ex: desvio-padrão): com só 3-6 meses de histórico esse
+    tipo de cálculo é instável, e o ponto do módulo inteiro é ser auditável
+    à vista — min/max são meses reais que já aconteceram, não uma
+    estimativa que o usuário precisa confiar às cegas."""
+    if monthly.empty:
+        return {"pior": 0.0, "media": 0.0, "melhor": 0.0}
+    recent = monthly.tail(janela)
+    return {
+        "pior": float(recent["Saldo"].min()),
+        "media": float(recent["Saldo"].mean()),
+        "melhor": float(recent["Saldo"].max()),
+    }
+
+
 def project_patrimonio(patrimonio_atual: float, saldo_medio_mensal: float, meses: int = 12) -> pd.DataFrame:
     """Projeta o patrimônio mês a mês assumindo que o saldo médio mensal se repete.
 

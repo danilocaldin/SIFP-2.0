@@ -23,7 +23,11 @@ export default async function ProjecoesPage({
     );
   }
 
-  const semSaldo = projecoes.saldo_medio_3m <= 0;
+  // patrimonio_final vem null só quando NEM o melhor mês recente foi
+  // positivo (ver projecoes_service.py) -- ou seja, mais permissivo que só
+  // olhar a média: se o pior de 3 meses puxou a média pro negativo mas um
+  // deles foi bom, ainda mostramos o gráfico com a faixa completa.
+  const temCenarioPositivo = projecoes.patrimonio_final !== null;
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 sm:py-16">
@@ -40,23 +44,35 @@ export default async function ProjecoesPage({
         Não é uma previsão do futuro — é o que aconteceria se nada mudasse.
       </p>
 
-      {semSaldo ? (
+      {!temCenarioPositivo ? (
         <Card className="mt-6 border-l-4 border-l-orange-500">
           <CardContent>
             <p className="text-sm">
               Nos últimos meses seu saldo médio foi{" "}
-              <span className="font-medium">{formatBRL(projecoes.saldo_medio_3m)}/mês</span> — no
-              ritmo atual, seu patrimônio não cresce. Ajustar isso é o primeiro passo antes de
-              projetar crescimento.
+              <span className="font-medium">{formatBRL(projecoes.saldo_medio_3m)}/mês</span>, e nem
+              o seu melhor mês recente ({formatBRL(projecoes.saldo_range.melhor)}) foi suficiente
+              pra um cenário de crescimento — no ritmo atual, seu patrimônio não cresce. Ajustar
+              isso é o primeiro passo antes de projetar crescimento.
             </p>
           </CardContent>
         </Card>
       ) : (
         <>
           <p className="mt-6 text-base leading-relaxed">
-            No ritmo médio dos últimos 3 meses (
-            <span className="font-semibold">{formatBRL(projecoes.saldo_medio_3m)}/mês</span>{" "}
-            guardados)
+            {projecoes.saldo_medio_3m > 0 ? (
+              <>
+                No ritmo médio dos últimos 3 meses (
+                <span className="font-semibold">{formatBRL(projecoes.saldo_medio_3m)}/mês</span>{" "}
+                guardados)
+              </>
+            ) : (
+              <>
+                Seu ritmo médio recente foi negativo (
+                <span className="font-semibold">{formatBRL(projecoes.saldo_medio_3m)}/mês</span>),
+                mas seu melhor mês guardou{" "}
+                <span className="font-semibold">{formatBRL(projecoes.saldo_range.melhor)}</span>
+              </>
+            )}
             {projecoes.taxa_rentabilidade_12m !== null && (
               <>
                 , considerando também que seus investimentos atuais rendem em média{" "}
@@ -65,10 +81,13 @@ export default async function ProjecoesPage({
                 </span>
               </>
             )}
-            , seu patrimônio deve ir de{" "}
-            <span className="font-semibold">{formatBRL(projecoes.patrimonio_atual)}</span> para{" "}
-            <span className="font-semibold">{formatBRL(projecoes.patrimonio_final ?? 0)}</span> em{" "}
-            {horizonte} meses.
+            , seu patrimônio pode ir de{" "}
+            <span className="font-semibold">{formatBRL(projecoes.patrimonio_atual)}</span> para
+            algo entre{" "}
+            <span className="font-semibold">{formatBRL(projecoes.patrimonio_final_pior ?? 0)}</span>{" "}
+            e{" "}
+            <span className="font-semibold">{formatBRL(projecoes.patrimonio_final_melhor ?? 0)}</span>{" "}
+            em {horizonte} meses, dependendo de qual padrão dos últimos meses se repetir.
           </p>
 
           <div className="mt-6">

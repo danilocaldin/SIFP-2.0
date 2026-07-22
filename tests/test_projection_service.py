@@ -25,6 +25,27 @@ def test_average_monthly_saldo_empty():
     assert proj.average_monthly_saldo(monthly) == 0.0
 
 
+def test_saldo_range_uses_min_max_observado_na_janela():
+    monthly = pd.DataFrame({
+        "month": ["2026-01", "2026-02", "2026-03", "2026-04"],
+        "Saldo": [1000.0, -500.0, 300.0, 700.0],
+    })
+    # janela=3 -> ultimos 3 meses: -500, 300, 700
+    result = proj.saldo_range(monthly, janela=3)
+    assert result == {"pior": -500.0, "media": pytest.approx(500.0 / 3), "melhor": 700.0}
+
+
+def test_saldo_range_fewer_months_than_janela():
+    monthly = pd.DataFrame({"month": ["2026-01", "2026-02"], "Saldo": [100.0, 300.0]})
+    result = proj.saldo_range(monthly, janela=3)
+    assert result == {"pior": 100.0, "media": pytest.approx(200.0), "melhor": 300.0}
+
+
+def test_saldo_range_empty():
+    monthly = pd.DataFrame(columns=["month", "Saldo"])
+    assert proj.saldo_range(monthly) == {"pior": 0.0, "media": 0.0, "melhor": 0.0}
+
+
 def test_project_patrimonio_linear_growth():
     result = proj.project_patrimonio(patrimonio_atual=1000.0, saldo_medio_mensal=100.0, meses=3)
     assert list(result["mes_offset"]) == [1, 2, 3]

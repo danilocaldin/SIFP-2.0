@@ -125,6 +125,8 @@ export type Patrimonio = PatrimonioData | PatrimonioEmpty;
 export interface ProjectionChartPoint {
   data: string;
   patrimonio: number;
+  patrimonio_melhor?: number;
+  patrimonio_pior?: number;
   tipo: "historico" | "projecao";
 }
 
@@ -139,13 +141,22 @@ export interface GoalProjection {
   dentro_do_prazo: boolean | null;
 }
 
+export interface SaldoRange {
+  pior: number;
+  media: number;
+  melhor: number;
+}
+
 export interface ProjecoesData {
   has_data: true;
   saldo_medio_3m: number;
+  saldo_range: SaldoRange;
   patrimonio_atual: number;
   taxa_rentabilidade_12m: number | null;
   horizonte: number;
   patrimonio_final: number | null;
+  patrimonio_final_melhor: number | null;
+  patrimonio_final_pior: number | null;
   chart: ProjectionChartPoint[];
   goals: GoalProjection[];
 }

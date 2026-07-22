@@ -31,6 +31,7 @@ class ProjecoesService:
         all_tx_real = ind.exclude_self_transfers(all_tx)
         monthly = ind.monthly_evolution(all_tx_real)
         saldo_medio = proj.average_monthly_saldo(monthly, janela=3)
+        faixa = proj.saldo_range(monthly, janela=3)
 
         latest_assets = self.asset_repo.get_latest_positions()
         patrimonio_atual = float(latest_assets["saldo_liquido"].sum()) if not latest_assets.empty else 0.0
@@ -39,27 +40,43 @@ class ProjecoesService:
         result = {
             "has_data": True,
             "saldo_medio_3m": saldo_medio,
+            "saldo_range": faixa,
             "patrimonio_atual": patrimonio_atual,
             "taxa_rentabilidade_12m": taxa_12m,
             "horizonte": horizonte,
             "patrimonio_final": None,
+            "patrimonio_final_melhor": None,
+            "patrimonio_final_pior": None,
             "chart": [],
             "goals": self._build_goals(saldo_medio),
         }
 
-        if saldo_medio > 0:
-            if taxa_12m is not None:
-                df_proj = proj.project_patrimonio_com_rendimento(
-                    patrimonio_atual, saldo_medio, taxa_12m, meses=horizonte
-                )
-            else:
-                df_proj = proj.project_patrimonio(patrimonio_atual, saldo_medio, meses=horizonte)
-            result["patrimonio_final"] = float(df_proj.iloc[-1]["patrimonio_projetado"])
-            result["chart"] = self._build_chart(df_proj, patrimonio_atual)
+        # Faixa (melhor/pior) em vez de só a média: usa min/max observado
+        # nos últimos 3 meses, não um cálculo estatístico -- ver
+        # projection_service.saldo_range(). Mostra o gráfico se HOUVER
+        # algum cenário positivo (mesmo que a média recente seja negativa,
+        # como pode acontecer com um único mês bom entre dois ruins) --
+        # mais honesto que esconder tudo quando a média isolada é negativa.
+        if faixa["melhor"] > 0:
+            def _projetar(saldo: float) -> pd.DataFrame:
+                if taxa_12m is not None:
+                    return proj.project_patrimonio_com_rendimento(patrimonio_atual, saldo, taxa_12m, meses=horizonte)
+                return proj.project_patrimonio(patrimonio_atual, saldo, meses=horizonte)
+
+            df_media = _projetar(faixa["media"])
+            df_melhor = _projetar(faixa["melhor"])
+            df_pior = _projetar(faixa["pior"])
+
+            result["patrimonio_final"] = float(df_media.iloc[-1]["patrimonio_projetado"])
+            result["patrimonio_final_melhor"] = float(df_melhor.iloc[-1]["patrimonio_projetado"])
+            result["patrimonio_final_pior"] = float(df_pior.iloc[-1]["patrimonio_projetado"])
+            result["chart"] = self._build_chart(df_media, df_melhor, df_pior, patrimonio_atual)
 
         return result
 
-    def _build_chart(self, df_proj: pd.DataFrame, patrimonio_atual: float) -> list[dict]:
+    def _build_chart(
+        self, df_media: pd.DataFrame, df_melhor: pd.DataFrame, df_pior: pd.DataFrame, patrimonio_atual: float
+    ) -> list[dict]:
         hist = ind.net_worth_history(self.asset_repo.get_all())
         if hist.empty:
             return []
@@ -72,10 +89,26 @@ class ProjecoesService:
         ]
 
         last_date = hist["data_referencia"].iloc[-1]
-        chart.append({"data": last_date.strftime("%Y-%m-%d"), "patrimonio": patrimonio_atual, "tipo": "projecao"})
-        for _, r in df_proj.iterrows():
-            d = last_date + pd.DateOffset(months=int(r["mes_offset"]))
-            chart.append({"data": d.strftime("%Y-%m-%d"), "patrimonio": float(r["patrimonio_projetado"]), "tipo": "projecao"})
+        # duplica o último ponto histórico como primeiro ponto de projeção,
+        # pra conectar as linhas visualmente (mesmo valor nas 3 séries).
+        chart.append({
+            "data": last_date.strftime("%Y-%m-%d"),
+            "patrimonio": patrimonio_atual,
+            "patrimonio_melhor": patrimonio_atual,
+            "patrimonio_pior": patrimonio_atual,
+            "tipo": "projecao",
+        })
+        for (_, r_media), (_, r_melhor), (_, r_pior) in zip(
+            df_media.iterrows(), df_melhor.iterrows(), df_pior.iterrows()
+        ):
+            d = last_date + pd.DateOffset(months=int(r_media["mes_offset"]))
+            chart.append({
+                "data": d.strftime("%Y-%m-%d"),
+                "patrimonio": float(r_media["patrimonio_projetado"]),
+                "patrimonio_melhor": float(r_melhor["patrimonio_projetado"]),
+                "patrimonio_pior": float(r_pior["patrimonio_projetado"]),
+                "tipo": "projecao",
+            })
         return chart
 
     def _build_goals(self, saldo_medio: float) -> list[dict]:
