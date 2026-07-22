@@ -30,7 +30,7 @@ Duas coisas independentes na mesma tela: (1) limites de gasto mensal por categor
 **Serviço:** `orcamento_service.py` (limites) + acesso direto ao `goal_repo` (metas, CRUD simples o suficiente pra não precisar de service próprio) · **Endpoints:** `GET /api/orcamento`, `POST/DELETE /api/orcamento/limites`, `GET/POST/PATCH/DELETE /api/metas`
 
 ## Projeções (`/projecoes`)
-Projeta o patrimônio nos próximos 6/12/24 meses, com base na sua média de economia mensal e na rentabilidade real dos seus investimentos (não a bruta — isola o efeito de aportes/resgates). Mostra também, por meta cadastrada, a data prevista de conclusão no ritmo atual.
+Projeta o patrimônio nos próximos 6/12/24 meses, com base na sua economia mensal recente e na rentabilidade real dos seus investimentos (não a bruta — isola o efeito de aportes/resgates). Mostra uma **faixa** entre o pior e o melhor cenário (baseada nos meses reais mais fraco e mais forte dos últimos 3, não uma estimativa estatística), em vez de um número único que passaria uma precisão falsa. O gráfico aparece sempre que houver algum cenário positivo — mesmo que a média recente seja negativa, desde que um mês bom recente sustente um cenário de crescimento. Mostra também, por meta cadastrada, a data prevista de conclusão no ritmo médio atual.
 **Serviço:** `projecoes_service.py` (usa `projection_service.py` por baixo) · **Endpoint:** `GET /api/projecoes?horizonte=`
 
 ## Diagnósticos (`/diagnosticos`)
