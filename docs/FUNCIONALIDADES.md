@@ -46,6 +46,10 @@ Consolida tudo (resumo, categorias, estabelecimentos, diagnósticos, patrimônio
 
 ---
 
+## Chat (`/chat`)
+Perguntas livres sobre as finanças ("quanto gastei com Uber esse ano?", "qual foi meu maior gasto do mês passado?"). Diferente do botão de explicação da tela Resumo (que só manda números já agregados), aqui o Claude decide sozinho quais consultas fazer nos dados reais — usando *tool use*: ele tem acesso a 4 ferramentas (buscar transações filtradas, resumo de um período, patrimônio atual, lista de categorias válidas) e escolhe quais chamar pra responder cada pergunta. A conversa não fica salva no banco — reinicia ao recarregar a página. Sem `ANTHROPIC_API_KEY`, a tela mostra que o recurso está indisponível, sem quebrar o resto do sistema.
+**Serviço:** `chat_service.py` · **Endpoint:** `POST /api/chat`
+
 ## Paridade entre as duas interfaces
 
 Toda aba que existe no Streamlit (`app.py`) tem uma tela equivalente no frontend novo, e vice-versa — nenhum dos dois tem funcionalidade exclusiva.

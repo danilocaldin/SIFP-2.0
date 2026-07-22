@@ -15,11 +15,11 @@
 - ✅ **Fase 6 (em andamento) — Reajuste em cobrança recorrente** — o motor de diagnósticos detecta quando um estabelecimento com cobrança historicamente estável (assinatura, mensalidade, conta fixa) subiu de valor no mês, sem depender de IA externa
 - ✅ **Consolidação (22/07/2026)** — primeira revisão de segurança dedicada do sistema (sem achados), telas de erro amigáveis no frontend (antes inexistentes), e um bug real corrigido: o site inteiro renderizava na fonte errada desde o primeiro commit (ver [`DECISOES_E_LICOES.md`](DECISOES_E_LICOES.md))
 - ✅ **Fase 6 — Explicação em linguagem natural (22/07/2026)** — primeira peça de Fase 6 que usa um LLM de verdade: botão sob demanda na tela Resumo que manda os números já agregados do mês pro Claude Haiku (Anthropic) e recebe de volta 3-4 frases explicando o porquê das oscilações, em português simples. Presente tanto no Streamlit quanto no frontend novo.
+- ✅ **Fase 6 — Chat com perguntas livres (22/07/2026)** — última peça planejada de Fase 6: nova tela de Chat onde o Claude consulta os dados reais por conta própria (tool use — 4 ferramentas: buscar transações, resumo de período, patrimônio, categorias válidas) em vez de receber tudo pronto de antemão, permitindo responder perguntas abertas tipo "quanto gastei com Uber esse ano?". Presente tanto no Streamlit quanto no frontend novo. Fase 6 está completa.
 
 ## Pendente
 
-### Fase 6 — Camada de Inteligência Artificial (continuação)
-Restou a peça de perguntas livres sobre as finanças ("quanto gastei com Uber esse ano?") — precisa de uma interface de chat de verdade e de o modelo poder consultar os dados via tool use, um trabalho maior do que a explicação de oscilações (que é só um texto curto de saída). Fica pra depois, como peça separada.
+Nenhum item de Fase 6 pendente no momento — as cinco peças planejadas (detecção de anomalias, faixa de confiança nas Projeções, reajuste em cobrança recorrente, explicação em linguagem natural, chat com perguntas livres) estão todas no ar.
 
 ### Integração automática via Open Finance — pesquisado e descartado por ora (22/07/2026)
 Pesquisa confirmou custo real: Pluggy a partir de R$2.500/mês, Belvo ~R$6.000/mês, a opção mais barata regulada (Tecnospeed) R$1.500 de entrada + R$540/mês. Inviável para o uso atual (só o Danilo) — só faz sentido financeiro quando houver assinantes pagantes suficientes pra diluir esse custo. Se um dia for necessário suportar outros bancos antes disso, o caminho mais barato é adicionar mais importadores manuais (mesmo padrão do `BTGImporter`, sem custo de API), não pagar por agregação automática.
