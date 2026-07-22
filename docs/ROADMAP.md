@@ -10,11 +10,12 @@
 - ✅ **Frontend dedicado** — Next.js hospedável, com paridade completa de funcionalidades em relação ao app Streamlit (todas as telas listadas em [`FUNCIONALIDADES.md`](FUNCIONALIDADES.md))
 - ✅ **Hospedagem** — sistema no ar, acessível de qualquer lugar (ver [`HOSPEDAGEM.md`](HOSPEDAGEM.md))
 - ✅ **Revisão proativa no upload** — pergunta categoria de transferências e estabelecimentos novos assim que um extrato é importado
+- ✅ **Fase 6 (em andamento) — Detecção de anomalias** — o motor de diagnósticos agora sinaliza transações individuais fora do padrão histórico da categoria (ex: um Pix bem maior que o normal, uma compra atípica) usando estatística (método de Tukey/IQR), sem depender de nenhuma IA externa
 
 ## Pendente
 
-### Fase 6 — Camada de Inteligência Artificial
-Deliberadamente deixada para depois de tudo o resto estar sólido. Escopo pretendido: explicar oscilações do patrimônio em linguagem natural, permitir perguntas livres sobre as finanças ("quanto gastei com Uber esse ano?"), detecção de anomalias, previsões mais sofisticadas que a projeção linear/composta atual.
+### Fase 6 — Camada de Inteligência Artificial (continuação)
+A detecção de anomalias (acima) foi a primeira peça, escolhida por não precisar de nenhum provedor de IA externo. O restante do escopo pretendido — explicar oscilações do patrimônio em linguagem natural e permitir perguntas livres sobre as finanças ("quanto gastei com Uber esse ano?") — provavelmente exige um LLM de verdade, o que significa escolher um provedor e assumir um custo de API. Essa é uma decisão que cabe ao Danilo tomar quando quiser avançar essa parte.
 
 ### Integração automática via Open Finance
 Importar extratos automaticamente em vez de precisar baixar e subir o arquivo manualmente. Deixado por último porque depende de fatores externos (aprovação/parceria com provedores de Open Finance) fora do controle direto do desenvolvimento.
