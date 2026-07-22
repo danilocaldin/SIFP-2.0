@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/projecoes", label: "Projeções" },
   { href: "/diagnosticos", label: "Diagnósticos" },
   { href: "/relatorio", label: "Relatório" },
+  { href: "/chat", label: "Chat" },
 ];
 
 export function NavBar() {

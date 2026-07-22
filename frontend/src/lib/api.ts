@@ -1,4 +1,6 @@
 import type {
+  ChatMensagem,
+  ChatResponse,
   Dashboard,
   Goal,
   NarrativaResponse,
@@ -192,5 +194,15 @@ export async function retreinarModelo(): Promise<{ mensagem: string }> {
 export async function gerarNarrativa(): Promise<NarrativaResponse> {
   const res = await fetch(`${PUBLIC_API_URL}/api/narrativa`, { method: "POST" });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao gerar a explicação."));
+  return res.json();
+}
+
+export async function enviarMensagemChat(mensagens: ChatMensagem[]): Promise<ChatResponse> {
+  const res = await fetch(`${PUBLIC_API_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mensagens }),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao enviar a mensagem."));
   return res.json();
 }

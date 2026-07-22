@@ -7,9 +7,10 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-from sifp.api.main import app, narrativa_service
+from sifp.api.main import app, chat_service, narrativa_service
 from sifp.repositories.connection import DEFAULT_DB_PATH, get_connection
 from sifp.repositories.transaction_repository import TransactionRepository, make_tx_hash
+from sifp.services.chat_service import ChatIndisponivel
 from sifp.services.narrativa_service import NarrativaIndisponivel
 
 client = TestClient(app)
@@ -380,4 +381,36 @@ def test_narrativa_returns_502_on_unexpected_error(monkeypatch):
 
     monkeypatch.setattr(narrativa_service, "explicar_mes", _raise)
     resp = client.post("/api/narrativa")
+    assert resp.status_code == 502
+
+
+def test_chat_returns_resposta_from_mocked_service(monkeypatch):
+    """Nunca chama a API real da Anthropic num teste — mocka a camada de
+    serviço, testa só o contrato HTTP (rota/status/shape do JSON)."""
+    monkeypatch.setattr(chat_service, "responder", lambda mensagens: "Resposta mockada.")
+    resp = client.post("/api/chat", json={"mensagens": [{"role": "user", "content": "oi"}]})
+    assert resp.status_code == 200
+    assert resp.json() == {"resposta": "Resposta mockada."}
+
+
+def test_chat_rejects_empty_mensagens():
+    resp = client.post("/api/chat", json={"mensagens": []})
+    assert resp.status_code == 400
+
+
+def test_chat_returns_503_when_indisponivel(monkeypatch):
+    def _raise(mensagens):
+        raise ChatIndisponivel("sem dados")
+
+    monkeypatch.setattr(chat_service, "responder", _raise)
+    resp = client.post("/api/chat", json={"mensagens": [{"role": "user", "content": "oi"}]})
+    assert resp.status_code == 503
+
+
+def test_chat_returns_502_on_unexpected_error(monkeypatch):
+    def _raise(mensagens):
+        raise RuntimeError("falha de rede")
+
+    monkeypatch.setattr(chat_service, "responder", _raise)
+    resp = client.post("/api/chat", json={"mensagens": [{"role": "user", "content": "oi"}]})
     assert resp.status_code == 502

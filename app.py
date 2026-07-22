@@ -34,6 +34,7 @@ from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services import indicator_service as ind
 from sifp.services import projection_service as proj
 from sifp.services.formatting import format_brl, format_brl_md, formatar_mes
+from sifp.services.chat_service import ChatIndisponivel, ChatService
 from sifp.services.import_service import ImportService
 from sifp.services.narrativa_service import NarrativaIndisponivel, NarrativaService
 from sifp.services.report_service import generate_text_report
@@ -55,6 +56,7 @@ goal_repo = GoalRepository()
 investment_importer = BTGInvestmentImporter()
 summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo)
 narrativa_service = NarrativaService(summary_service, transaction_repo)
+chat_service = ChatService(transaction_repo, asset_repo)
 
 # ---------------------------------------------------------------------
 # Estado da sessão
@@ -114,10 +116,10 @@ st.caption("Upload de extratos • Categorização automática (regras + Machine
 
 (
     tab_resumo, tab_upload, tab_revisao, tab_dashboard, tab_patrimonio,
-    tab_orcamento, tab_projecoes, tab_diagnosticos, tab_relatorio,
+    tab_orcamento, tab_projecoes, tab_diagnosticos, tab_relatorio, tab_chat,
 ) = st.tabs([
     "🏠 Resumo", "📤 Upload", "✏️ Revisão de Categorias", "📊 Dashboard", "💼 Patrimônio",
-    "🎯 Orçamento e Metas", "🔮 Projeções", "🩺 Diagnósticos", "📄 Relatório",
+    "🎯 Orçamento e Metas", "🔮 Projeções", "🩺 Diagnósticos", "📄 Relatório", "💬 Chat",
 ])
 
 # =======================================================================
@@ -1070,3 +1072,33 @@ with tab_relatorio:
             file_name=f"relatorio_sifp_{selected_month_rel}.txt",
             mime="text/plain",
         )
+
+# =======================================================================
+# TAB 9 - CHAT
+# =======================================================================
+with tab_chat:
+    st.subheader("Pergunte sobre suas finanças")
+    st.caption("As respostas vêm sempre dos seus dados reais, nunca de estimativas.")
+
+    if "chat_mensagens" not in st.session_state:
+        st.session_state.chat_mensagens = []
+
+    for msg in st.session_state.chat_mensagens:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    pergunta = st.chat_input("Pergunte algo sobre suas finanças...")
+    if pergunta:
+        st.session_state.chat_mensagens.append({"role": "user", "content": pergunta})
+        with st.chat_message("user"):
+            st.markdown(pergunta)
+        with st.chat_message("assistant"):
+            with st.spinner("Pensando..."):
+                try:
+                    resposta = chat_service.responder(st.session_state.chat_mensagens)
+                except ChatIndisponivel as e:
+                    resposta = f"⚠️ {e}"
+                except Exception:
+                    resposta = "⚠️ Falha ao gerar a resposta. Tente novamente em instantes."
+            st.markdown(resposta)
+        st.session_state.chat_mensagens.append({"role": "assistant", "content": resposta})

@@ -35,6 +35,7 @@ from sifp.repositories.goal_repository import GoalRepository
 from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services.dashboard_service import DashboardService
 from sifp.services.formatting import formatar_mes, unescape_currency
+from sifp.services.chat_service import ChatIndisponivel, ChatService
 from sifp.services.import_service import ImportService
 from sifp.services.narrativa_service import NarrativaIndisponivel, NarrativaService
 from sifp.services.orcamento_service import OrcamentoService
@@ -70,6 +71,7 @@ orcamento_service = OrcamentoService(transaction_repo, budget_repo)
 relatorio_service = RelatorioService(transaction_repo, asset_repo, summary_service)
 revisao_service = RevisaoService(transaction_repo)
 narrativa_service = NarrativaService(summary_service, transaction_repo)
+chat_service = ChatService(transaction_repo, asset_repo)
 
 
 def _refresh_model() -> str:
@@ -141,6 +143,30 @@ def narrativa():
     except Exception:
         raise HTTPException(status_code=502, detail="Falha ao gerar a explicação. Tente novamente em instantes.")
     return {"texto": texto}
+
+
+class ChatMensagem(BaseModel):
+    role: str
+    content: str
+
+
+class ChatIn(BaseModel):
+    mensagens: list[ChatMensagem]
+
+
+@app.post("/api/chat")
+def chat(body: ChatIn):
+    """Perguntas livres sobre as finanças (Fase 6/IA) — a conversa inteira
+    é reenviada a cada chamada (API sem estado, sem sessão/login)."""
+    if not body.mensagens:
+        raise HTTPException(status_code=400, detail="Envie ao menos uma mensagem.")
+    try:
+        resposta = chat_service.responder([m.model_dump() for m in body.mensagens])
+    except ChatIndisponivel as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=502, detail="Falha ao gerar a resposta. Tente novamente em instantes.")
+    return {"resposta": resposta}
 
 
 @app.get("/api/dashboard")

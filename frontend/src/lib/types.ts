@@ -43,6 +43,17 @@ export interface NarrativaResponse {
   texto: string;
 }
 
+// Espelha POST /api/chat (sifp/services/chat_service.py).
+
+export interface ChatMensagem {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatResponse {
+  resposta: string;
+}
+
 // Espelha GET /api/dashboard (sifp/services/dashboard_service.py).
 
 export interface CategoryBreakdown {
