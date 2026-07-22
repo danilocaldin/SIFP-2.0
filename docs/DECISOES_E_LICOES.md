@@ -35,6 +35,13 @@ O modelo de Machine Learning treinado prevê alguma categoria pra qualquer texto
 ### Coluna de texto de moeda escapada aparecendo errada
 Streamlit renderiza `$` pareado como fórmula matemática (LaTeX) dentro de texto markdown — então todo texto de diagnóstico que passa por `st.markdown` precisa escapar o `R$` como `R\$`. Só que a API (que serve o frontend novo, sem renderização de markdown) precisa do texto *sem* esse escape, senão a barra invertida aparece visível na tela. Solução: uma função de "desescape" (`unescape_currency`) aplicada só na camada da API.
 
+### O site inteiro renderizava na fonte errada desde o primeiro commit
+No arquivo de tema (`globals.css`), a variável `--font-sans` estava definida como `var(--font-sans)` — apontando pra si mesma. CSS não acusa erro nisso, só resolve silenciosamente pra "nada", caindo no fallback padrão do navegador (uma fonte serifada, tipo Times New Roman). A variável de fonte monoespaçada, logo abaixo, estava correta (`var(--font-geist-mono)`) — só a `sans` tinha o typo. Passou despercebido porque uma fonte serifada genérica ainda "parece uma página normal" numa olhada rápida; só apareceu inspecionando o estilo computado (`getComputedStyle`) durante uma revisão de consolidação, meses depois de o frontend ter ido ao ar. **Lição: uma variável CSS que aponta pra si mesma nunca dá erro — se uma fonte/cor parecer "quase certa mas não exatamente", vale a pena checar o estilo computado de verdade, não só olhar a tela.**
+
+## Revisão de segurança (22/07/2026)
+
+Passada dedicada de segurança em todo o código que fala com a internet (`sifp/api/`, `sifp/repositories/`, `sifp/importers/`) — a primeira desde que o sistema foi ao ar. Checado e confirmado limpo: toda query SQL é parametrizada (sem injeção), upload de arquivo é tratado inteiramente em memória (nunca grava em disco, sem risco de path traversal), sem `eval`/`exec`/execução de comando dinâmica em lugar nenhum, CORS restrito à origem exata do frontend, sem modo debug em produção, e nenhum token usado durante o desenvolvimento (Railway, Vercel) jamais foi parar no histórico do Git — conferido diretamente. Zero problemas encontrados. Vale repetir essa revisão periodicamente conforme o sistema crescer, especialmente antes de qualquer autenticação/multiusuário entrar em cena.
+
 ## Aprendizados sobre ferramentas (técnico)
 
 - A CLI da Railway não aceita tokens de acesso escopados a um workspace (só tokens de conta) — o deploy é feito direto pela API GraphQL da Railway nesse caso. A CLI da Vercel, por outro lado, funciona normalmente com qualquer token.
