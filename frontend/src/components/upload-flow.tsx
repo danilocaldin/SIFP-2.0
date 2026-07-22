@@ -6,6 +6,7 @@ import { previewUpload, persistUpload } from "@/lib/api";
 import { formatBRL } from "@/lib/format";
 import type { UploadPersistSummary, UploadPreview } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { UploadReview } from "@/components/upload-review";
 import {
   Table,
   TableBody,
@@ -15,12 +16,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+type ReviewResult = { confirmadas: number; puladas: number };
+
 type Status =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "previewed"; preview: UploadPreview }
   | { kind: "persisting"; preview: UploadPreview }
-  | { kind: "done"; summary: UploadPersistSummary }
+  | { kind: "reviewing"; summary: UploadPersistSummary }
+  | { kind: "done"; summary: UploadPersistSummary; reviewResult: ReviewResult | null }
   | { kind: "error"; message: string };
 
 export function UploadFlow() {
@@ -48,11 +52,20 @@ export function UploadFlow() {
     setStatus({ kind: "persisting", preview });
     try {
       const summary = await persistUpload(file);
-      setStatus({ kind: "done", summary });
       router.refresh();
+      if (summary.revisao_pendente.length > 0) {
+        setStatus({ kind: "reviewing", summary });
+      } else {
+        setStatus({ kind: "done", summary, reviewResult: null });
+      }
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : "Erro desconhecido." });
     }
+  }
+
+  function handleReviewDone(summary: UploadPersistSummary, reviewResult: ReviewResult) {
+    setStatus({ kind: "done", summary, reviewResult });
+    router.refresh();
   }
 
   function handleReset() {
@@ -133,6 +146,21 @@ export function UploadFlow() {
         </div>
       )}
 
+      {status.kind === "reviewing" && (
+        <div className="space-y-3">
+          <p className="text-sm">
+            {status.summary.inseridas} transação(ões) nova(s) importada(s). Antes de continuar,{" "}
+            {status.summary.revisao_pendente.length} precisam da sua confirmação — transferências e
+            estabelecimentos novos que o BTG nem sempre categoriza certo.
+          </p>
+          <UploadReview
+            items={status.summary.revisao_pendente}
+            categorias={status.summary.categorias}
+            onDone={(result) => handleReviewDone(status.summary, result)}
+          />
+        </div>
+      )}
+
       {status.kind === "done" && (
         <div className="space-y-3">
           <p className="text-sm text-emerald-600">
@@ -143,6 +171,12 @@ export function UploadFlow() {
               <> {status.summary.saldos_gravados} saldo(s) diário(s) gravado(s).</>
             )}
           </p>
+          {status.reviewResult && (
+            <p className="text-sm text-muted-foreground">
+              {status.reviewResult.confirmadas} confirmada(s) na revisão rápida
+              {status.reviewResult.puladas > 0 && <> · {status.reviewResult.puladas} pulada(s)</>}.
+            </p>
+          )}
           <Button variant="outline" size="sm" onClick={handleReset}>
             Importar outro arquivo
           </Button>

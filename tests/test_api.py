@@ -232,6 +232,40 @@ def test_upload_persist_inserts_and_dedupes_without_corrupting_real_data():
     assert fake_desc not in all_tx["description"].values
 
 
+def test_upload_persist_returns_revisao_pendente_for_transfer():
+    # Nota: não testamos aqui o caso de "estabelecimento novo sem
+    # confiança" porque este endpoint roda contra o modelo de ML REAL já
+    # treinado (não um modelo vazio) -- ele pode prever alguma categoria
+    # com confiança pra qualquer texto, mesmo sintético (não tem opção
+    # "não sei"). Esse caso já é coberto de forma determinística em
+    # test_import_service.py com um CategorizationService(model=None).
+    fake_pix_desc = "Pix enviado - [PYTEST] Fulano De Tal Teste"
+    csv_content = f"Data;Descrição;Valor\n01/01/2000;{fake_pix_desc};-50,00\n".encode("utf-8-sig")
+    tx_hash_pix = make_tx_hash("2000-01-01 00:00", fake_pix_desc, -50.00)
+
+    try:
+        resp = client.post(
+            "/api/upload/persist",
+            files={"file": ("extrato.csv", io.BytesIO(csv_content), "text/csv")},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["inseridas"] == 1
+
+        revisao = {r["description"]: r for r in body["revisao_pendente"]}
+        assert fake_pix_desc in revisao
+        assert revisao[fake_pix_desc]["is_transfer"] is True
+        assert isinstance(revisao[fake_pix_desc]["value"], float)
+    finally:
+        conn = get_connection(DEFAULT_DB_PATH)
+        conn.execute("DELETE FROM transactions WHERE tx_hash = ?", (tx_hash_pix,))
+        conn.commit()
+        conn.close()
+
+    all_tx = TransactionRepository().get_all()
+    assert not all_tx["description"].str.contains("PYTEST", na=False).any()
+
+
 def test_revisao_returns_json_with_has_data_flag():
     resp = client.get("/api/revisao")
     assert resp.status_code == 200

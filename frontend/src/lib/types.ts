@@ -213,11 +213,22 @@ export interface UploadPreview {
   preview: UploadTransactionPreview[];
 }
 
+export interface RevisaoPendenteItem {
+  tx_hash: string;
+  date: string;
+  description: string;
+  value: number;
+  category: string;
+  is_transfer: boolean;
+}
+
 export interface UploadPersistSummary {
   total_lidas: number;
   inseridas: number;
   ignoradas_duplicadas: number;
   saldos_gravados: number;
+  revisao_pendente: RevisaoPendenteItem[];
+  categorias: string[];
 }
 
 // Espelha GET /api/revisao (sifp/services/revisao_service.py).

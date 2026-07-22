@@ -84,9 +84,17 @@ def test_insert_new_dedups_by_hash(repo):
     inserted_first = repo.insert_new(df, source_file="extrato1.csv")
     inserted_second = repo.insert_new(df, source_file="extrato2.csv")  # mesmo conteúdo, "outro arquivo"
 
-    assert inserted_first == 2
-    assert inserted_second == 0
+    assert len(inserted_first) == 2
+    assert len(inserted_second) == 0
     assert len(repo.get_all()) == 2
+
+
+def test_insert_new_returns_the_inserted_tx_hashes(repo):
+    df = _sample_transactions()
+    inserted = repo.insert_new(df)
+
+    all_tx = repo.get_all()
+    assert set(inserted) == set(all_tx["tx_hash"])
 
 
 def test_get_all_parses_dates_with_and_without_time_in_same_table(repo):

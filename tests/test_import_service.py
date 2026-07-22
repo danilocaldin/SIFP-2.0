@@ -65,3 +65,41 @@ def test_unknown_importer_raises_value_error(import_service):
     upload = FakeUploadedFile(b"dados", "extrato.ofx")
     with pytest.raises(ValueError):
         import_service.parse(upload)
+
+
+def test_revisao_pendente_inclui_transferencia_para_terceiro_mas_nao_self_transfer(
+    import_service, sample_btg_xlsx_bytes
+):
+    upload = FakeUploadedFile(sample_btg_xlsx_bytes, "extrato.xlsx")
+    summary = import_service.import_and_persist(upload)
+
+    revisao = {r["description"]: r for r in summary["revisao_pendente"]}
+    # Pix pra "Maria Jose Vieira" (terceiro) -> precisa perguntar
+    pix_terceiro = next(r for d, r in revisao.items() if "Maria Jose Vieira" in d)
+    assert pix_terceiro["is_transfer"] is True
+
+    # as duas linhas de transferência entre contas do próprio titular
+    # (self_transfer) não devem aparecer na fila -- já resolvidas com certeza
+    assert not any("Transferência" in d and "Maria" not in d for d in revisao)
+
+
+def test_revisao_pendente_inclui_estabelecimento_sem_confianca(import_service, sample_btg_xlsx_bytes):
+    upload = FakeUploadedFile(sample_btg_xlsx_bytes, "extrato.xlsx")
+    summary = import_service.import_and_persist(upload)
+
+    all_tx = import_service.transaction_repo.get_all()
+    pendentes_reais = all_tx[all_tx["category"] == "Não categorizado"]
+
+    revisao_descricoes = {r["description"] for r in summary["revisao_pendente"]}
+    for desc in pendentes_reais["description"]:
+        assert desc in revisao_descricoes
+
+
+def test_revisao_pendente_vazia_quando_tudo_ja_existia(import_service, sample_btg_xlsx_bytes):
+    upload1 = FakeUploadedFile(sample_btg_xlsx_bytes, "extrato.xlsx")
+    import_service.import_and_persist(upload1)
+
+    upload2 = FakeUploadedFile(sample_btg_xlsx_bytes, "extrato.xlsx")
+    summary2 = import_service.import_and_persist(upload2)
+
+    assert summary2["revisao_pendente"] == []

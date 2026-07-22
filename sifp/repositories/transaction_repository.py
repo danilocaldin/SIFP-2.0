@@ -31,6 +31,15 @@ def make_tx_hash(date: str, description: str, value: float) -> str:
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
 
+def normalize_tx_date(date_value) -> str:
+    """Formato de string único ("%Y-%m-%d %H:%M") pra qualquer valor de
+    data antes de virar tx_hash ou ir pro banco — ver nota em
+    TransactionRepository.insert_new(). Exportado pra quem precisa
+    calcular o MESMO tx_hash que insert_new vai gravar antes de chamá-lo
+    (ex: ImportService.persist() monta a fila de revisão)."""
+    return pd.to_datetime(date_value).strftime("%Y-%m-%d %H:%M")
+
+
 class TransactionRepository:
     def __init__(self, db_path: Path = DEFAULT_DB_PATH):
         self.db_path = db_path
@@ -38,23 +47,16 @@ class TransactionRepository:
     def _connect(self):
         return get_connection(self.db_path)
 
-    def insert_new(self, df: pd.DataFrame, source_file: str = "") -> int:
+    def insert_new(self, df: pd.DataFrame, source_file: str = "") -> list[str]:
         """Insere transações novas; ignora as que já existem (dedup por hash).
-        Retorna quantas linhas novas foram efetivamente inseridas."""
+        Retorna os tx_hash das linhas efetivamente inseridas (novas) — o
+        chamador pode usar `len(...)` pra contagem, ou os hashes em si pra
+        saber exatamente quais linhas são novas (ex: fila de revisão)."""
         conn = self._connect()
         cur = conn.cursor()
-        inserted = 0
+        inserted_hashes: list[str] = []
         for _, row in df.iterrows():
-            # Normaliza pra um único formato de string ("%Y-%m-%d %H:%M")
-            # antes de gravar — a coluna date é TEXT sem tipo fixo, e
-            # get_all() lê de volta com parse_dates (o pandas infere o
-            # formato pela maioria das linhas). Se importadores diferentes
-            # gravassem formatos diferentes, o formato minoritário viraria
-            # NaT silenciosamente e corromperia indicadores calculados a
-            # partir dessa transação. Normalizar aqui, no único ponto de
-            # inserção, protege qualquer importador atual ou futuro
-            # (Inter/Nubank/Santander/XP estão planejados).
-            date_normalized = pd.to_datetime(row["date"]).strftime("%Y-%m-%d %H:%M")
+            date_normalized = normalize_tx_date(row["date"])
             tx_hash = make_tx_hash(date_normalized, row["description"], row["value"])
             try:
                 cur.execute(
@@ -78,12 +80,12 @@ class TransactionRepository:
                         row.get("category_source", "") or "",
                     ),
                 )
-                inserted += 1
+                inserted_hashes.append(tx_hash)
             except sqlite3.IntegrityError:
                 continue  # tx_hash já existe -> duplicada, ignora
         conn.commit()
         conn.close()
-        return inserted
+        return inserted_hashes
 
     def get_all(self) -> pd.DataFrame:
         conn = self._connect()
