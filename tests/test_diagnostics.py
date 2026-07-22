@@ -606,3 +606,80 @@ def test_run_diagnostics_integra_transacao_anomala():
     )
     codigos = {d.codigo for d in result}
     assert any(c.startswith("transacao_anomala_") for c in codigos)
+
+
+# ---------------------------------------------------------------------
+# assinatura reajustada (Fase 6 -- cobrança recorrente com valor alterado)
+# ---------------------------------------------------------------------
+def _tx_merchant_row(month, merchant, value, category="Assinaturas"):
+    return {
+        "month": month, "category": category, "value": value,
+        "description": merchant, "merchant": merchant, "date": f"{month}-10 10:00",
+    }
+
+
+def _historico_assinatura(mes_atual_valor=None, meses_historicos=("2026-01", "2026-02", "2026-03", "2026-04", "2026-05")):
+    # 5 meses estáveis em ~R$40 (Netflix-like) -> desvio baixo, conta como "recorrente"
+    rows = [_tx_merchant_row(mes, "Netflix", -40.0) for mes in meses_historicos]
+    if mes_atual_valor is not None:
+        rows.append(_tx_merchant_row("2026-06", "Netflix", -mes_atual_valor))
+    return pd.DataFrame(rows)
+
+
+def test_assinatura_nao_dispara_sem_historico_suficiente():
+    df = pd.DataFrame([
+        _tx_merchant_row("2026-05", "Netflix", -40.0),
+        _tx_merchant_row("2026-06", "Netflix", -60.0),
+    ])
+    assert diag.check_assinatura_reajustada(df, latest_month="2026-06") == []
+
+
+def test_assinatura_nao_dispara_quando_valor_historico_ja_variava():
+    # historico instavel (nao e uma "cobranca recorrente" de verdade)
+    rows = [
+        _tx_merchant_row("2026-01", "Uber", -10.0),
+        _tx_merchant_row("2026-02", "Uber", -25.0),
+        _tx_merchant_row("2026-03", "Uber", -15.0),
+        _tx_merchant_row("2026-06", "Uber", -50.0),
+    ]
+    df = pd.DataFrame(rows)
+    assert diag.check_assinatura_reajustada(df, latest_month="2026-06") == []
+
+
+def test_assinatura_nao_dispara_para_aumento_pequeno():
+    df = _historico_assinatura(mes_atual_valor=42.0)  # +5%, abaixo do limiar de 10%
+    assert diag.check_assinatura_reajustada(df, latest_month="2026-06") == []
+
+
+def test_assinatura_dispara_para_reajuste_real():
+    df = _historico_assinatura(mes_atual_valor=59.90)  # ~+50%
+    result = diag.check_assinatura_reajustada(df, latest_month="2026-06")
+    assert len(result) == 1
+    assert result[0].codigo == "assinatura_reajustada_Netflix"
+    assert result[0].severidade == DiagnosticSeverity.BAIXA
+    assert "Netflix" in result[0].titulo
+    assert result[0].impacto_financeiro == pytest.approx(19.90)
+
+
+def test_assinatura_ignora_transacao_sem_mes_atual():
+    df = _historico_assinatura(mes_atual_valor=59.90)
+    assert diag.check_assinatura_reajustada(df, latest_month=None) == []
+
+
+def test_assinatura_nao_quebra_sem_coluna_merchant():
+    df = pd.DataFrame({"category": ["Mercado"] * 5, "month": ["2026-06"] * 5, "value": [-10.0] * 5})
+    assert diag.check_assinatura_reajustada(df, latest_month="2026-06") == []
+
+
+def test_run_diagnostics_integra_assinatura_reajustada():
+    df = _historico_assinatura(mes_atual_valor=59.90)
+    monthly = pd.DataFrame({"month": ["2026-06"], "Receitas": [5000], "Despesas": [59.90], "Saldo": [4940.10]})
+    summary = {"receitas": 5000, "despesas": 59.90, "saldo": 4940.10, "taxa_poupanca": 98.8}
+    by_cat = pd.DataFrame({"category": ["Assinaturas"], "value_abs": [59.90], "pct": [100.0]})
+
+    result = diag.run_diagnostics(
+        monthly=monthly, latest_summary=summary, latest_period_label="Jun/2026",
+        latest_by_cat=by_cat, all_tx=df, latest_month="2026-06",
+    )
+    codigos = {d.codigo for d in result}
+    assert "assinatura_reajustada_Netflix" in codigos

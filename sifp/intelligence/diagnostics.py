@@ -612,6 +612,98 @@ def check_transacao_anomala(all_tx: pd.DataFrame, latest_month: str | None) -> l
     return diagnostics[:TRANSACAO_ANOMALA_MAX_DIAGNOSTICOS]
 
 
+ASSINATURA_MIN_OCORRENCIAS = 3  # precisa aparecer em pelo menos N meses distintos pra contar como recorrente
+ASSINATURA_VARIACAO_HISTORICA_MAX_PCT = 8.0  # cobranças anteriores precisam ser estáveis entre si
+ASSINATURA_REAJUSTE_MIN_PCT = 10.0  # aumento mínimo (%) pra valer a pena avisar
+ASSINATURA_REAJUSTE_MIN_RS = 5.0  # e em reais, pra não avisar de centavos
+ASSINATURA_MAX_DIAGNOSTICOS = 3
+
+
+def check_assinatura_reajustada(all_tx: pd.DataFrame, latest_month: str | None) -> list[Diagnostic]:
+    """
+    all_tx: TransactionRepository.get_all() (todo o histórico, com coluna
+    'month'). Fase 6 (IA) — terceira peça sem depender de LLM: detecta
+    cobranças recorrentes (mesmo estabelecimento aparecendo repetidamente
+    com valor historicamente ESTÁVEL) cujo valor no mês diagnosticado subiu
+    em relação a esse padrão — o caso clássico de assinatura, mensalidade
+    ou conta fixa que reajustou sem aviso claro (streaming, telefonia,
+    academia), mas também pega qualquer gasto habitual de valor fixo (ex:
+    almoço sempre no mesmo lugar pelo mesmo preço).
+
+    Diferente de check_transacao_anomala: aqui a comparação é por
+    ESTABELECIMENTO exato (usa `merchant`, já normalizado pelo motor de
+    relacionamento — Módulo 4 — pra não quebrar com pequenas variações de
+    texto na descrição), não por categoria; e exige que os valores
+    anteriores já fossem estáveis entre si (um gasto que sempre variou não
+    é uma "cobrança recorrente" no sentido que interessa aqui, é só uma
+    despesa comum, tipo Mercado).
+    """
+    if (
+        all_tx.empty
+        or not latest_month
+        or "month" not in all_tx.columns
+        or "merchant" not in all_tx.columns
+    ):
+        return []
+
+    despesas = all_tx[
+        (all_tx["value"] < 0)
+        & (all_tx["category"] != CATEGORIA_NAO_CATEGORIZADO)
+        & (all_tx["category"] != SELF_TRANSFER_CATEGORY)
+        & (all_tx["merchant"].fillna("") != "")
+    ].copy()
+    if despesas.empty:
+        return []
+    despesas["value_abs"] = despesas["value"].abs()
+
+    atuais = despesas[despesas["month"] == latest_month]
+    historico = despesas[despesas["month"] != latest_month]
+    if atuais.empty or historico.empty:
+        return []
+
+    diagnostics: list[Diagnostic] = []
+    for merchant in atuais["merchant"].unique():
+        hist_merchant = historico[historico["merchant"] == merchant]
+        if hist_merchant["month"].nunique() < ASSINATURA_MIN_OCORRENCIAS:
+            continue
+
+        media_hist = hist_merchant["value_abs"].mean()
+        if media_hist <= 0:
+            continue
+        desvio_hist_pct = (hist_merchant["value_abs"].std() or 0) / media_hist * 100
+        if desvio_hist_pct > ASSINATURA_VARIACAO_HISTORICA_MAX_PCT:
+            continue
+
+        atual_valor = float(atuais[atuais["merchant"] == merchant]["value_abs"].iloc[-1])
+        aumento_rs = atual_valor - media_hist
+        aumento_pct = aumento_rs / media_hist * 100
+        if aumento_pct < ASSINATURA_REAJUSTE_MIN_PCT or aumento_rs < ASSINATURA_REAJUSTE_MIN_RS:
+            continue
+
+        diagnostics.append(
+            Diagnostic(
+                codigo=f"assinatura_reajustada_{merchant}",
+                titulo=f"Possível reajuste em '{merchant}'",
+                severidade=DiagnosticSeverity.BAIXA,
+                descricao=(
+                    f"'{merchant}' custava em média {_brl(media_hist)} (valor estável nos "
+                    f"últimos {hist_merchant['month'].nunique()} meses) e agora está "
+                    f"{_brl(atual_valor)} — {aumento_pct:.0f}% a mais."
+                ),
+                explicacao=(
+                    "Cobranças recorrentes (assinaturas, mensalidades, contas fixas) às vezes "
+                    "reajustam sem aviso claro — vale confirmar se foi intencional ou se é hora "
+                    "de reavaliar."
+                ),
+                recomendacao=f"Confira se '{merchant}' mudou de plano, reajustou o preço ou se é uma cobrança indevida.",
+                impacto_financeiro=aumento_rs,
+            )
+        )
+
+    diagnostics.sort(key=lambda d: d.impacto_financeiro or 0, reverse=True)
+    return diagnostics[:ASSINATURA_MAX_DIAGNOSTICOS]
+
+
 def run_diagnostics(
     monthly: pd.DataFrame,
     latest_summary: dict,
@@ -659,4 +751,5 @@ def run_diagnostics(
             benchmark_nome=primeiro_ativo.get("benchmark"),
         )
     diagnostics += check_transacao_anomala(all_tx, latest_month)
+    diagnostics += check_assinatura_reajustada(all_tx, latest_month)
     return sorted(diagnostics, key=lambda d: d.prioridade)
