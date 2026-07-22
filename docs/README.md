@@ -1,10 +1,12 @@
-# SIFP — Sistema de Inteligência Financeira Pessoal
+# Sifra (nome técnico do sistema: SIFP)
 
 Documentação de referência do projeto. Se surgir uma dúvida sobre como o sistema funciona, por que uma decisão foi tomada, ou como mexer em alguma parte dele, comece por aqui.
 
-## O que é o SIFP
+**Nomenclatura:** o produto se chama **Sifra** pra quem usa (título das telas, marca, identidade visual). **SIFP** (Sistema de Inteligência Financeira Pessoal) continua sendo o nome técnico — pacote Python (`sifp/`), repositório (`SIFP-2.0`), variáveis de ambiente (`SIFP_DB_PATH`, `SIFP_API_URL`), nomes de projeto na Railway/Vercel. Trocar esses identificadores técnicos teria custo/risco de deploy sem nenhum ganho visível pra quem usa — ver [`DECISOES_E_LICOES.md`](DECISOES_E_LICOES.md).
 
-O SIFP não é um app de "anotar gastos" — é uma plataforma de **inteligência financeira pessoal**: importa extratos bancários reais, categoriza transações automaticamente (regras + Machine Learning), calcula indicadores, gera diagnósticos automáticos sobre a saúde financeira, projeta patrimônio futuro, e consolida tudo isso em relatórios. A ideia central é que o sistema *interprete* os dados pra você, não só os organize.
+## O que é o Sifra
+
+O Sifra não é um app de "anotar gastos" — é uma plataforma de **inteligência financeira pessoal**: importa extratos bancários reais, categoriza transações automaticamente (regras + Machine Learning), calcula indicadores, gera diagnósticos automáticos sobre a saúde financeira, projeta patrimônio futuro, e consolida tudo isso em relatórios. A ideia central é que o sistema *interprete* os dados pra você, não só os organize.
 
 Hoje é uso pessoal do Danilo. O objetivo de longo prazo é abrir como um produto que qualquer pessoa possa usar (SaaS multiusuário) — ver [`ROADMAP.md`](ROADMAP.md).
 

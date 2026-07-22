@@ -2,7 +2,7 @@
 
 Cronograma em ordem cronológica de construção. Ver [`FUNCIONALIDADES.md`](FUNCIONALIDADES.md) para o inventário completo de telas e [`DECISOES_E_LICOES.md`](DECISOES_E_LICOES.md) para o porquê de cada decisão.
 
-## Concluído (10 de 10 entregas planejadas até aqui)
+## Concluído (11 de 11 entregas planejadas até aqui)
 
 ### Fase 1 — Arquitetura em camadas
 Migração dos scripts soltos originais para uma estrutura em camadas (`domain`, `importers`, `intelligence`, `repositories`, `services`) — a base que permitiu todo o resto crescer sem reescrever o que já funcionava.
@@ -40,7 +40,10 @@ Da primeira regra estatística até o chat com acesso livre aos dados reais. As 
 4. ✅ **Explicação em linguagem natural** — botão sob demanda na tela Resumo que explica o porquê das oscilações do mês, em português simples (Claude Haiku).
 5. ✅ **Chat com perguntas livres** — tela dedicada onde o Claude consulta os dados reais por conta própria (tool use — 4 ferramentas) para responder perguntas abertas como "quanto gastei com Uber esse ano?" (Claude Haiku).
 
-## Pendente — três iniciativas em espera, não esquecidas
+### Identidade visual própria — Sifra (22/07/2026)
+Nome de marca (**Sifra** — evolução de "SIFP" pra uma palavra real: cifra = quantia em dinheiro, e também código a decifrar), paleta azul-petróleo profundo (light e dark, tokens centralizados em `globals.css`), ícone/favicon (barras ascendentes, geometria simples que funciona em qualquer tamanho), wordmark em serifada. **SIFP continua sendo o nome técnico** — pacote Python, repositório, variáveis de ambiente, projetos na Railway/Vercel não mudaram, evitando um custo de retrabalho/risco de deploy sem ganho visível pra quem usa. Ver [`DECISOES_E_LICOES.md`](DECISOES_E_LICOES.md) para o processo completo de escolha do nome.
+
+## Pendente — duas iniciativas em espera, não esquecidas
 
 Nenhuma foi descartada por falta de valor. Cada uma tem um critério claro de quando fazer sentido, e o código de hoje já foi desenhado pra não exigir retrabalho quando chegar a hora.
 
@@ -50,11 +53,6 @@ Pesquisa confirmou custo real: Pluggy a partir de R$2.500/mês, Belvo ~R$6.000/m
 **Integração direta com o BTG especificamente também foi descartada:** a API oficial do BTG (`developers.empresas.btgpactual.com`) é exclusiva pra contas Pessoa Jurídica, com plano pago — não existe versão pra pessoa física. O único caminho pra automação numa conta pessoal continua sendo o Open Finance (BTG participa como provedor de dados), o que não muda a conclusão acima.
 
 **Retomar quando:** houver receita de assinatura real. Até lá, se for necessário suportar outro banco, o caminho mais barato é adicionar mais importadores manuais (mesmo padrão do `BTGImporter`, sem custo de API).
-
-### Identidade visual própria — adiado de propósito (decisão 22/07/2026)
-Marca, nome de exibição, ícone, paleta de cores de identidade. Hoje o frontend usa um tema neutro cinza (já parecido com Linear/Notion) sobre variáveis de tema centralizadas — essa arquitetura já deixa a troca barata de aplicar mais tarde.
-
-**Retomar quando:** o sistema for aberto pra outras pessoas além do Danilo — é aí que o retorno do investimento em marca própria fica maior.
 
 ### Visão de longo prazo: SaaS multiusuário
 Hoje o SIFP é uso pessoal, sem login. A visão de longo prazo, já validada com o Danilo, é abrir como produto aberto — qualquer pessoa pode se cadastrar. Isso exige, quando chegar a hora: autenticação real (cadastro/login com senha), migração do banco de SQLite pra Postgres com isolamento de dados por usuário, e uma superfície de API mais ampla.

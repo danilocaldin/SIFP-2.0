@@ -41,7 +41,7 @@ from sifp.services.report_service import generate_text_report
 from sifp.services.summary_service import SummaryService
 
 st.set_page_config(
-    page_title="Inteligência Financeira Pessoal",
+    page_title="Sifra — Inteligência Financeira Pessoal",
     page_icon="💰",
     layout="wide",
 )
@@ -111,8 +111,8 @@ def _delta_str(pct: float | None) -> str | None:
     return None if pct is None else f"{pct:+.0f}% vs mês anterior"
 
 
-st.title("💰 Inteligência Financeira Pessoal")
-st.caption("Upload de extratos • Categorização automática (regras + Machine Learning) • Dashboard")
+st.title("💰 Sifra")
+st.caption("Inteligência financeira pessoal • Upload de extratos • Categorização automática (regras + Machine Learning) • Dashboard")
 
 (
     tab_resumo, tab_upload, tab_revisao, tab_dashboard, tab_patrimonio,

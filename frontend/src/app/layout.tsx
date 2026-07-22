@@ -5,7 +5,7 @@ import { NavBar } from "@/components/nav-bar";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SIFP — Inteligência Financeira Pessoal",
+  title: "Sifra — Inteligência Financeira Pessoal",
   description: "Como você está financeiramente, agora.",
 };
 
