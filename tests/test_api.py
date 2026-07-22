@@ -7,9 +7,10 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-from sifp.api.main import app
+from sifp.api.main import app, narrativa_service
 from sifp.repositories.connection import DEFAULT_DB_PATH, get_connection
 from sifp.repositories.transaction_repository import TransactionRepository, make_tx_hash
+from sifp.services.narrativa_service import NarrativaIndisponivel
 
 client = TestClient(app)
 
@@ -353,3 +354,30 @@ def test_revisao_confirmar_atualiza_categoria_por_tx_hash():
 
     all_tx_final = TransactionRepository().get_all()
     assert fake_desc not in all_tx_final["description"].values
+
+
+def test_narrativa_returns_texto_from_mocked_service(monkeypatch):
+    """Nunca chama a API real da Anthropic num teste — mocka a camada de
+    serviço, testa só o contrato HTTP (rota/status/shape do JSON)."""
+    monkeypatch.setattr(narrativa_service, "explicar_mes", lambda: "Explicação mockada.")
+    resp = client.post("/api/narrativa")
+    assert resp.status_code == 200
+    assert resp.json() == {"texto": "Explicação mockada."}
+
+
+def test_narrativa_returns_503_when_indisponivel(monkeypatch):
+    def _raise():
+        raise NarrativaIndisponivel("sem dados")
+
+    monkeypatch.setattr(narrativa_service, "explicar_mes", _raise)
+    resp = client.post("/api/narrativa")
+    assert resp.status_code == 503
+
+
+def test_narrativa_returns_502_on_unexpected_error(monkeypatch):
+    def _raise():
+        raise RuntimeError("falha de rede")
+
+    monkeypatch.setattr(narrativa_service, "explicar_mes", _raise)
+    resp = client.post("/api/narrativa")
+    assert resp.status_code == 502

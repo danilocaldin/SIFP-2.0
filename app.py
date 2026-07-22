@@ -11,6 +11,10 @@ Rodar com:
     streamlit run app.py
 """
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -31,6 +35,7 @@ from sifp.services import indicator_service as ind
 from sifp.services import projection_service as proj
 from sifp.services.formatting import format_brl, format_brl_md, formatar_mes
 from sifp.services.import_service import ImportService
+from sifp.services.narrativa_service import NarrativaIndisponivel, NarrativaService
 from sifp.services.report_service import generate_text_report
 from sifp.services.summary_service import SummaryService
 
@@ -49,6 +54,7 @@ budget_repo = BudgetRepository()
 goal_repo = GoalRepository()
 investment_importer = BTGInvestmentImporter()
 summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo)
+narrativa_service = NarrativaService(summary_service, transaction_repo)
 
 # ---------------------------------------------------------------------
 # Estado da sessão
@@ -198,6 +204,24 @@ with tab_resumo:
                 "📉 Nos últimos 3 meses seu saldo médio foi negativo — no ritmo atual, seu "
                 "patrimônio não cresce. Veja a aba 🔮 Projeções."
             )
+
+        st.divider()
+        if st.button("🤖 Explicar este mês em linguagem natural"):
+            with st.spinner("Gerando explicação..."):
+                try:
+                    st.session_state.narrativa_texto = narrativa_service.explicar_mes()
+                    st.session_state.narrativa_erro = None
+                except NarrativaIndisponivel as e:
+                    st.session_state.narrativa_texto = None
+                    st.session_state.narrativa_erro = str(e)
+                except Exception:
+                    st.session_state.narrativa_texto = None
+                    st.session_state.narrativa_erro = "Falha ao gerar a explicação. Tente novamente em instantes."
+
+        if st.session_state.get("narrativa_texto"):
+            st.info(st.session_state.narrativa_texto)
+        elif st.session_state.get("narrativa_erro"):
+            st.warning(st.session_state.narrativa_erro)
 
 # =======================================================================
 # TAB 1 - UPLOAD

@@ -1,6 +1,7 @@
 import type {
   Dashboard,
   Goal,
+  NarrativaResponse,
   OrcamentoData,
   Patrimonio,
   Projecoes,
@@ -185,5 +186,11 @@ export async function confirmarRevisao(
 export async function retreinarModelo(): Promise<{ mensagem: string }> {
   const res = await fetch(`${PUBLIC_API_URL}/api/revisao/retreinar`, { method: "POST" });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao re-treinar o modelo."));
+  return res.json();
+}
+
+export async function gerarNarrativa(): Promise<NarrativaResponse> {
+  const res = await fetch(`${PUBLIC_API_URL}/api/narrativa`, { method: "POST" });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao gerar a explicação."));
   return res.json();
 }

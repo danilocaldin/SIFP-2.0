@@ -15,6 +15,10 @@ Rodar com:
 import io
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -32,6 +36,7 @@ from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services.dashboard_service import DashboardService
 from sifp.services.formatting import formatar_mes, unescape_currency
 from sifp.services.import_service import ImportService
+from sifp.services.narrativa_service import NarrativaIndisponivel, NarrativaService
 from sifp.services.orcamento_service import OrcamentoService
 from sifp.services.patrimonio_service import PatrimonioService
 from sifp.services.projecoes_service import ProjecoesService
@@ -64,6 +69,7 @@ projecoes_service = ProjecoesService(transaction_repo, asset_repo, goal_repo)
 orcamento_service = OrcamentoService(transaction_repo, budget_repo)
 relatorio_service = RelatorioService(transaction_repo, asset_repo, summary_service)
 revisao_service = RevisaoService(transaction_repo)
+narrativa_service = NarrativaService(summary_service, transaction_repo)
 
 
 def _refresh_model() -> str:
@@ -121,6 +127,20 @@ def _plain_resumo(resumo: dict) -> dict:
 @app.get("/api/resumo")
 def resumo():
     return _plain_resumo(summary_service.build_resumo(formatar_mes))
+
+
+@app.post("/api/narrativa")
+def narrativa():
+    """Explicação em linguagem natural do mês, gerada sob demanda (Fase 6/IA).
+    503 quando o recurso está desligado (sem ANTHROPIC_API_KEY ou sem dados
+    ainda) — não é um erro do usuário, é um estado esperado do sistema."""
+    try:
+        texto = narrativa_service.explicar_mes()
+    except NarrativaIndisponivel as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=502, detail="Falha ao gerar a explicação. Tente novamente em instantes.")
+    return {"texto": texto}
 
 
 @app.get("/api/dashboard")

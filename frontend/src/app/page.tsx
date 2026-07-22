@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DiagnosticCard } from "@/components/diagnostic-card";
+import { NarrativaButton } from "@/components/narrativa-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getResumo } from "@/lib/api";
 import { formatBRL, formatPct, formatPctSigned } from "@/lib/format";
@@ -133,6 +134,8 @@ export default async function Home() {
           </>
         )}
       </p>
+
+      <NarrativaButton />
     </main>
   );
 }

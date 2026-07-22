@@ -22,6 +22,7 @@ Ainda não existe login — é hospedagem de uso pessoal (só o Danilo), sem aut
 |---|---|---|
 | Railway | `SIFP_DB_PATH` | `/data/financas.db` |
 | Railway | `CORS_ORIGINS` | `https://frontend-seven-virid-91.vercel.app` |
+| Railway | `ANTHROPIC_API_KEY` | chave da Anthropic (console.anthropic.com) — sem ela, o botão "Explicar este mês" fica indisponível, mas o resto do sistema funciona normalmente |
 | Vercel | `SIFP_API_URL` | `https://sifp-20-production.up.railway.app` |
 | Vercel | `NEXT_PUBLIC_SIFP_API_URL` | `https://sifp-20-production.up.railway.app` |
 

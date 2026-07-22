@@ -6,6 +6,9 @@ Inventário de cada tela: o que faz, onde a lógica mora, e o endpoint da API co
 Tela inicial. Responde de cara as três perguntas centrais: quanto você tem (patrimônio + rentabilidade do mês), como está seu saldo (com comparação ao mês anterior), e o que mais precisa de atenção agora (o diagnóstico de maior prioridade). Projeção de 12 meses condensada numa frase.
 **Serviço:** `summary_service.py` · **Endpoint:** `GET /api/resumo`
 
+Também tem um botão **"Explicar este mês em linguagem natural"** (sob demanda, não roda sozinho ao abrir a página): manda os números já agregados do mês (saldo, taxa de poupança, categorias, alertas — nunca transações individuais) pro Claude Haiku, que devolve 3-4 frases em português simples explicando por que o saldo/gastos se comportaram assim. Fica indisponível (sem erro visível pro resto do sistema) se `ANTHROPIC_API_KEY` não estiver configurada.
+**Serviço:** `narrativa_service.py` · **Endpoint:** `POST /api/narrativa`
+
 ## Upload (`/upload`)
 Importa um extrato bancário (CSV, XLS ou XLSX do BTG). Fluxo em duas etapas: primeiro mostra uma pré-visualização das transações lidas (sem gravar nada), depois — só quando você confirma — categoriza e grava de fato. Reimportar o mesmo arquivo nunca duplica dados (detecção por hash da transação).
 

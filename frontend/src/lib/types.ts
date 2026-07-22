@@ -37,6 +37,12 @@ export interface ResumoEmpty {
 
 export type Resumo = ResumoData | ResumoEmpty;
 
+// Espelha POST /api/narrativa (sifp/services/narrativa_service.py).
+
+export interface NarrativaResponse {
+  texto: string;
+}
+
 // Espelha GET /api/dashboard (sifp/services/dashboard_service.py).
 
 export interface CategoryBreakdown {

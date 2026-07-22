@@ -24,3 +24,6 @@ files.zip
 # Config local do Claude Code (por máquina, pode conter caminhos/nomes de
 # arquivo locais — não é código do projeto)
 .claude/settings.local.json
+
+# Segredos locais (API keys) — nunca versionar
+.env
