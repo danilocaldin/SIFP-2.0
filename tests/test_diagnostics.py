@@ -500,3 +500,109 @@ def test_run_diagnostics_integra_dinheiro_parado():
     )
     codigos = {d.codigo for d in result}
     assert "custo_dinheiro_parado" in codigos
+
+
+# ---------------------------------------------------------------------
+# transação anômala (Fase 6 -- detecção de anomalia estatística, sem IA)
+# ---------------------------------------------------------------------
+def _tx_row(month, category, value, description="Compra", date="2026-06-10 10:00", tx_hash=None):
+    row = {"month": month, "category": category, "value": value, "description": description, "date": date}
+    if tx_hash is not None:
+        row["tx_hash"] = tx_hash
+    return row
+
+
+def _historico_mercado(mes_atual_valor=None, meses_historicos=("2026-01", "2026-02", "2026-03", "2026-04", "2026-05")):
+    # 5 meses de histórico ~50 reais em Mercado -> Q1~46, Q3~54, limiar (Tukey) ~66
+    valores_hist = [40.0, 45.0, 50.0, 55.0, 60.0]
+    rows = [
+        _tx_row(mes, "Mercado", -valor)
+        for mes, valor in zip(meses_historicos, valores_hist)
+    ]
+    if mes_atual_valor is not None:
+        rows.append(_tx_row("2026-06", "Mercado", -mes_atual_valor))
+    return pd.DataFrame(rows)
+
+
+def test_transacao_anomala_nao_dispara_sem_historico_suficiente():
+    # só 2 transações históricas -- abaixo do mínimo de 5
+    df = pd.DataFrame([
+        _tx_row("2026-04", "Mercado", -50.0),
+        _tx_row("2026-05", "Mercado", -50.0),
+        _tx_row("2026-06", "Mercado", -1000.0),
+    ])
+    assert diag.check_transacao_anomala(df, latest_month="2026-06") == []
+
+
+def test_transacao_anomala_nao_dispara_dentro_do_padrao():
+    df = _historico_mercado(mes_atual_valor=58.0)  # bem dentro do limiar (~66)
+    assert diag.check_transacao_anomala(df, latest_month="2026-06") == []
+
+
+def test_transacao_anomala_dispara_para_valor_fora_do_padrao():
+    df = _historico_mercado(mes_atual_valor=500.0)
+    result = diag.check_transacao_anomala(df, latest_month="2026-06")
+    assert len(result) == 1
+    assert result[0].severidade == DiagnosticSeverity.MEDIA
+    assert "Mercado" in result[0].titulo
+    assert result[0].impacto_financeiro == pytest.approx(500.0 - 50.0)  # media historica = 50
+
+
+def test_transacao_anomala_ignora_categoria_nao_categorizada():
+    rows = [_tx_row(m, CATEGORIA_NAO_CATEGORIZADO, -v) for m, v in zip(
+        ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05"], [40, 45, 50, 55, 60]
+    )]
+    rows.append(_tx_row("2026-06", CATEGORIA_NAO_CATEGORIZADO, -1000.0))
+    df = pd.DataFrame(rows)
+    assert diag.check_transacao_anomala(df, latest_month="2026-06") == []
+
+
+def test_transacao_anomala_ignora_self_transfer():
+    from sifp.domain.categories import SELF_TRANSFER_CATEGORY
+    rows = [_tx_row(m, SELF_TRANSFER_CATEGORY, -v) for m, v in zip(
+        ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05"], [40, 45, 50, 55, 60]
+    )]
+    rows.append(_tx_row("2026-06", SELF_TRANSFER_CATEGORY, -1000.0))
+    df = pd.DataFrame(rows)
+    assert diag.check_transacao_anomala(df, latest_month="2026-06") == []
+
+
+def test_transacao_anomala_sem_mes_atual_retorna_vazio():
+    df = _historico_mercado(mes_atual_valor=500.0)
+    assert diag.check_transacao_anomala(df, latest_month=None) == []
+
+
+def test_transacao_anomala_ignora_diferenca_pequena_mesmo_fora_do_iqr():
+    # so 1 real acima do limiar estatistico -- nao vale a pena mencionar
+    df = _historico_mercado(mes_atual_valor=66.5)
+    assert diag.check_transacao_anomala(df, latest_month="2026-06") == []
+
+
+def test_transacao_anomala_limita_ao_top_3():
+    rows = []
+    for cat in ["A", "B", "C", "D"]:
+        for i, valor in enumerate([40.0, 45.0, 50.0, 55.0, 60.0]):
+            rows.append(_tx_row(f"2026-0{i+1}", cat, -valor))
+    # anomalias com magnitudes diferentes por categoria
+    rows.append(_tx_row("2026-06", "A", -600.0))
+    rows.append(_tx_row("2026-06", "B", -500.0))
+    rows.append(_tx_row("2026-06", "C", -400.0))
+    rows.append(_tx_row("2026-06", "D", -300.0))
+    df = pd.DataFrame(rows)
+    result = diag.check_transacao_anomala(df, latest_month="2026-06")
+    assert len(result) == 3
+    assert "A" in result[0].titulo  # maior impacto financeiro primeiro
+
+
+def test_run_diagnostics_integra_transacao_anomala():
+    df = _historico_mercado(mes_atual_valor=500.0)
+    monthly = pd.DataFrame({"month": ["2026-06"], "Receitas": [5000], "Despesas": [500], "Saldo": [4500]})
+    summary = {"receitas": 5000, "despesas": 500, "saldo": 4500, "taxa_poupanca": 90.0}
+    by_cat = pd.DataFrame({"category": ["Mercado"], "value_abs": [500.0], "pct": [100.0]})
+
+    result = diag.run_diagnostics(
+        monthly=monthly, latest_summary=summary, latest_period_label="Jun/2026",
+        latest_by_cat=by_cat, all_tx=df, latest_month="2026-06",
+    )
+    codigos = {d.codigo for d in result}
+    assert any(c.startswith("transacao_anomala_") for c in codigos)

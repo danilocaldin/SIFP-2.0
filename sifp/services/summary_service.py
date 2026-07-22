@@ -59,6 +59,7 @@ class SummaryService:
             latest_assets=latest_assets,
             category_trend_df=ind.category_trend(all_tx_real),
             weekend_stats=ind.weekend_vs_weekday_spending(all_tx_real),
+            latest_month=month,
             balance_stats=ind.average_balance(self.balance_repo.get_all()),
         )
 

@@ -16,7 +16,7 @@ lista não mudam.
 
 import pandas as pd
 
-from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
+from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO, SELF_TRANSFER_CATEGORY
 from sifp.domain.models import Diagnostic, DiagnosticSeverity
 from sifp.services.formatting import format_brl_md as _brl
 
@@ -532,6 +532,86 @@ def check_custo_dinheiro_parado(
     ]
 
 
+TRANSACAO_ANOMALA_MIN_HISTORICO = 5  # mínimo de transações anteriores na categoria pra confiar no padrão
+TRANSACAO_ANOMALA_LIMIAR_RS = 50.0  # precisa exceder o limiar estatístico em pelo menos isso pra valer a pena mencionar
+TRANSACAO_ANOMALA_MAX_DIAGNOSTICOS = 3  # não inundar a tela — só as maiores anomalias
+
+
+def check_transacao_anomala(all_tx: pd.DataFrame, latest_month: str | None) -> list[Diagnostic]:
+    """
+    all_tx: TransactionRepository.get_all() (todo o histórico, com coluna
+    'month'). Fase 6 (IA) — primeira peça: detecção de anomalias
+    estatística, sem depender de nenhum modelo de linguagem.
+
+    Pra cada categoria com gasto no mês diagnosticado, compara cada
+    transação individual contra a distribuição histórica DAQUELA categoria
+    (método de Tukey: fora do padrão se valor > Q3 + 1.5×IQR — mais
+    robusto que desvio-padrão pra gastos, que costumam ser assimétricos).
+    Categoria sem histórico suficiente (< TRANSACAO_ANOMALA_MIN_HISTORICO
+    transações anteriores) não gera diagnóstico — não há base de
+    comparação confiável, e um falso alarme é pior que silêncio. Também
+    exige que o valor exceda o limiar estatístico em pelo menos
+    TRANSACAO_ANOMALA_LIMIAR_RS reais, pra não sinalizar diferenças
+    estatisticamente "fora da curva" mas financeiramente irrelevantes em
+    categorias de gasto baixo. Self-transfer fica de fora (não é gasto).
+    """
+    if all_tx.empty or not latest_month or "month" not in all_tx.columns:
+        return []
+
+    despesas = all_tx[
+        (all_tx["value"] < 0)
+        & (all_tx["category"] != CATEGORIA_NAO_CATEGORIZADO)
+        & (all_tx["category"] != SELF_TRANSFER_CATEGORY)
+    ].copy()
+    if despesas.empty:
+        return []
+    despesas["value_abs"] = despesas["value"].abs()
+
+    atuais = despesas[despesas["month"] == latest_month]
+    historico = despesas[despesas["month"] != latest_month]
+    if atuais.empty:
+        return []
+
+    diagnostics: list[Diagnostic] = []
+    for categoria in atuais["category"].unique():
+        hist_valores = historico.loc[historico["category"] == categoria, "value_abs"]
+        if len(hist_valores) < TRANSACAO_ANOMALA_MIN_HISTORICO:
+            continue
+
+        q1, q3 = hist_valores.quantile(0.25), hist_valores.quantile(0.75)
+        limiar = q3 + 1.5 * (q3 - q1)
+        if limiar <= 0:
+            continue
+
+        media_hist = float(hist_valores.mean())
+        atuais_cat = atuais[atuais["category"] == categoria]
+        anomalas = atuais_cat[atuais_cat["value_abs"] - limiar >= TRANSACAO_ANOMALA_LIMIAR_RS]
+
+        for _, row in anomalas.iterrows():
+            diagnostics.append(
+                Diagnostic(
+                    codigo=f"transacao_anomala_{row.get('tx_hash') or categoria}",
+                    titulo=f"Gasto fora do padrão em {categoria}",
+                    severidade=DiagnosticSeverity.MEDIA,
+                    descricao=(
+                        f"'{row['description']}' — {_brl(row['value_abs'])} em "
+                        f"{pd.Timestamp(row['date']).strftime('%d/%m/%Y')} — é bem maior que o "
+                        f"normal pra '{categoria}' (média histórica de {_brl(media_hist)})."
+                    ),
+                    explicacao=(
+                        "Uma transação muito acima do padrão da categoria pode ser um gasto "
+                        "pontual esperado (ok) ou um sinal de algo que vale conferir — cobrança "
+                        "duplicada, erro de valor, ou um gasto que fugiu do planejado."
+                    ),
+                    recomendacao="Confira essa transação específica no Dashboard pra confirmar se está correta.",
+                    impacto_financeiro=float(row["value_abs"] - media_hist),
+                )
+            )
+
+    diagnostics.sort(key=lambda d: d.impacto_financeiro or 0, reverse=True)
+    return diagnostics[:TRANSACAO_ANOMALA_MAX_DIAGNOSTICOS]
+
+
 def run_diagnostics(
     monthly: pd.DataFrame,
     latest_summary: dict,
@@ -547,6 +627,7 @@ def run_diagnostics(
     category_trend_df: pd.DataFrame | None = None,
     weekend_stats: dict | None = None,
     balance_stats: dict | None = None,
+    latest_month: str | None = None,
 ) -> list[Diagnostic]:
     """
     Roda todas as regras cadastradas e devolve a lista ordenada por
@@ -577,4 +658,5 @@ def run_diagnostics(
             taxa_anual_referencia=primeiro_ativo.get("benchmark_12m_pct"),
             benchmark_nome=primeiro_ativo.get("benchmark"),
         )
+    diagnostics += check_transacao_anomala(all_tx, latest_month)
     return sorted(diagnostics, key=lambda d: d.prioridade)
