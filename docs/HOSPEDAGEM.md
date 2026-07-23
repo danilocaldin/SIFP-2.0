@@ -4,17 +4,20 @@
 
 | | URL |
 |---|---|
-| **App (uso diário)** | https://frontend-seven-virid-91.vercel.app |
-| API (uso interno) | https://sifp-20-production.up.railway.app |
+| **App pessoal do Danilo (uso diário)** | https://frontend-seven-virid-91.vercel.app |
+| **SaaS multiusuário (clientes, com login)** | https://sifra-saas.vercel.app |
+| API (compartilhada pelos dois acima) | https://sifp-20-production.up.railway.app |
 | Repositório | https://github.com/danilocaldin/SIFP-2.0 |
 
-Ainda não existe login — é hospedagem de uso pessoal (só o Danilo), sem autenticação. Virar produto multiusuário é uma etapa futura deliberadamente separada (ver [`ROADMAP.md`](ROADMAP.md)).
+Duas frentes, mesmo código-fonte e mesma API: o app pessoal do Danilo continua sem login (SQLite, rotas `/api/...`); o SaaS multiusuário exige login (Supabase Postgres + Row Level Security, rotas `/api/v2/...`). Uma única variável de ambiente no frontend (`NEXT_PUBLIC_SAAS_MODE`) decide qual modo cada deploy roda — nenhuma tela foi duplicada. Ver [`DECISOES_E_LICOES.md`](DECISOES_E_LICOES.md) e a memória do projeto para o processo completo de migração.
 
 ## Como está montado
 
-- **Frontend** (Next.js) → **Vercel**, projeto `danilocaldins-projects/frontend`, deploy a partir da pasta `frontend/` do repositório.
-- **API** (FastAPI) → **Railway**, projeto `zooming-motivation`, serviço `SIFP-2.0`, buildado a partir do `Dockerfile` na raiz do repositório.
-- **Banco de dados** (SQLite) → arquivo num **volume persistente** do Railway, montado em `/data`. Sobrevive a redeploys porque fica fora da imagem Docker.
+- **Frontend pessoal** (Next.js) → **Vercel**, projeto `danilocaldins-projects/frontend`, deploy a partir da pasta `frontend/` do repositório. `NEXT_PUBLIC_SAAS_MODE` não definida.
+- **Frontend SaaS** (mesmo código) → **Vercel**, projeto `danilocaldins-projects/sifra-saas`. `NEXT_PUBLIC_SAAS_MODE=true`.
+- **API** (FastAPI) → **Railway**, projeto `zooming-motivation`, serviço `SIFP-2.0`, buildado a partir do `Dockerfile` na raiz do repositório. Serve os dois frontends ao mesmo tempo.
+- **Banco de dados do app pessoal** (SQLite) → arquivo num **volume persistente** do Railway, montado em `/data`. Sobrevive a redeploys porque fica fora da imagem Docker.
+- **Banco de dados do SaaS** (Postgres + Auth) → **Supabase**, projeto `sifra-saas` (org `danilocaldin`, região `sa-east-1`). Row Level Security isola os dados de cada cliente no próprio banco — ver `sifp/repositories/pg/schema.sql`.
 
 ### Variáveis de ambiente
 
@@ -23,10 +26,17 @@ Ainda não existe login — é hospedagem de uso pessoal (só o Danilo), sem aut
 | Railway | `SIFP_DB_PATH` | `/data/financas.db` |
 | Railway | `CORS_ORIGINS` | `https://frontend-seven-virid-91.vercel.app` |
 | Railway | `ANTHROPIC_API_KEY` | chave da Anthropic (console.anthropic.com) — sem ela, o botão "Explicar este mês" fica indisponível, mas o resto do sistema funciona normalmente |
-| Vercel | `SIFP_API_URL` | `https://sifp-20-production.up.railway.app` |
-| Vercel | `NEXT_PUBLIC_SIFP_API_URL` | `https://sifp-20-production.up.railway.app` |
+| Railway | `SUPABASE_URL` | `https://nkusahedzogplsjknijj.supabase.co` |
+| Railway | `SUPABASE_PUBLISHABLE_KEY` | chave pública do Supabase (safe, não é segredo) |
+| Railway | `SUPABASE_DB_URL` | connection string do Postgres (transaction pooler, porta 6543 — IPv4, Railway não tem IPv6) |
+| Vercel (app pessoal) | `SIFP_API_URL` / `NEXT_PUBLIC_SIFP_API_URL` | `https://sifp-20-production.up.railway.app` |
+| Vercel (SaaS) | mesmas duas acima, **mais** `NEXT_PUBLIC_SAAS_MODE=true`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | |
 
 (`SIFP_API_URL` é usada no servidor do Next.js; `NEXT_PUBLIC_SIFP_API_URL` é a mesma URL, mas com o prefixo que o Next.js exige pra deixá-la acessível também no navegador — funcionalidades como Upload chamam a API direto do navegador do usuário.)
+
+## Convidando um novo cliente pro SaaS
+
+Cadastro é por convite, não é aberto ao público (decisão do Danilo, dado sensível financeiro). Painel do Supabase → **Authentication → Users → Add user**, com "Auto Confirm User" marcado (ou usar "Send magic link"/"Invite" se preferir que o próprio cliente defina a senha por e-mail). O cliente acessa https://sifra-saas.vercel.app e loga — os dados dele nascem vazios e isolados dos de qualquer outro cliente (RLS garante isso no banco, não só no código).
 
 ## Como publicar uma atualização
 

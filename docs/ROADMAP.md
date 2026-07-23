@@ -48,13 +48,18 @@ Nome de marca (**Sifra** — evolução de "SIFP" pra uma palavra real: cifra = 
 ### Relatório em PDF (23/07/2026)
 Botão "Baixar PDF" na tela Relatório (frontend) e na aba Relatório (Streamlit), ao lado do já existente ".txt". Capa com a marca, número de patrimônio em destaque, resumo do mês, gráfico de gastos por categoria e de evolução mensal (nativos, `reportlab.graphics.charts` — sem depender de matplotlib), e os 3 diagnósticos mais relevantes — deliberadamente curto (1–2 páginas), não um documento institucional denso. `pdf_report_service.py` reaproveita exatamente os mesmos dados que `RelatorioService` já compõe pro relatório em texto (nenhum número recalculado). Escolhido reportlab (puro Python) em vez de WeasyPrint pra evitar dependência nativa de SO (Pango/Cairo) — mesmo raciocínio da fonte Geist self-hosted.
 
+### SaaS multiusuário — no ar (23/07/2026)
+Danilo decidiu começar a entregar o Sifra pra clientes reais (22/07/2026) e confirmou Supabase como base (23/07/2026). Construído e publicado no mesmo dia: https://sifra-saas.vercel.app, cadastro por convite (não é aberto ao público). Ver [`HOSPEDAGEM.md`](HOSPEDAGEM.md) para como convidar um cliente.
+
+Postgres + Supabase Auth + Row Level Security — isolamento entre clientes garantido no próprio banco (`sifp/repositories/pg/`), não só em código. Mesmo código-fonte do frontend serve os dois produtos (`NEXT_PUBLIC_SAAS_MODE` liga/desliga login e troca `/api/` por `/api/v2/`) — nenhuma tela foi duplicada. A API na Railway serve os dois deploys ao mesmo tempo, rotas `/api/...` (SQLite, sem auth) e `/api/v2/...` (Postgres, com auth) convivendo lado a lado.
+
+O app pessoal do Danilo (Streamlit e o frontend de sempre) continua exatamente como sempre foi — sem login, sem mudança nenhuma.
+
+**Estratégia interim de instância isolada por cliente** ([`CLIENTES.md`](CLIENTES.md)) segue documentada como plano B, mas não é mais o caminho principal agora que o SaaS de verdade está no ar.
+
 ## Em andamento
 
-### SaaS multiusuário (decisão de escalar tomada em 22/07/2026)
-Danilo decidiu começar a entregar o Sifra pra clientes reais. Duas frentes em paralelo:
-
-1. **Estratégia rápida, disponível já:** uma instância isolada por cliente (próprio deploy, próprio banco vazio, sem necessidade de login porque cada um tem sua própria URL). Zero trabalho novo de código — reaproveita o processo de hospedagem já validado. Ver o passo a passo completo em [`CLIENTES.md`](CLIENTES.md).
-2. **Estratégia definitiva, em construção por trás:** SaaS multiusuário de verdade — um único sistema, cadastro aberto, dados isolados por usuário no banco. Exige: autenticação real, migração de SQLite pra Postgres, isolamento de dados por usuário em toda tabela/rota, e telas de cadastro/login no frontend novo (o Streamlit **não** vai ganhar login — continua sendo só a ferramenta pessoal do Danilo).
+Nada em construção ativa no momento além de refinar a identidade de marca e convidar os primeiros clientes reais pro SaaS.
 
 **Decisão de arquitetura proposta (aguardando confirmação do Danilo):** usar **Supabase** como base — hospeda o Postgres *e* a autenticação no mesmo provedor, e oferece Row Level Security (RLS): o isolamento entre clientes fica garantido no próprio banco de dados, não só em cada linha de código que filtra por usuário. Isso importa especialmente aqui porque um filtro esquecido numa única query seria um vazamento real de dado financeiro entre clientes, não um bug cosmético — RLS fecha essa classe inteira de erro numa camada só, em vez de depender de disciplina manual espalhada em cada repository.
 
