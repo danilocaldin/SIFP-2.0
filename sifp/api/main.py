@@ -12,21 +12,21 @@ Rodar com:
     uvicorn sifp.api.main:app --reload --port 8000
 """
 
-import io
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from sifp.api.routes_saas import router as saas_router
+from sifp.api.shared import as_file_like, categorization_service, transactions_payload
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
 from sifp.importers.btg_importer import BTGImporter
 from sifp.importers.btg_investment_importer import BTGInvestmentImporter
-from sifp.intelligence.categorization import CategorizationService
 from sifp.repositories.asset_repository import AssetRepository
 from sifp.repositories.balance_repository import BalanceRepository
 from sifp.repositories.budget_repository import BudgetRepository
@@ -53,10 +53,6 @@ asset_repo = AssetRepository()
 budget_repo = BudgetRepository()
 goal_repo = GoalRepository()
 investment_importer = BTGInvestmentImporter()
-# Estado do modelo de ML vive nesta instância (mesmo padrão de
-# st.session_state.categorization no Streamlit) — singleton do processo,
-# recarrega do disco (categorizer_model.joblib) uma vez no boot da API.
-categorization_service = CategorizationService.load()
 import_service = ImportService(
     importers=[BTGImporter()],
     categorization=categorization_service,
@@ -79,15 +75,8 @@ def _refresh_model() -> str:
     return categorization_service.train(training_df)
 
 
-def _as_file_like(file: UploadFile) -> io.BytesIO:
-    """Importers/ImportService esperam um arquivo com `.name` (mesma
-    interface do UploadedFile do Streamlit) pra decidir o parser pela
-    extensão — UploadFile.file (SpooledTemporaryFile) não garante isso."""
-    file_like = io.BytesIO(file.file.read())
-    file_like.name = file.filename or ""
-    return file_like
-
 app = FastAPI(title="SIFP API")
+app.include_router(saas_router)
 
 # Origem(s) do frontend, via env var — sem isso, hospedar em outra máquina
 # (ou domínio de produção) exigiria editar código-fonte. CORS_ORIGINS
@@ -261,33 +250,36 @@ def relatorio(month: str | None = None):
     return relatorio_service.build_relatorio(month, formatar_mes)
 
 
-def _transactions_payload(df) -> list[dict]:
-    """Sanitiza tipos numpy (bool_/float64) que o encoder JSON do FastAPI
-    não serializa nativamente, antes de devolver linhas de transação."""
-    records = df.to_dict("records")
-    for r in records:
-        r["value"] = float(r["value"])
-        r["self_transfer"] = bool(r["self_transfer"])
-    return records
+@app.get("/api/relatorio/pdf")
+def relatorio_pdf(month: str | None = None):
+    pdf_bytes = relatorio_service.build_relatorio_pdf(month, formatar_mes)
+    if pdf_bytes is None:
+        raise HTTPException(status_code=404, detail="Nenhum dado importado ainda.")
+    nome_arquivo = f"relatorio_sifra_{month or 'atual'}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'},
+    )
 
 
 @app.post("/api/upload/preview")
 def upload_preview(file: UploadFile):
     try:
-        df, balances = import_service.parse(_as_file_like(file))
+        df, balances = import_service.parse(as_file_like(file))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {
         "count": len(df),
         "balances_count": len(balances),
-        "preview": _transactions_payload(df.head(10)),
+        "preview": transactions_payload(df.head(10)),
     }
 
 
 @app.post("/api/upload/persist")
 def upload_persist(file: UploadFile):
     try:
-        summary = import_service.import_and_persist(_as_file_like(file))
+        summary = import_service.import_and_persist(as_file_like(file))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return summary

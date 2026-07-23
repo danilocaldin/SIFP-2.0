@@ -3,7 +3,7 @@ import { MonthlyEvolutionChart } from "@/components/charts/monthly-evolution-cha
 import { DiagnosticCard } from "@/components/diagnostic-card";
 import { NarrativaButton } from "@/components/narrativa-button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getDashboard, getResumo } from "@/lib/api";
+import { getDashboard, getResumo } from "@/lib/api-server";
 import { formatBRL, formatPct, formatPctSigned } from "@/lib/format";
 
 export default async function Home() {

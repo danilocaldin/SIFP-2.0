@@ -113,6 +113,17 @@ def test_relatorio_accepts_month_query_param():
         assert "report_text" in body and isinstance(body["report_text"], str)
 
 
+def test_relatorio_pdf_returns_pdf_bytes_when_has_data():
+    resp_json = client.get("/api/relatorio")
+    resp_pdf = client.get("/api/relatorio/pdf")
+    if resp_json.json()["has_data"]:
+        assert resp_pdf.status_code == 200
+        assert resp_pdf.headers["content-type"] == "application/pdf"
+        assert resp_pdf.content.startswith(b"%PDF")
+    else:
+        assert resp_pdf.status_code == 404
+
+
 def test_criar_e_remover_limite_de_orcamento():
     """Usa uma categoria real da lista padrão, mas restaura o estado
     original no final (mesmo se a asserção falhar) — a API roda contra o

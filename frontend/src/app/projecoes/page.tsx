@@ -1,7 +1,7 @@
 import { ProjectionChart } from "@/components/charts/projection-chart";
 import { HorizonteSelect } from "@/components/horizonte-select";
 import { Card, CardContent } from "@/components/ui/card";
-import { getProjecoes } from "@/lib/api";
+import { getProjecoes } from "@/lib/api-server";
 import { formatBRL, formatPct } from "@/lib/format";
 
 const VALID_HORIZONTES = [6, 12, 24];

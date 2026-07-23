@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getPatrimonio } from "@/lib/api";
+import { getPatrimonio } from "@/lib/api-server";
 import { formatBRL, formatPct } from "@/lib/format";
 
 export default async function PatrimonioPage() {

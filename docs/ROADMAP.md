@@ -45,6 +45,9 @@ Nome de marca (**Sifra** — evolução de "SIFP" pra uma palavra real: cifra = 
 
 **Segunda passada, depois do feedback "muito simples, não profissional" (22/07/2026):** menu lateral fixo sempre na cor de tinta da marca (independente do tema claro/escuro do conteúdo), agrupado por propósito com ícones; Resumo ganhou um gráfico de evolução mensal de verdade e um número de patrimônio grande em serifada; e alternador de modo claro/escuro (`next-themes`, detecta a preferência do sistema operacional e lembra a escolha entre visitas).
 
+### Relatório em PDF (23/07/2026)
+Botão "Baixar PDF" na tela Relatório (frontend) e na aba Relatório (Streamlit), ao lado do já existente ".txt". Capa com a marca, número de patrimônio em destaque, resumo do mês, gráfico de gastos por categoria e de evolução mensal (nativos, `reportlab.graphics.charts` — sem depender de matplotlib), e os 3 diagnósticos mais relevantes — deliberadamente curto (1–2 páginas), não um documento institucional denso. `pdf_report_service.py` reaproveita exatamente os mesmos dados que `RelatorioService` já compõe pro relatório em texto (nenhum número recalculado). Escolhido reportlab (puro Python) em vez de WeasyPrint pra evitar dependência nativa de SO (Pango/Cairo) — mesmo raciocínio da fonte Geist self-hosted.
+
 ## Em andamento
 
 ### SaaS multiusuário (decisão de escalar tomada em 22/07/2026)

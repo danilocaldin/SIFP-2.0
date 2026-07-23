@@ -1,6 +1,6 @@
 import { BudgetSection } from "@/components/budget-section";
 import { GoalsSection } from "@/components/goals-section";
-import { getMetas, getOrcamento } from "@/lib/api";
+import { getMetas, getOrcamento } from "@/lib/api-server";
 
 export default async function OrcamentoPage() {
   const [orcamento, metas] = await Promise.all([getOrcamento(), getMetas()]);

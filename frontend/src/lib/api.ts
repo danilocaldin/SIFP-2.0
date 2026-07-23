@@ -1,22 +1,11 @@
-import type {
-  ChatMensagem,
-  ChatResponse,
-  Dashboard,
-  Goal,
-  NarrativaResponse,
-  OrcamentoData,
-  Patrimonio,
-  Projecoes,
-  Relatorio,
-  Resumo,
-  Revisao,
-  UploadPersistSummary,
-  UploadPreview,
-} from "@/lib/types";
+import type { ChatMensagem, ChatResponse, NarrativaResponse, UploadPersistSummary, UploadPreview } from "@/lib/types";
+import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client";
 
-// Server Components rodam no processo Node do Next, então este fetch é
-// servidor-para-servidor — nunca passa pelo navegador, não precisa de CORS.
-const API_URL = process.env.SIFP_API_URL ?? "http://localhost:8000";
+// Este arquivo é seguro pra importar de Client Components — nunca toca
+// next/headers nem nada exclusivo de servidor. As buscas (get*) usadas por
+// Server Components ficam em api-server.ts, separado de propósito: um
+// import estático de next/headers aqui quebraria qualquer Client
+// Component que importasse deste mesmo módulo (ver narrativa-button.tsx).
 
 // Client Components (ex: upload de PDF) chamam a API direto do navegador —
 // precisa do prefixo NEXT_PUBLIC_ pro Next.js embutir o valor no bundle do
@@ -24,77 +13,22 @@ const API_URL = process.env.SIFP_API_URL ?? "http://localhost:8000";
 // caminho o CORS do backend entra em ação (ver sifp/api/main.py).
 export const PUBLIC_API_URL = process.env.NEXT_PUBLIC_SIFP_API_URL ?? "http://localhost:8000";
 
-export async function getResumo(): Promise<Resumo> {
-  const res = await fetch(`${API_URL}/api/resumo`, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Falha ao buscar /api/resumo: ${res.status}`);
-  }
-  return res.json();
-}
+// Mesmo código-fonte, dois deploys: o Sifra pessoal do Danilo (sem login,
+// SQLite, rotas /api/...) e o SaaS multiusuário (login obrigatório,
+// Postgres+RLS, rotas /api/v2/...). SAAS_MODE=true muda o prefixo das
+// rotas e passa a anexar o token de sessão do Supabase em toda chamada —
+// nada mais muda (mesmas telas, mesmos componentes).
+export const SAAS_MODE = process.env.NEXT_PUBLIC_SAAS_MODE === "true";
+export const API_PREFIX = SAAS_MODE ? "/api/v2" : "/api";
 
-export async function getDashboard(month?: string): Promise<Dashboard> {
-  const url = new URL(`${API_URL}/api/dashboard`);
-  if (month) url.searchParams.set("month", month);
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Falha ao buscar /api/dashboard: ${res.status}`);
-  }
-  return res.json();
+async function authHeadersClient(): Promise<Record<string, string>> {
+  if (!SAAS_MODE) return {};
+  const supabase = createBrowserSupabaseClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session ? { Authorization: `Bearer ${session.access_token}` } : {};
 }
-
-export async function getPatrimonio(): Promise<Patrimonio> {
-  const res = await fetch(`${API_URL}/api/patrimonio`, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Falha ao buscar /api/patrimonio: ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function getProjecoes(horizonte: number = 12): Promise<Projecoes> {
-  const url = new URL(`${API_URL}/api/projecoes`);
-  url.searchParams.set("horizonte", String(horizonte));
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Falha ao buscar /api/projecoes: ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function getOrcamento(): Promise<OrcamentoData> {
-  const res = await fetch(`${API_URL}/api/orcamento`, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Falha ao buscar /api/orcamento: ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function getMetas(): Promise<Goal[]> {
-  const res = await fetch(`${API_URL}/api/metas`, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Falha ao buscar /api/metas: ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function getRevisao(): Promise<Revisao> {
-  const res = await fetch(`${API_URL}/api/revisao`, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Falha ao buscar /api/revisao: ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function getRelatorio(month?: string): Promise<Relatorio> {
-  const url = new URL(`${API_URL}/api/relatorio`);
-  if (month) url.searchParams.set("month", month);
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Falha ao buscar /api/relatorio: ${res.status}`);
-  }
-  return res.json();
-}
-
-// --- Mutações: chamadas do navegador (Client Components), usam PUBLIC_API_URL ---
 
 async function parseErrorDetail(res: Response, fallback: string): Promise<string> {
   try {
@@ -106,48 +40,56 @@ async function parseErrorDetail(res: Response, fallback: string): Promise<string
 }
 
 export async function criarLimite(category: string, valor: number): Promise<void> {
-  const res = await fetch(`${PUBLIC_API_URL}/api/orcamento/limites`, {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/orcamento/limites`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
     body: JSON.stringify({ category, valor }),
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao salvar o limite."));
 }
 
 export async function removerLimite(category: string): Promise<void> {
-  const res = await fetch(`${PUBLIC_API_URL}/api/orcamento/limites/${encodeURIComponent(category)}`, {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/orcamento/limites/${encodeURIComponent(category)}`, {
     method: "DELETE",
+    headers: await authHeadersClient(),
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao remover o limite."));
 }
 
 export async function criarMeta(nome: string, valorNecessario: number, prazo: string): Promise<void> {
-  const res = await fetch(`${PUBLIC_API_URL}/api/metas`, {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/metas`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
     body: JSON.stringify({ nome, valor_necessario: valorNecessario, prazo }),
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao criar a meta."));
 }
 
 export async function atualizarProgressoMeta(id: number, valorAcumulado: number): Promise<void> {
-  const res = await fetch(`${PUBLIC_API_URL}/api/metas/${id}`, {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/metas/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
     body: JSON.stringify({ valor_acumulado: valorAcumulado }),
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao atualizar a meta."));
 }
 
 export async function excluirMeta(id: number): Promise<void> {
-  const res = await fetch(`${PUBLIC_API_URL}/api/metas/${id}`, { method: "DELETE" });
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/metas/${id}`, {
+    method: "DELETE",
+    headers: await authHeadersClient(),
+  });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao excluir a meta."));
 }
 
 export async function previewUpload(file: File): Promise<UploadPreview> {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${PUBLIC_API_URL}/api/upload/preview`, { method: "POST", body: formData });
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/upload/preview`, {
+    method: "POST",
+    body: formData,
+    headers: await authHeadersClient(),
+  });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao ler o arquivo."));
   return res.json();
 }
@@ -155,7 +97,11 @@ export async function previewUpload(file: File): Promise<UploadPreview> {
 export async function persistUpload(file: File): Promise<UploadPersistSummary> {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${PUBLIC_API_URL}/api/upload/persist`, { method: "POST", body: formData });
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/upload/persist`, {
+    method: "POST",
+    body: formData,
+    headers: await authHeadersClient(),
+  });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao importar o arquivo."));
   return res.json();
 }
@@ -164,9 +110,9 @@ export async function aplicarCategoriaEmLote(
   description: string,
   category: string
 ): Promise<{ atualizadas: number; mensagem_treino: string }> {
-  const res = await fetch(`${PUBLIC_API_URL}/api/revisao/lote`, {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/revisao/lote`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
     body: JSON.stringify({ description, category }),
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao aplicar categoria em lote."));
@@ -176,9 +122,9 @@ export async function aplicarCategoriaEmLote(
 export async function confirmarRevisao(
   updates: { tx_hash: string; category: string }[]
 ): Promise<{ confirmadas: number; ainda_pendentes: number; mensagem_treino: string }> {
-  const res = await fetch(`${PUBLIC_API_URL}/api/revisao/confirmar`, {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/revisao/confirmar`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
     body: JSON.stringify({ updates }),
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao confirmar a revisão."));
@@ -186,21 +132,35 @@ export async function confirmarRevisao(
 }
 
 export async function retreinarModelo(): Promise<{ mensagem: string }> {
-  const res = await fetch(`${PUBLIC_API_URL}/api/revisao/retreinar`, { method: "POST" });
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/revisao/retreinar`, {
+    method: "POST",
+    headers: await authHeadersClient(),
+  });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao re-treinar o modelo."));
   return res.json();
 }
 
 export async function gerarNarrativa(): Promise<NarrativaResponse> {
-  const res = await fetch(`${PUBLIC_API_URL}/api/narrativa`, { method: "POST" });
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/narrativa`, {
+    method: "POST",
+    headers: await authHeadersClient(),
+  });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao gerar a explicação."));
   return res.json();
 }
 
+export async function baixarRelatorioPdf(month: string): Promise<Blob> {
+  const url = new URL(`${PUBLIC_API_URL}${API_PREFIX}/relatorio/pdf`);
+  url.searchParams.set("month", month);
+  const res = await fetch(url, { headers: await authHeadersClient() });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao gerar o PDF."));
+  return res.blob();
+}
+
 export async function enviarMensagemChat(mensagens: ChatMensagem[]): Promise<ChatResponse> {
-  const res = await fetch(`${PUBLIC_API_URL}/api/chat`, {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
     body: JSON.stringify({ mensagens }),
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao enviar a mensagem."));

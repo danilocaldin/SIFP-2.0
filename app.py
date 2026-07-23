@@ -37,6 +37,7 @@ from sifp.services.formatting import format_brl, format_brl_md, formatar_mes
 from sifp.services.chat_service import ChatIndisponivel, ChatService
 from sifp.services.import_service import ImportService
 from sifp.services.narrativa_service import NarrativaIndisponivel, NarrativaService
+from sifp.services.pdf_report_service import generate_pdf_report
 from sifp.services.report_service import generate_text_report
 from sifp.services.summary_service import SummaryService
 
@@ -1066,12 +1067,31 @@ with tab_relatorio:
         )
 
         st.text_area("Relatório", report_text, height=500, label_visibility="collapsed")
-        st.download_button(
-            "⬇️ Baixar relatório (.txt)",
-            data=report_text,
-            file_name=f"relatorio_sifp_{selected_month_rel}.txt",
-            mime="text/plain",
-        )
+
+        col_txt, col_pdf = st.columns(2)
+        with col_txt:
+            st.download_button(
+                "⬇️ Baixar relatório (.txt)",
+                data=report_text,
+                file_name=f"relatorio_sifp_{selected_month_rel}.txt",
+                mime="text/plain",
+            )
+        with col_pdf:
+            patrimonio_total_rel = float(latest_assets_rel["saldo_liquido"].sum()) if not latest_assets_rel.empty else 0.0
+            pdf_bytes_rel = generate_pdf_report(
+                period_label=period_label_rel,
+                summary=summary_rel,
+                by_cat=by_cat_rel,
+                monthly=monthly_rel,
+                diagnostics=diagnostics_rel,
+                patrimonio_total=patrimonio_total_rel,
+            )
+            st.download_button(
+                "⬇️ Baixar relatório (PDF)",
+                data=pdf_bytes_rel,
+                file_name=f"relatorio_sifra_{selected_month_rel}.pdf",
+                mime="application/pdf",
+            )
 
 # =======================================================================
 # TAB 9 - CHAT

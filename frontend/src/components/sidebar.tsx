@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import {
@@ -9,6 +9,7 @@ import {
   Home,
   LayoutDashboard,
   ListChecks,
+  LogOut,
   MessageCircle,
   Moon,
   PiggyBank,
@@ -19,6 +20,9 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+
+const SAAS_MODE = process.env.NEXT_PUBLIC_SAAS_MODE === "true";
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
 type NavGroup = { label: string; items: NavItem[] };
@@ -58,10 +62,18 @@ const GROUPS: NavGroup[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <aside className="flex h-screen w-14 flex-shrink-0 flex-col overflow-y-auto bg-brand-ink px-2 py-5 md:w-60 md:px-4">
@@ -119,6 +131,18 @@ export function Sidebar() {
           {mounted && resolvedTheme === "dark" ? "Modo claro" : "Modo escuro"}
         </span>
       </button>
+
+      {SAAS_MODE && (
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="Sair"
+          className="mt-0.5 flex items-center justify-center gap-2.5 rounded-md px-0 py-2 text-sm text-white/65 transition-colors hover:bg-white/5 hover:text-white md:justify-start md:px-2.5 md:py-1.5"
+        >
+          <LogOut size={17} strokeWidth={2} className="flex-shrink-0" />
+          <span className="hidden md:inline">Sair</span>
+        </button>
+      )}
     </aside>
   );
 }

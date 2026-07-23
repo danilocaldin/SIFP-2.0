@@ -1,6 +1,6 @@
 import { RevisaoLote } from "@/components/revisao-lote";
 import { RevisaoTable } from "@/components/revisao-table";
-import { getRevisao } from "@/lib/api";
+import { getRevisao } from "@/lib/api-server";
 
 export default async function RevisaoPage() {
   const revisao = await getRevisao();

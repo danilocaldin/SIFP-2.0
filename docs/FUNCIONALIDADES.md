@@ -41,8 +41,8 @@ Lista completa de alertas automáticos, ordenados por prioridade. Regras hoje: s
 **Motor:** `sifp/intelligence/diagnostics.py` · **Endpoint:** reaproveita `GET /api/resumo` (mesma lista completa de diagnósticos, não tem endpoint próprio)
 
 ## Relatório (`/relatorio`)
-Consolida tudo (resumo, categorias, estabelecimentos, diagnósticos, patrimônio, dívidas) num texto único pra um mês, pronto pra copiar ou baixar. Nunca diverge das outras telas porque usa exatamente os mesmos cálculos.
-**Serviço:** `relatorio_service.py` (usa `report_service.py` por baixo) · **Endpoint:** `GET /api/relatorio?month=`
+Consolida tudo (resumo, categorias, estabelecimentos, diagnósticos, patrimônio, dívidas) num texto único pra um mês, pronto pra copiar ou baixar — mais uma versão em PDF, curta e com gráficos, pra compartilhar. Nunca diverge das outras telas porque usa exatamente os mesmos cálculos.
+**Serviço:** `relatorio_service.py` (usa `report_service.py` para o texto e `pdf_report_service.py` para o PDF) · **Endpoints:** `GET /api/relatorio?month=`, `GET /api/relatorio/pdf?month=`
 
 ---
 

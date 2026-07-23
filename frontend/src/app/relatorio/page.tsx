@@ -1,6 +1,6 @@
 import { ReportActions } from "@/components/report-actions";
 import { ReportMonthSelect } from "@/components/report-month-select";
-import { getRelatorio } from "@/lib/api";
+import { getRelatorio } from "@/lib/api-server";
 
 export default async function RelatorioPage({
   searchParams,

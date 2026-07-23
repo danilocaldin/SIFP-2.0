@@ -45,7 +45,13 @@ class RevisaoService:
         all_tx["date"] = pd.to_datetime(all_tx["date"]).dt.strftime("%Y-%m-%d %H:%M")
 
         pending = all_tx[all_tx["category"] == CATEGORIA_NAO_CATEGORIZADO]
-        establishment_pending = pending[~pending["description"].apply(is_pix_or_transfer)]
+        # .astype(bool): numa Series vazia, .apply() numa coluna
+        # PyArrow/string-backed infere dtype "str" em vez de "bool" (não tem
+        # elemento pra inferir de verdade), e o "~" (NOT) num dtype "str"
+        # produz lixo em vez de negar — mesmo gotcha já documentado em
+        # import_service.py._revisao_pendente.
+        is_transfer = pending["description"].apply(is_pix_or_transfer).astype(bool)
+        establishment_pending = pending[~is_transfer]
         lote_pendentes = (
             establishment_pending.groupby("description")
             .size()

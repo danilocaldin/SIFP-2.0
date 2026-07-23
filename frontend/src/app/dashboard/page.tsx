@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getDashboard } from "@/lib/api";
+import { getDashboard } from "@/lib/api-server";
 import { formatBRL, formatPct, formatPctSigned } from "@/lib/format";
 
 export default async function DashboardPage({

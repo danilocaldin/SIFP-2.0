@@ -1,5 +1,5 @@
 import { DiagnosticCard } from "@/components/diagnostic-card";
-import { getResumo } from "@/lib/api";
+import { getResumo } from "@/lib/api-server";
 
 export default async function DiagnosticosPage() {
   const resumo = await getResumo();
