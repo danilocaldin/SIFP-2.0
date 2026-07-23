@@ -43,6 +43,8 @@ Da primeira regra estatística até o chat com acesso livre aos dados reais. As 
 ### Identidade visual própria — Sifra (22/07/2026)
 Nome de marca (**Sifra** — evolução de "SIFP" pra uma palavra real: cifra = quantia em dinheiro, e também código a decifrar), paleta azul-petróleo profundo (light e dark, tokens centralizados em `globals.css`), ícone/favicon (barras ascendentes, geometria simples que funciona em qualquer tamanho), wordmark em serifada. **SIFP continua sendo o nome técnico** — pacote Python, repositório, variáveis de ambiente, projetos na Railway/Vercel não mudaram, evitando um custo de retrabalho/risco de deploy sem ganho visível pra quem usa. Ver [`DECISOES_E_LICOES.md`](DECISOES_E_LICOES.md) para o processo completo de escolha do nome.
 
+**Segunda passada, depois do feedback "muito simples, não profissional" (22/07/2026):** menu lateral fixo sempre na cor de tinta da marca (independente do tema claro/escuro do conteúdo), agrupado por propósito com ícones; Resumo ganhou um gráfico de evolução mensal de verdade e um número de patrimônio grande em serifada; e alternador de modo claro/escuro (`next-themes`, detecta a preferência do sistema operacional e lembra a escolha entre visitas).
+
 ## Em andamento
 
 ### SaaS multiusuário (decisão de escalar tomada em 22/07/2026)
