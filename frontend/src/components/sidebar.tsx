@@ -17,6 +17,7 @@ import {
   Sun,
   TrendingUp,
   Upload,
+  User,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -133,15 +134,29 @@ export function Sidebar() {
       </button>
 
       {SAAS_MODE && (
-        <button
-          type="button"
-          onClick={handleLogout}
-          title="Sair"
-          className="mt-0.5 flex items-center justify-center gap-2.5 rounded-md px-0 py-2 text-sm text-white/65 transition-colors hover:bg-white/5 hover:text-white md:justify-start md:px-2.5 md:py-1.5"
-        >
-          <LogOut size={17} strokeWidth={2} className="flex-shrink-0" />
-          <span className="hidden md:inline">Sair</span>
-        </button>
+        <>
+          <Link
+            href="/perfil"
+            title="Perfil"
+            className={`mt-2 flex items-center justify-center gap-2.5 rounded-md px-0 py-2 text-sm transition-colors md:justify-start md:px-2.5 md:py-1.5 ${
+              pathname === "/perfil"
+                ? "bg-brand-teal/15 font-medium text-brand-teal"
+                : "text-white/65 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <User size={17} strokeWidth={2} className="flex-shrink-0" />
+            <span className="hidden md:inline">Perfil</span>
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            title="Sair"
+            className="mt-0.5 flex items-center justify-center gap-2.5 rounded-md px-0 py-2 text-sm text-white/65 transition-colors hover:bg-white/5 hover:text-white md:justify-start md:px-2.5 md:py-1.5"
+          >
+            <LogOut size={17} strokeWidth={2} className="flex-shrink-0" />
+            <span className="hidden md:inline">Sair</span>
+          </button>
+        </>
       )}
     </aside>
   );

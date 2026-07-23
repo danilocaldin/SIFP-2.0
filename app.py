@@ -11,6 +11,8 @@ Rodar com:
     streamlit run app.py
 """
 
+import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -1088,6 +1090,7 @@ with tab_relatorio:
                 asset_positions=latest_assets_rel,
                 debt_transactions=debt_transactions_rel,
                 patrimonio_total=patrimonio_total_rel,
+                nome_titular=os.environ.get("SIFP_TITULAR_NOME") or None,
             )
             st.download_button(
                 "⬇️ Baixar relatório (PDF)",

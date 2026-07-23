@@ -95,9 +95,13 @@ class RelatorioService:
             "report_text": report_text,
         }
 
-    def build_relatorio_pdf(self, month: str | None, month_label_fmt) -> bytes | None:
+    def build_relatorio_pdf(
+        self, month: str | None, month_label_fmt, nome_titular: str | None = None
+    ) -> bytes | None:
         """PDF do mesmo período/dados do relatório em texto. None se não há
-        nenhuma transação importada ainda."""
+        nenhuma transação importada ainda. `nome_titular` aparece na capa
+        quando informado (nome do usuário logado, no SaaS; ausente no uso
+        pessoal, que não tem login)."""
         dados = self._compor_periodo(month, month_label_fmt)
         if dados is None:
             return None
@@ -114,6 +118,7 @@ class RelatorioService:
             monthly=dados["monthly"],
             diagnostics=dados["diagnostics"],
             asset_positions=dados["latest_assets"],
+            nome_titular=nome_titular,
             debt_transactions=dados["debt_transactions"],
             patrimonio_total=patrimonio_total,
         )

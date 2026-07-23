@@ -24,7 +24,7 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 
-from sifp.api.auth import get_db
+from sifp.api.auth import get_current_user_name, get_db
 from sifp.api.shared import as_file_like, categorization_service, transactions_payload
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
 from sifp.importers.btg_importer import BTGImporter
@@ -198,13 +198,17 @@ def relatorio(month: str | None = None, conn: psycopg.Connection = Depends(get_d
 
 
 @router.get("/relatorio/pdf")
-def relatorio_pdf(month: str | None = None, conn: psycopg.Connection = Depends(get_db)):
+def relatorio_pdf(
+    month: str | None = None,
+    conn: psycopg.Connection = Depends(get_db),
+    nome_titular: str | None = Depends(get_current_user_name),
+):
     r = _repos(conn)
     summary_service = SummaryService(
         r["transaction_repo"], r["balance_repo"], r["asset_repo"], r["budget_repo"], r["goal_repo"]
     )
     relatorio_service = RelatorioService(r["transaction_repo"], r["asset_repo"], summary_service)
-    pdf_bytes = relatorio_service.build_relatorio_pdf(month, formatar_mes)
+    pdf_bytes = relatorio_service.build_relatorio_pdf(month, formatar_mes, nome_titular=nome_titular)
     if pdf_bytes is None:
         raise HTTPException(status_code=404, detail="Nenhum dado importado ainda.")
     nome_arquivo = f"relatorio_sifra_{month or 'atual'}.pdf"

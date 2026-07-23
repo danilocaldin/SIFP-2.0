@@ -50,12 +50,15 @@ from reportlab.graphics.shapes import Drawing
 from sifp.domain.models import Diagnostic, DiagnosticSeverity
 from sifp.services.formatting import format_brl, unescape_currency
 
-# Paleta — mesmos hex do tema claro em frontend/src/app/globals.css.
+# Paleta — mesmos hex da identidade visual em frontend/src/app/globals.css
+# e frontend/src/app/icon.svg (marca: barras ascendentes em teal sobre
+# fundo tinta).
 INK = colors.HexColor("#16211f")
 MUTED = colors.HexColor("#52625e")
 BORDER = colors.HexColor("#dde5e2")
 HEADER_BG = colors.HexColor("#f0f4f2")
 PRIMARY = colors.HexColor("#0d5c63")
+TEAL = colors.HexColor("#7fdcca")
 RECEITA = colors.HexColor("#008300")
 DESPESA = colors.HexColor("#e34948")
 SALDO = colors.HexColor("#2a78d6")
@@ -77,9 +80,13 @@ _SEVERITY_LABEL = {
 _PAGE_MARGIN = 1.9 * cm
 
 _STYLES = {
-    "brand": ParagraphStyle("brand", fontName="Helvetica-Bold", fontSize=16, textColor=INK, leading=19),
-    "tagline": ParagraphStyle("tagline", fontName="Helvetica", fontSize=9.5, textColor=MUTED, leading=12),
-    "h1": ParagraphStyle("h1", fontName="Helvetica-Bold", fontSize=12.5, textColor=INK, spaceBefore=18, spaceAfter=8),
+    "tagline": ParagraphStyle("tagline", fontName="Helvetica", fontSize=10, textColor=MUTED, leading=13),
+    "titular": ParagraphStyle(
+        "titular", fontName="Helvetica-Bold", fontSize=10, textColor=INK, leading=13, spaceBefore=2
+    ),
+    "h1": ParagraphStyle(
+        "h1", fontName="Helvetica-Bold", fontSize=12.5, textColor=PRIMARY, spaceBefore=18, spaceAfter=8
+    ),
     "hero_label": ParagraphStyle("hero_label", fontName="Helvetica", fontSize=10, textColor=MUTED, leading=13),
     "hero_number": ParagraphStyle(
         "hero_number", fontName="Helvetica-Bold", fontSize=32, textColor=PRIMARY, leading=36, spaceBefore=2
@@ -98,7 +105,22 @@ _STYLES = {
         "diag_reco_label", fontName="Helvetica-Bold", fontSize=8, textColor=PRIMARY, leading=11, spaceBefore=3
     ),
     "empty": ParagraphStyle("empty", fontName="Helvetica-Oblique", fontSize=9, textColor=MUTED, leading=12),
+    "disclaimer_title": ParagraphStyle(
+        "disclaimer_title", fontName="Helvetica-Bold", fontSize=8, textColor=MUTED, leading=11, spaceBefore=16
+    ),
+    "disclaimer": ParagraphStyle(
+        "disclaimer", fontName="Helvetica-Oblique", fontSize=7.5, textColor=MUTED, leading=10.5
+    ),
 }
+
+_DISCLAIMER = (
+    "Este relatório é gerado automaticamente pelo Sifra com base nos extratos e posições importados pelo "
+    "próprio usuário — não é auditado nem verificado por terceiros, e sua precisão depende da precisão dos "
+    "dados de origem. O conteúdo tem finalidade exclusivamente informativa e não constitui recomendação de "
+    "investimento, oferta, análise de valores mobiliários ou aconselhamento financeiro, contábil, jurídico ou "
+    "tributário. O Sifra não é uma instituição financeira, corretora ou consultoria de investimentos "
+    "registrada, e não se responsabiliza por decisões tomadas com base neste documento."
+)
 
 
 class _Rule(Flowable):
@@ -318,6 +340,23 @@ def _diagnosticos_section(diagnostics: list[Diagnostic], content_width: float) -
     return story
 
 
+def _draw_mark(canvas, x: float, y: float, size: float):
+    """Desenha a marca do Sifra (badge com 4 barras ascendentes) direto no
+    canvas — mesma geometria de frontend/src/app/icon.svg, sem precisar de
+    uma dependência nova (svglib) só pra isso."""
+    canvas.saveState()
+    canvas.setFillColor(INK)
+    canvas.roundRect(x, y, size, size, size * 0.22, fill=1, stroke=0)
+    canvas.setFillColor(TEAL)
+    bar_w = size * 0.1
+    gap = size * 0.18
+    heights = [0.22, 0.34, 0.46, 0.56]
+    for i, h in enumerate(heights):
+        bx = x + size * 0.18 + i * gap
+        canvas.roundRect(bx, y + size * 0.2, bar_w, size * h, bar_w * 0.5, fill=1, stroke=0)
+    canvas.restoreState()
+
+
 def generate_pdf_report(
     period_label: str,
     summary: dict,
@@ -328,15 +367,38 @@ def generate_pdf_report(
     asset_positions: pd.DataFrame,
     debt_transactions: pd.DataFrame,
     patrimonio_total: float,
+    nome_titular: str | None = None,
 ) -> bytes:
     buffer = BytesIO()
     content_width = A4[0] - 2 * _PAGE_MARGIN
+    header_height = 30
 
-    def _footer(canvas, doc):
+    def _page_decoration(canvas, doc):
         canvas.saveState()
+        # Faixa de destaque no topo — presença de marca em toda página, sem
+        # depender só do cabeçalho.
+        canvas.setFillColor(PRIMARY)
+        canvas.rect(0, A4[1] - 3, A4[0], 3, fill=1, stroke=0)
+
+        # Cabeçalho: marca + período, repetido em toda página (pedido do
+        # Danilo — o relatório de referência que ele mandou tem isso).
+        top_y = A4[1] - _PAGE_MARGIN + 2
+        mark_size = 13
+        _draw_mark(canvas, _PAGE_MARGIN, top_y - mark_size + 3, mark_size)
+        canvas.setFont("Helvetica-Bold", 11)
+        canvas.setFillColor(INK)
+        canvas.drawString(_PAGE_MARGIN + mark_size + 6, top_y - 8, "SIFRA")
+        canvas.setFont("Helvetica", 8.5)
+        canvas.setFillColor(MUTED)
+        canvas.drawRightString(A4[0] - _PAGE_MARGIN, top_y - 8, period_label)
+        canvas.setStrokeColor(BORDER)
+        canvas.setLineWidth(0.5)
+        canvas.line(_PAGE_MARGIN, top_y - mark_size - 2, A4[0] - _PAGE_MARGIN, top_y - mark_size - 2)
+
+        # Rodapé
+        y = _PAGE_MARGIN - 10
         canvas.setStrokeColor(BORDER)
         canvas.setLineWidth(0.6)
-        y = _PAGE_MARGIN - 10
         canvas.line(_PAGE_MARGIN, y, A4[0] - _PAGE_MARGIN, y)
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(MUTED)
@@ -350,18 +412,27 @@ def generate_pdf_report(
         pagesize=A4,
         leftMargin=_PAGE_MARGIN,
         rightMargin=_PAGE_MARGIN,
-        topMargin=_PAGE_MARGIN,
+        topMargin=_PAGE_MARGIN + header_height,
         bottomMargin=_PAGE_MARGIN + 14,
         title=f"Relatório Sifra — {period_label}",
     )
-    frame = Frame(_PAGE_MARGIN, _PAGE_MARGIN + 14, content_width, A4[1] - 2 * _PAGE_MARGIN - 14, id="main")
-    doc.addPageTemplates([PageTemplate(id="main", frames=[frame], onPage=_footer)])
+    frame = Frame(
+        _PAGE_MARGIN,
+        _PAGE_MARGIN + 14,
+        content_width,
+        A4[1] - 2 * _PAGE_MARGIN - 14 - header_height,
+        id="main",
+    )
+    doc.addPageTemplates([PageTemplate(id="main", frames=[frame], onPage=_page_decoration)])
 
     story: list = []
 
-    # Cabeçalho de marca
-    story.append(Paragraph("SIFRA", _STYLES["brand"]))
-    story.append(Paragraph(f"Relatório financeiro · {period_label}", _STYLES["tagline"]))
+    # Capa — a marca já vive no cabeçalho de toda página; aqui só o
+    # essencial da capa em si (pra quem imprime ou olha só a primeira
+    # página): pra quem é, e o número que mais importa.
+    story.append(Paragraph("Relatório financeiro", _STYLES["tagline"]))
+    if nome_titular:
+        story.append(Paragraph(f"Preparado para {nome_titular}", _STYLES["titular"]))
     story.append(Spacer(1, 16))
 
     # Hero — patrimônio
@@ -425,6 +496,11 @@ def generate_pdf_report(
     story.append(PageBreak())
     story.append(Paragraph("Diagnósticos", _STYLES["h1"]))
     story += _diagnosticos_section(diagnostics, content_width)
+
+    # Aviso legal
+    story.append(_Rule(content_width))
+    story.append(Paragraph("AVISO", _STYLES["disclaimer_title"]))
+    story.append(Paragraph(_DISCLAIMER, _STYLES["disclaimer"]))
 
     doc.build(story)
     return buffer.getvalue()

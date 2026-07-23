@@ -36,7 +36,11 @@ _JWKS_URL = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
 _jwk_client = jwt.PyJWKClient(_JWKS_URL) if SUPABASE_URL else None
 
 
-def get_current_user_id(authorization: str | None = Header(default=None)) -> str:
+def get_token_payload(authorization: str | None = Header(default=None)) -> dict:
+    """Valida e decodifica o JWT uma vez por request — get_current_user_id
+    e get_current_user_name dependem disso (o FastAPI resolve Depends
+    repetidos uma vez só por request, então o decode não roda em dobro
+    quando uma rota usa as duas dependencies)."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Faça login para continuar.")
     token = authorization.removeprefix("Bearer ").strip()
@@ -46,7 +50,7 @@ def get_current_user_id(authorization: str | None = Header(default=None)) -> str
 
     try:
         signing_key = _jwk_client.get_signing_key_from_jwt(token)
-        payload = jwt.decode(
+        return jwt.decode(
             token,
             signing_key.key,
             algorithms=["ES256"],
@@ -55,10 +59,22 @@ def get_current_user_id(authorization: str | None = Header(default=None)) -> str
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Sessão inválida ou expirada. Faça login novamente.")
 
+
+def get_current_user_id(payload: dict = Depends(get_token_payload)) -> str:
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=401, detail="Sessão inválida.")
     return user_id
+
+
+def get_current_user_name(payload: dict = Depends(get_token_payload)) -> str | None:
+    """Nome completo definido pelo próprio usuário (tela de Perfil, no
+    frontend — grava em user_metadata via supabase.auth.updateUser). None
+    se o usuário ainda não preencheu — quem chama decide o que fazer nesse
+    caso (ex: relatório em PDF simplesmente omite "Preparado para")."""
+    metadata = payload.get("user_metadata") or {}
+    nome = metadata.get("full_name")
+    return nome.strip() if isinstance(nome, str) and nome.strip() else None
 
 
 def get_db(user_id: str = Depends(get_current_user_id)) -> Iterator[psycopg.Connection]:

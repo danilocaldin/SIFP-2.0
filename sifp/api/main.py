@@ -252,7 +252,11 @@ def relatorio(month: str | None = None):
 
 @app.get("/api/relatorio/pdf")
 def relatorio_pdf(month: str | None = None):
-    pdf_bytes = relatorio_service.build_relatorio_pdf(month, formatar_mes)
+    # Sem login nesse caminho (uso pessoal) — nome do titular, se quiser
+    # que apareça na capa, vem de uma variável de ambiente em vez de
+    # cadastro/perfil (não faz sentido construir isso pra uma pessoa só).
+    nome_titular = os.environ.get("SIFP_TITULAR_NOME") or None
+    pdf_bytes = relatorio_service.build_relatorio_pdf(month, formatar_mes, nome_titular=nome_titular)
     if pdf_bytes is None:
         raise HTTPException(status_code=404, detail="Nenhum dado importado ainda.")
     nome_arquivo = f"relatorio_sifra_{month or 'atual'}.pdf"
