@@ -13,9 +13,12 @@ import { updateSession } from "@/lib/supabase/middleware";
 const SAAS_MODE = process.env.NEXT_PUBLIC_SAAS_MODE === "true";
 
 export async function proxy(request: NextRequest) {
-  const { response, user } = await updateSession(request);
+  // No deploy pessoal (sem SAAS_MODE) as credenciais do Supabase nem
+  // existem nesse projeto Vercel — nunca chama updateSession, que
+  // quebraria toda rota tentando criar um cliente Supabase sem URL/chave.
+  if (!SAAS_MODE) return NextResponse.next();
 
-  if (!SAAS_MODE) return response;
+  const { response, user } = await updateSession(request);
 
   const path = request.nextUrl.pathname;
   const isLoginRoute = path === "/login";
