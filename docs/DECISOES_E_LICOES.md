@@ -20,6 +20,8 @@ Registro do "porquê" por trás de escolhas importantes, e de bugs reais que já
 
 **Paleta: azul-petróleo profundo, escolhida com preview visual antes de codar.** Danilo escolheu entre 4 direções de cor mostradas como amostras reais (não descrições) — confirma que decisão de identidade visual rende melhor com preview do que com texto. Tokens: `#0D5C63` (acento claro) / `#16211F` (tinta escura) / `#F6F8F7` (fundo claro), com equivalentes pro modo escuro (`#7FDCCA` acento, `#0E1513` fundo). Aplicado em `frontend/src/app/globals.css`, sem tocar nos tokens `--chart-*` (esses são a paleta de dataviz, validada à parte, ver skill dataviz — cor de marca e cor de dado são preocupações separadas).
 
+**A primeira aplicação da paleta ficou discreta demais — Danilo pediu mais impacto (22/07/2026).** O tom "sóbrio, private banking" só com texto/ícone/wordmark trocados, sem mudar a estrutura da tela, leu como "não mudou quase nada" numa captura de tela — mesmo com as cores tecnicamente corretas. Correção: menu lateral fixo sempre na cor de tinta da marca (não reage ao tema claro/escuro do conteúdo, ao contrário do resto da paleta), gráfico de verdade na tela de Resumo, número de patrimônio em destaque grande. **Lição: sobriedade na paleta (poucas cores, tom de acento discreto) e impacto visual (a tela parecer visivelmente diferente/desenhada) são dois eixos independentes — dá pra ter as duas coisas, mas trocar só a cor sem mudar nenhuma estrutura de layout raramente basta pra sensação de "produto redesenhado".**
+
 ## Decisões de arquitetura
 
 **Toda regra de negócio vive em `sifp/`, nunca no Streamlit ou na API.** Isso é o que garante que as duas interfaces nunca mostrem números diferentes.
