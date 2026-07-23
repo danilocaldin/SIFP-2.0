@@ -37,6 +37,7 @@ from reportlab.platypus import (
     Flowable,
     Frame,
     KeepTogether,
+    NextPageTemplate,
     PageBreak,
     PageTemplate,
     Paragraph,
@@ -80,16 +81,8 @@ _SEVERITY_LABEL = {
 _PAGE_MARGIN = 1.9 * cm
 
 _STYLES = {
-    "tagline": ParagraphStyle("tagline", fontName="Helvetica", fontSize=10, textColor=MUTED, leading=13),
-    "titular": ParagraphStyle(
-        "titular", fontName="Helvetica-Bold", fontSize=10, textColor=INK, leading=13, spaceBefore=2
-    ),
     "h1": ParagraphStyle(
         "h1", fontName="Helvetica-Bold", fontSize=12.5, textColor=PRIMARY, spaceBefore=18, spaceAfter=8
-    ),
-    "hero_label": ParagraphStyle("hero_label", fontName="Helvetica", fontSize=10, textColor=MUTED, leading=13),
-    "hero_number": ParagraphStyle(
-        "hero_number", fontName="Helvetica-Bold", fontSize=32, textColor=PRIMARY, leading=36, spaceBefore=2
     ),
     "stat_label": ParagraphStyle("stat_label", fontName="Helvetica", fontSize=8.5, textColor=MUTED, leading=11),
     "stat_value": ParagraphStyle(
@@ -340,13 +333,16 @@ def _diagnosticos_section(diagnostics: list[Diagnostic], content_width: float) -
     return story
 
 
-def _draw_mark(canvas, x: float, y: float, size: float):
-    """Desenha a marca do Sifra (badge com 4 barras ascendentes) direto no
-    canvas — mesma geometria de frontend/src/app/icon.svg, sem precisar de
-    uma dependência nova (svglib) só pra isso."""
+def _draw_mark(canvas, x: float, y: float, size: float, badge: bool = True):
+    """Desenha a marca do Sifra (barras ascendentes) direto no canvas —
+    mesma geometria de frontend/src/app/icon.svg, sem precisar de uma
+    dependência nova (svglib) só pra isso. `badge=False` desenha só as
+    barras, sem o fundo em rounded-square (usado no motivo decorativo
+    grande da capa, onde o fundo escuro já é o próprio painel)."""
     canvas.saveState()
-    canvas.setFillColor(INK)
-    canvas.roundRect(x, y, size, size, size * 0.22, fill=1, stroke=0)
+    if badge:
+        canvas.setFillColor(INK)
+        canvas.roundRect(x, y, size, size, size * 0.22, fill=1, stroke=0)
     canvas.setFillColor(TEAL)
     bar_w = size * 0.1
     gap = size * 0.18
@@ -407,6 +403,77 @@ def generate_pdf_report(
         canvas.drawRightString(A4[0] - _PAGE_MARGIN, y - 12, f"Página {doc.page}")
         canvas.restoreState()
 
+    def _draw_cover(canvas, doc):
+        """Capa em página própria — desenhada inteira no canvas (não flui
+        por Platypus): é conteúdo fixo, então dá mais controle de
+        composição do que lutar com Frame pra uma página só. Painel escuro
+        assimétrico no topo (marca + período), motivo decorativo grande
+        (as mesmas barras ascendentes do ícone, em baixa opacidade) e
+        bastante espaço em branco embaixo — padrão de capa de relatório
+        institucional: um elemento visual dominante, texto mínimo,
+        respiro generoso, nunca a página inteira ocupada."""
+        canvas.saveState()
+        panel_h = A4[1] * 0.40
+        panel_y = A4[1] - panel_h
+
+        canvas.setFillColor(INK)
+        canvas.rect(0, panel_y, A4[0], panel_h, fill=1, stroke=0)
+
+        # Motivo decorativo: barras ascendentes grandes, em opacidade baixa,
+        # ancoradas na quina inferior direita do painel — segundo foco
+        # visual, assimétrico em relação à marca (canto superior esquerdo).
+        canvas.saveState()
+        canvas.setFillAlpha(0.16)
+        _draw_mark(canvas, A4[0] - _PAGE_MARGIN - 150, panel_y - 40, 190, badge=False)
+        canvas.restoreState()
+
+        # Marca, canto superior esquerdo do painel.
+        mark_size = 30
+        mark_x = _PAGE_MARGIN
+        mark_y = A4[1] - _PAGE_MARGIN - mark_size
+        _draw_mark(canvas, mark_x, mark_y, mark_size)
+        canvas.setFont("Helvetica-Bold", 19)
+        canvas.setFillColor(colors.white)
+        canvas.drawString(mark_x + mark_size + 10, mark_y + mark_size * 0.28, "SIFRA")
+
+        # Período, canto superior direito do painel — equilibra a
+        # composição sem competir com a marca.
+        canvas.setFont("Helvetica", 9.5)
+        canvas.setFillColor(TEAL)
+        canvas.drawRightString(A4[0] - _PAGE_MARGIN, A4[1] - _PAGE_MARGIN - 4, period_label.upper())
+
+        # Título, base do painel.
+        canvas.setFont("Helvetica", 12)
+        canvas.setFillColor(colors.HexColor("#c9ded9"))
+        canvas.drawString(_PAGE_MARGIN, panel_y + 26, "Relatório financeiro")
+
+        canvas.restoreState()
+
+        # Abaixo do painel: quem é o titular, e só o número que mais
+        # importa — o resto da página fica em branco de propósito.
+        y = panel_y - 60
+        if nome_titular:
+            canvas.setFont("Helvetica-Bold", 13)
+            canvas.setFillColor(INK)
+            canvas.drawString(_PAGE_MARGIN, y, f"Preparado para {nome_titular}")
+            y -= 46
+        else:
+            y -= 14
+
+        canvas.setFont("Helvetica", 10.5)
+        canvas.setFillColor(MUTED)
+        canvas.drawString(_PAGE_MARGIN, y, "Patrimônio total")
+        canvas.setFont("Helvetica-Bold", 40)
+        canvas.setFillColor(PRIMARY)
+        canvas.drawString(_PAGE_MARGIN, y - 46, format_brl(patrimonio_total))
+
+        canvas.setStrokeColor(BORDER)
+        canvas.setLineWidth(0.6)
+        gerado_em = datetime.now().strftime("%d/%m/%Y")
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColor(MUTED)
+        canvas.drawString(_PAGE_MARGIN, _PAGE_MARGIN - 4, f"Sifra — Inteligência Financeira Pessoal · gerado em {gerado_em}")
+
     doc = BaseDocTemplate(
         buffer,
         pagesize=A4,
@@ -416,30 +483,24 @@ def generate_pdf_report(
         bottomMargin=_PAGE_MARGIN + 14,
         title=f"Relatório Sifra — {period_label}",
     )
-    frame = Frame(
+    content_frame = Frame(
         _PAGE_MARGIN,
         _PAGE_MARGIN + 14,
         content_width,
         A4[1] - 2 * _PAGE_MARGIN - 14 - header_height,
         id="main",
     )
-    doc.addPageTemplates([PageTemplate(id="main", frames=[frame], onPage=_page_decoration)])
+    # Capa não usa o frame pra nada (tudo desenhado direto em _draw_cover),
+    # mas BaseDocTemplate exige ao menos um por PageTemplate.
+    cover_frame = Frame(_PAGE_MARGIN, _PAGE_MARGIN, content_width, 10, id="cover")
+    doc.addPageTemplates(
+        [
+            PageTemplate(id="cover", frames=[cover_frame], onPage=_draw_cover),
+            PageTemplate(id="content", frames=[content_frame], onPage=_page_decoration),
+        ]
+    )
 
-    story: list = []
-
-    # Capa — a marca já vive no cabeçalho de toda página; aqui só o
-    # essencial da capa em si (pra quem imprime ou olha só a primeira
-    # página): pra quem é, e o número que mais importa.
-    story.append(Paragraph("Relatório financeiro", _STYLES["tagline"]))
-    if nome_titular:
-        story.append(Paragraph(f"Preparado para {nome_titular}", _STYLES["titular"]))
-    story.append(Spacer(1, 16))
-
-    # Hero — patrimônio
-    story.append(Paragraph("Patrimônio total", _STYLES["hero_label"]))
-    story.append(Paragraph(format_brl(patrimonio_total), _STYLES["hero_number"]))
-    story.append(Spacer(1, 16))
-    story.append(_Rule(content_width))
+    story: list = [NextPageTemplate("content"), PageBreak()]
 
     # Resumo do mês
     story.append(Paragraph("Resumo do mês", _STYLES["h1"]))
