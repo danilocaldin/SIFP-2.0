@@ -8,7 +8,7 @@ Documentação de referência do projeto. Se surgir uma dúvida sobre como o sis
 
 O Sifra não é um app de "anotar gastos" — é uma plataforma de **inteligência financeira pessoal**: importa extratos bancários reais, categoriza transações automaticamente (regras + Machine Learning), calcula indicadores, gera diagnósticos automáticos sobre a saúde financeira, projeta patrimônio futuro, e consolida tudo isso em relatórios. A ideia central é que o sistema *interprete* os dados pra você, não só os organize.
 
-Hoje é uso pessoal do Danilo. O objetivo de longo prazo é abrir como um produto que qualquer pessoa possa usar (SaaS multiusuário) — ver [`ROADMAP.md`](ROADMAP.md).
+Hoje é uso pessoal do Danilo, com a expansão pra clientes reais em andamento (SaaS multiusuário) — ver [`ROADMAP.md`](ROADMAP.md) e [`CLIENTES.md`](CLIENTES.md).
 
 ## Onde encontrar cada coisa
 
@@ -17,6 +17,7 @@ Hoje é uso pessoal do Danilo. O objetivo de longo prazo é abrir como um produt
 | Como o código está organizado, o que cada camada faz | [`ARQUITETURA.md`](ARQUITETURA.md) |
 | O que cada tela do sistema faz, onde a lógica dela mora | [`FUNCIONALIDADES.md`](FUNCIONALIDADES.md) |
 | Onde o sistema está hospedado, como fazer um novo deploy | [`HOSPEDAGEM.md`](HOSPEDAGEM.md) |
+| Como entregar o sistema pra um cliente novo | [`CLIENTES.md`](CLIENTES.md) |
 | Por que uma decisão foi tomada, bugs reais já encontrados e corrigidos | [`DECISOES_E_LICOES.md`](DECISOES_E_LICOES.md) |
 | O que já foi feito, o que falta | [`ROADMAP.md`](ROADMAP.md) |
 

@@ -43,18 +43,14 @@ Da primeira regra estatística até o chat com acesso livre aos dados reais. As 
 ### Identidade visual própria — Sifra (22/07/2026)
 Nome de marca (**Sifra** — evolução de "SIFP" pra uma palavra real: cifra = quantia em dinheiro, e também código a decifrar), paleta azul-petróleo profundo (light e dark, tokens centralizados em `globals.css`), ícone/favicon (barras ascendentes, geometria simples que funciona em qualquer tamanho), wordmark em serifada. **SIFP continua sendo o nome técnico** — pacote Python, repositório, variáveis de ambiente, projetos na Railway/Vercel não mudaram, evitando um custo de retrabalho/risco de deploy sem ganho visível pra quem usa. Ver [`DECISOES_E_LICOES.md`](DECISOES_E_LICOES.md) para o processo completo de escolha do nome.
 
-## Pendente — duas iniciativas em espera, não esquecidas
+## Em andamento
 
-Nenhuma foi descartada por falta de valor. Cada uma tem um critério claro de quando fazer sentido, e o código de hoje já foi desenhado pra não exigir retrabalho quando chegar a hora.
+### SaaS multiusuário (decisão de escalar tomada em 22/07/2026)
+Danilo decidiu começar a entregar o Sifra pra clientes reais. Duas frentes em paralelo:
 
-### Integração automática via Open Finance — custo não compensa ainda (pesquisado 22/07/2026)
-Pesquisa confirmou custo real: Pluggy a partir de R$2.500/mês, Belvo ~R$6.000/mês, a opção mais barata regulada (Tecnospeed) R$1.500 de entrada + R$540/mês. Inviável para o uso atual (só o Danilo) — só faz sentido financeiro quando houver assinantes pagantes suficientes pra diluir esse custo.
+1. **Estratégia rápida, disponível já:** uma instância isolada por cliente (próprio deploy, próprio banco vazio, sem necessidade de login porque cada um tem sua própria URL). Zero trabalho novo de código — reaproveita o processo de hospedagem já validado. Ver o passo a passo completo em [`CLIENTES.md`](CLIENTES.md).
+2. **Estratégia definitiva, em construção por trás:** SaaS multiusuário de verdade — um único sistema, cadastro aberto, dados isolados por usuário no banco. Exige: autenticação real, migração de SQLite pra Postgres, isolamento de dados por usuário em toda tabela/rota, e telas de cadastro/login no frontend novo (o Streamlit **não** vai ganhar login — continua sendo só a ferramenta pessoal do Danilo).
 
-**Integração direta com o BTG especificamente também foi descartada:** a API oficial do BTG (`developers.empresas.btgpactual.com`) é exclusiva pra contas Pessoa Jurídica, com plano pago — não existe versão pra pessoa física. O único caminho pra automação numa conta pessoal continua sendo o Open Finance (BTG participa como provedor de dados), o que não muda a conclusão acima.
+**Decisão de arquitetura proposta (aguardando confirmação do Danilo):** usar **Supabase** como base — hospeda o Postgres *e* a autenticação no mesmo provedor, e oferece Row Level Security (RLS): o isolamento entre clientes fica garantido no próprio banco de dados, não só em cada linha de código que filtra por usuário. Isso importa especialmente aqui porque um filtro esquecido numa única query seria um vazamento real de dado financeiro entre clientes, não um bug cosmético — RLS fecha essa classe inteira de erro numa camada só, em vez de depender de disciplina manual espalhada em cada repository.
 
-**Retomar quando:** houver receita de assinatura real. Até lá, se for necessário suportar outro banco, o caminho mais barato é adicionar mais importadores manuais (mesmo padrão do `BTGImporter`, sem custo de API).
-
-### Visão de longo prazo: SaaS multiusuário
-Hoje o SIFP é uso pessoal, sem login. A visão de longo prazo, já validada com o Danilo, é abrir como produto aberto — qualquer pessoa pode se cadastrar. Isso exige, quando chegar a hora: autenticação real (cadastro/login com senha), migração do banco de SQLite pra Postgres com isolamento de dados por usuário, e uma superfície de API mais ampla.
-
-**Nasce em:** só no frontend novo — o Streamlit **não** vai ganhar login, continua sendo só a ferramenta pessoal do Danilo.
+**Nasce em:** só no frontend novo.
