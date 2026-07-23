@@ -231,6 +231,35 @@ def test_orcamento_ignora_categoria_sem_limite_configurado():
 
 
 # ---------------------------------------------------------------------
+# despesas fixas altas
+# ---------------------------------------------------------------------
+def test_despesas_fixas_nao_dispara_sem_limite_configurado():
+    assert diag.check_despesas_fixas_altas(total_mensal=3000.0, receita_media_mensal=5000.0, limite_pct=None) == []
+
+
+def test_despesas_fixas_nao_dispara_dentro_do_limite():
+    assert diag.check_despesas_fixas_altas(total_mensal=1000.0, receita_media_mensal=5000.0, limite_pct=30.0) == []
+
+
+def test_despesas_fixas_nao_dispara_sem_receita():
+    assert diag.check_despesas_fixas_altas(total_mensal=1000.0, receita_media_mensal=0.0, limite_pct=30.0) == []
+
+
+def test_despesas_fixas_dispara_media_quando_pouco_acima():
+    # 2000/5000 = 40%, 10 pontos acima do limite de 30% (< 15 = MEDIA)
+    result = diag.check_despesas_fixas_altas(total_mensal=2000.0, receita_media_mensal=5000.0, limite_pct=30.0)
+    assert len(result) == 1
+    assert result[0].severidade == DiagnosticSeverity.MEDIA
+    assert result[0].impacto_financeiro == pytest.approx(2000.0)
+
+
+def test_despesas_fixas_dispara_alta_quando_muito_acima():
+    # 3000/5000 = 60%, 30 pontos acima do limite de 30% (>= 15 = ALTA)
+    result = diag.check_despesas_fixas_altas(total_mensal=3000.0, receita_media_mensal=5000.0, limite_pct=30.0)
+    assert result[0].severidade == DiagnosticSeverity.ALTA
+
+
+# ---------------------------------------------------------------------
 # metas
 # ---------------------------------------------------------------------
 def test_meta_concluida_nao_dispara():

@@ -13,7 +13,9 @@ from sifp.repositories.asset_repository import AssetRepository
 from sifp.repositories.balance_repository import BalanceRepository
 from sifp.repositories.budget_repository import BudgetRepository
 from sifp.repositories.connection import init_db
+from sifp.repositories.despesa_fixa_repository import DespesaFixaRepository
 from sifp.repositories.goal_repository import GoalRepository
+from sifp.repositories.preferencia_repository import PreferenciaRepository
 from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services.narrativa_service import NarrativaIndisponivel, NarrativaService
 from sifp.services.summary_service import SummaryService
@@ -59,6 +61,8 @@ def service(tmp_db_path):
     asset_repo = AssetRepository(tmp_db_path)
     budget_repo = BudgetRepository(tmp_db_path)
     goal_repo = GoalRepository(tmp_db_path)
+    despesa_fixa_repo = DespesaFixaRepository(tmp_db_path)
+    preferencia_repo = PreferenciaRepository(tmp_db_path)
 
     tx = pd.DataFrame([
         {"date": "2026-05-05", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
@@ -78,7 +82,9 @@ def service(tmp_db_path):
         )
     ])
 
-    summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo)
+    summary_service = SummaryService(
+        transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo, despesa_fixa_repo, preferencia_repo
+    )
     return NarrativaService(summary_service, transaction_repo)
 
 
@@ -98,6 +104,7 @@ def test_explicar_mes_sem_dados_levanta_indisponivel(tmp_db_path, monkeypatch):
         SummaryService(
             TransactionRepository(tmp_db_path), BalanceRepository(tmp_db_path),
             AssetRepository(tmp_db_path), BudgetRepository(tmp_db_path), GoalRepository(tmp_db_path),
+            DespesaFixaRepository(tmp_db_path), PreferenciaRepository(tmp_db_path),
         ),
         TransactionRepository(tmp_db_path),
     )

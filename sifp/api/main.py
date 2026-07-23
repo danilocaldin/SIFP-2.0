@@ -31,9 +31,12 @@ from sifp.repositories.asset_repository import AssetRepository
 from sifp.repositories.balance_repository import BalanceRepository
 from sifp.repositories.budget_repository import BudgetRepository
 from sifp.repositories.connection import init_db
+from sifp.repositories.despesa_fixa_repository import DespesaFixaRepository
 from sifp.repositories.goal_repository import GoalRepository
+from sifp.repositories.preferencia_repository import PreferenciaRepository
 from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services.dashboard_service import DashboardService
+from sifp.services.despesas_fixas_service import DespesasFixasService
 from sifp.services.formatting import formatar_mes, unescape_currency
 from sifp.services.chat_service import ChatIndisponivel, ChatService
 from sifp.services.import_service import ImportService
@@ -52,6 +55,8 @@ balance_repo = BalanceRepository()
 asset_repo = AssetRepository()
 budget_repo = BudgetRepository()
 goal_repo = GoalRepository()
+despesa_fixa_repo = DespesaFixaRepository()
+preferencia_repo = PreferenciaRepository()
 investment_importer = BTGInvestmentImporter()
 import_service = ImportService(
     importers=[BTGImporter()],
@@ -59,11 +64,14 @@ import_service = ImportService(
     transaction_repo=transaction_repo,
     balance_repo=balance_repo,
 )
-summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo)
+summary_service = SummaryService(
+    transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo, despesa_fixa_repo, preferencia_repo
+)
 dashboard_service = DashboardService(transaction_repo, balance_repo)
 patrimonio_service = PatrimonioService(asset_repo, investment_importer)
 projecoes_service = ProjecoesService(transaction_repo, asset_repo, goal_repo)
 orcamento_service = OrcamentoService(transaction_repo, budget_repo)
+despesas_fixas_service = DespesasFixasService(despesa_fixa_repo, preferencia_repo, transaction_repo)
 relatorio_service = RelatorioService(transaction_repo, asset_repo, summary_service)
 revisao_service = RevisaoService(transaction_repo)
 narrativa_service = NarrativaService(summary_service, transaction_repo)
@@ -242,6 +250,68 @@ def atualizar_progresso_meta(goal_id: int, body: GoalProgressIn):
 @app.delete("/api/metas/{goal_id}")
 def excluir_meta(goal_id: int):
     goal_repo.delete(goal_id)
+    return {"ok": True}
+
+
+class DespesaFixaIn(BaseModel):
+    nome: str
+    categoria: str
+    valor_mensal: float
+    tipo: str  # "recorrente" | "parcelada"
+    data_inicio: str  # "YYYY-MM-DD"
+    parcela_atual: int | None = None
+    parcelas_totais: int | None = None
+
+
+class DespesaFixaParcelaIn(BaseModel):
+    parcela_atual: int
+
+
+class LimiteAlertaIn(BaseModel):
+    pct: float
+
+
+@app.get("/api/despesas-fixas")
+def despesas_fixas():
+    return despesas_fixas_service.build_despesas_fixas()
+
+
+@app.post("/api/despesas-fixas")
+def criar_despesa_fixa(body: DespesaFixaIn):
+    if not body.nome or body.valor_mensal <= 0:
+        raise HTTPException(status_code=400, detail="Preencha o nome e um valor maior que zero.")
+    if body.tipo not in ("recorrente", "parcelada"):
+        raise HTTPException(status_code=400, detail="Tipo deve ser 'recorrente' ou 'parcelada'.")
+    despesa_id = despesa_fixa_repo.create(
+        body.nome, body.categoria, body.valor_mensal, body.tipo, body.data_inicio,
+        body.parcela_atual, body.parcelas_totais,
+    )
+    return {"id": despesa_id}
+
+
+@app.patch("/api/despesas-fixas/{despesa_id}/parcela")
+def atualizar_parcela_despesa_fixa(despesa_id: int, body: DespesaFixaParcelaIn):
+    despesa_fixa_repo.update_parcela_atual(despesa_id, body.parcela_atual)
+    return {"ok": True}
+
+
+@app.post("/api/despesas-fixas/{despesa_id}/encerrar")
+def encerrar_despesa_fixa(despesa_id: int):
+    despesa_fixa_repo.set_ativa(despesa_id, False)
+    return {"ok": True}
+
+
+@app.delete("/api/despesas-fixas/{despesa_id}")
+def excluir_despesa_fixa(despesa_id: int):
+    despesa_fixa_repo.delete(despesa_id)
+    return {"ok": True}
+
+
+@app.put("/api/despesas-fixas/limite-alerta")
+def definir_limite_alerta(body: LimiteAlertaIn):
+    if body.pct <= 0:
+        raise HTTPException(status_code=400, detail="Informe um percentual maior que zero.")
+    despesas_fixas_service.set_limite_alerta_pct(body.pct)
     return {"ok": True}
 
 

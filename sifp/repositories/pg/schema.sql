@@ -82,6 +82,29 @@ create table if not exists goals (
     user_id uuid not null default auth.uid() references auth.users(id) on delete cascade
 );
 
+create table if not exists despesas_fixas (
+    id bigint generated always as identity primary key,
+    nome text not null,
+    categoria text not null,
+    valor_mensal double precision not null,
+    tipo text not null,
+    data_inicio text not null,
+    parcela_atual integer,
+    parcelas_totais integer,
+    ativa boolean not null default true,
+    criado_em timestamptz default now(),
+    user_id uuid not null default auth.uid() references auth.users(id) on delete cascade
+);
+
+-- Configurações do usuário de valor único (ex: limiar de alerta de
+-- despesas fixas) — chave-valor genérica, mesmo motivo da versão SQLite.
+create table if not exists preferencias (
+    chave text not null,
+    valor text not null,
+    user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+    primary key (user_id, chave)
+);
+
 -- RLS: habilita e cria uma política única por tabela (cobre SELECT/INSERT/
 -- UPDATE/DELETE — USING filtra leitura, WITH CHECK filtra escrita, ambos
 -- exigindo user_id = auth.uid()). auth.uid() já existe em todo projeto
@@ -91,7 +114,7 @@ do $$
 declare
     t text;
 begin
-    foreach t in array array['transactions', 'daily_balances', 'assets', 'budgets', 'goals']
+    foreach t in array array['transactions', 'daily_balances', 'assets', 'budgets', 'goals', 'despesas_fixas', 'preferencias']
     loop
         execute format('alter table %I enable row level security', t);
         execute format('drop policy if exists tenant_isolation on %I', t);
@@ -104,3 +127,4 @@ begin
 end $$;
 
 grant usage, select on sequence goals_id_seq to authenticated;
+grant usage, select on sequence despesas_fixas_id_seq to authenticated;

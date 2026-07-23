@@ -17,6 +17,7 @@ from sifp.domain.models import Diagnostic
 from sifp.intelligence import diagnostics as diag
 from sifp.services import indicator_service as ind
 from sifp.services import projection_service as proj
+from sifp.services.despesas_fixas_service import DespesasFixasService
 
 
 def diagnostic_to_dict(d: Diagnostic) -> dict:
@@ -27,12 +28,17 @@ def diagnostic_to_dict(d: Diagnostic) -> dict:
 
 
 class SummaryService:
-    def __init__(self, transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo):
+    def __init__(
+        self, transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo,
+        despesa_fixa_repo, preferencia_repo,
+    ):
         self.transaction_repo = transaction_repo
         self.balance_repo = balance_repo
         self.asset_repo = asset_repo
         self.budget_repo = budget_repo
         self.goal_repo = goal_repo
+        self.despesa_fixa_repo = despesa_fixa_repo
+        self.preferencia_repo = preferencia_repo
 
     def diagnostics_for_month(
         self, all_tx_full: pd.DataFrame, all_tx_real: pd.DataFrame, month: str, month_label: str
@@ -45,6 +51,10 @@ class SummaryService:
         latest_assets = self.asset_repo.get_latest_positions()
         patrimonio_total = float(latest_assets["saldo_liquido"].sum()) if not latest_assets.empty else 0.0
         despesa_media_mensal = float(monthly["Despesas"].mean()) if not monthly.empty else 0.0
+
+        despesas_fixas = DespesasFixasService(
+            self.despesa_fixa_repo, self.preferencia_repo, self.transaction_repo
+        ).build_despesas_fixas()
 
         return diag.run_diagnostics(
             monthly=monthly,
@@ -61,6 +71,9 @@ class SummaryService:
             weekend_stats=ind.weekend_vs_weekday_spending(all_tx_real),
             latest_month=month,
             balance_stats=ind.average_balance(self.balance_repo.get_all()),
+            despesas_fixas_total=despesas_fixas["total_mensal"],
+            receita_media_mensal=despesas_fixas["receita_media_mensal"],
+            despesas_fixas_limite_pct=despesas_fixas["limite_alerta_pct"],
         )
 
     def build_resumo(self, month_label_fmt) -> dict:

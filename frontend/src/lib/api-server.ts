@@ -1,4 +1,14 @@
-import type { Dashboard, Goal, OrcamentoData, Patrimonio, Projecoes, Relatorio, Resumo, Revisao } from "@/lib/types";
+import type {
+  Dashboard,
+  DespesasFixasData,
+  Goal,
+  OrcamentoData,
+  Patrimonio,
+  Projecoes,
+  Relatorio,
+  Resumo,
+  Revisao,
+} from "@/lib/types";
 import { API_PREFIX, SAAS_MODE } from "@/lib/api";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -80,6 +90,17 @@ export async function getMetas(): Promise<Goal[]> {
   });
   if (!res.ok) {
     throw new Error(`Falha ao buscar ${API_PREFIX}/metas: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getDespesasFixas(): Promise<DespesasFixasData> {
+  const res = await fetch(`${API_URL}${API_PREFIX}/despesas-fixas`, {
+    cache: "no-store",
+    headers: await authHeadersServer(),
+  });
+  if (!res.ok) {
+    throw new Error(`Falha ao buscar ${API_PREFIX}/despesas-fixas: ${res.status}`);
   }
   return res.json();
 }

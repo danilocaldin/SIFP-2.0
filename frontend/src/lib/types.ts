@@ -208,6 +208,32 @@ export interface Goal {
   criado_em: string;
 }
 
+// Espelha GET /api/despesas-fixas (sifp/services/despesas_fixas_service.py).
+
+export type TipoDespesaFixa = "recorrente" | "parcelada";
+
+export interface DespesaFixa {
+  id: number;
+  nome: string;
+  categoria: string;
+  valor_mensal: number;
+  tipo: TipoDespesaFixa;
+  data_inicio: string;
+  parcela_atual: number | null;
+  parcelas_totais: number | null;
+  parcelas_restantes: number | null;
+}
+
+export interface DespesasFixasData {
+  despesas: DespesaFixa[];
+  total_mensal: number;
+  receita_media_mensal: number;
+  pct_comprometido: number | null;
+  margem_mensal: number | null;
+  limite_alerta_pct: number | null;
+  categorias: string[];
+}
+
 // Espelha GET /api/relatorio (sifp/services/relatorio_service.py).
 
 export interface RelatorioData {

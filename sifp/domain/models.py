@@ -149,6 +149,41 @@ class Budget:
     limite_mensal: float
 
 
+class TipoDespesaFixa(str, Enum):
+    """Recorrente: sem fim definido (assinatura, plano de saúde,
+    psicóloga) — some da lista só quando o usuário marca como encerrada.
+    Parcelada: tem fim contado (compra parcelada) — parcelas_totais e
+    parcela_atual definem quando termina sozinha."""
+
+    RECORRENTE = "recorrente"
+    PARCELADA = "parcelada"
+
+
+@dataclass(frozen=True)
+class DespesaFixa:
+    """Compromisso financeiro recorrente declarado manualmente (Módulo
+    17) — não é derivado de transações importadas, é uma declaração de
+    compromisso ("tenho um plano de saúde de X/mês"), pra responder
+    "quanto já está comprometido, cabe mais uma dívida?" independente do
+    extrato bancário."""
+
+    id: int | None  # None antes de persistir; a repository preenche ao inserir
+    nome: str
+    categoria: str
+    valor_mensal: float
+    tipo: TipoDespesaFixa
+    data_inicio: str  # "YYYY-MM-DD"
+    parcela_atual: int | None = None
+    parcelas_totais: int | None = None
+    ativa: bool = True
+
+    @property
+    def parcelas_restantes(self) -> int | None:
+        if self.tipo != TipoDespesaFixa.PARCELADA or self.parcelas_totais is None or self.parcela_atual is None:
+            return None
+        return max(self.parcelas_totais - self.parcela_atual, 0)
+
+
 @dataclass(frozen=True)
 class Goal:
     """Meta financeira (Módulo 14) — reserva de emergência, viagem,

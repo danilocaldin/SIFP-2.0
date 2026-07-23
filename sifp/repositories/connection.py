@@ -125,5 +125,34 @@ def init_db(db_path: Path = DEFAULT_DB_PATH) -> None:
         """
     )
 
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS despesas_fixas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            categoria TEXT NOT NULL,
+            valor_mensal REAL NOT NULL,
+            tipo TEXT NOT NULL,
+            data_inicio TEXT NOT NULL,
+            parcela_atual INTEGER,
+            parcelas_totais INTEGER,
+            ativa INTEGER NOT NULL DEFAULT 1,
+            criado_em TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    # Configurações do usuário de valor único (ex: limiar de alerta de
+    # despesas fixas) — chave-valor genérica pra não precisar de uma
+    # tabela nova a cada nova preferência simples.
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS preferencias (
+            chave TEXT PRIMARY KEY,
+            valor TEXT NOT NULL
+        )
+        """
+    )
+
     conn.commit()
     conn.close()

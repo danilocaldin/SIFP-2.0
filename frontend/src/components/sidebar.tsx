@@ -12,6 +12,7 @@ import {
   LogOut,
   MessageCircle,
   Moon,
+  Pin,
   PiggyBank,
   Stethoscope,
   Sun,
@@ -48,6 +49,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/patrimonio", label: "Patrimônio", icon: Wallet },
       { href: "/orcamento", label: "Orçamento", icon: PiggyBank },
+      { href: "/despesas-fixas", label: "Despesas Fixas", icon: Pin },
       { href: "/projecoes", label: "Projeções", icon: TrendingUp },
     ],
   },

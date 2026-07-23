@@ -254,6 +254,50 @@ def check_orcamento_estourado(by_cat: pd.DataFrame, limits: dict, periodo_label:
     return diagnostics
 
 
+DESPESAS_FIXAS_EXCESSO_ALTA_PCT = 15.0
+
+
+def check_despesas_fixas_altas(
+    total_mensal: float, receita_media_mensal: float, limite_pct: float | None
+) -> list[Diagnostic]:
+    """
+    total_mensal: soma de DespesaFixaRepository.get_all()['valor_mensal'].
+    limite_pct: preferência do próprio usuário (Módulo 17) — sem preferência
+    definida, a regra não dispara (opt-in, mesmo espírito de
+    check_orcamento_estourado: não impor um limiar que não é escolha dele).
+    """
+    if not limite_pct or receita_media_mensal <= 0 or total_mensal <= 0:
+        return []
+    pct_comprometido = total_mensal / receita_media_mensal * 100
+    if pct_comprometido < limite_pct:
+        return []
+    excesso_pct = pct_comprometido - limite_pct
+    severidade = (
+        DiagnosticSeverity.ALTA if excesso_pct >= DESPESAS_FIXAS_EXCESSO_ALTA_PCT else DiagnosticSeverity.MEDIA
+    )
+    return [
+        Diagnostic(
+            codigo="despesas_fixas_altas",
+            titulo="Despesas fixas comprometem grande parte da renda",
+            severidade=severidade,
+            descricao=(
+                f"Suas despesas fixas somam {_brl(total_mensal)}/mês, {pct_comprometido:.0f}% da sua "
+                f"renda média mensal ({_brl(receita_media_mensal)}) — acima do limite de "
+                f"{limite_pct:.0f}% que você definiu."
+            ),
+            explicacao=(
+                "Um comprometimento alto da renda com gastos fixos reduz a margem pra imprevistos "
+                "e para assumir novos compromissos financeiros."
+            ),
+            recomendacao=(
+                "Antes de assumir uma nova dívida ou parcelamento, avalie se algum gasto fixo atual "
+                "pode ser reduzido ou cancelado (aba Despesas Fixas)."
+            ),
+            impacto_financeiro=total_mensal,
+        )
+    ]
+
+
 def check_metas(goals_df: pd.DataFrame, hoje: str | None = None) -> list[Diagnostic]:
     """
     goals_df: GoalRepository.get_all() (colunas id, nome, valor_necessario,
@@ -720,6 +764,9 @@ def run_diagnostics(
     weekend_stats: dict | None = None,
     balance_stats: dict | None = None,
     latest_month: str | None = None,
+    despesas_fixas_total: float = 0.0,
+    receita_media_mensal: float = 0.0,
+    despesas_fixas_limite_pct: float | None = None,
 ) -> list[Diagnostic]:
     """
     Roda todas as regras cadastradas e devolve a lista ordenada por
@@ -752,4 +799,5 @@ def run_diagnostics(
         )
     diagnostics += check_transacao_anomala(all_tx, latest_month)
     diagnostics += check_assinatura_reajustada(all_tx, latest_month)
+    diagnostics += check_despesas_fixas_altas(despesas_fixas_total, receita_media_mensal, despesas_fixas_limite_pct)
     return sorted(diagnostics, key=lambda d: d.prioridade)

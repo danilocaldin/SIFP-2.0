@@ -33,10 +33,13 @@ from sifp.repositories.pg.asset_repository import AssetRepository
 from sifp.repositories.pg.balance_repository import BalanceRepository
 from sifp.repositories.pg.bound import ConnBound
 from sifp.repositories.pg.budget_repository import BudgetRepository
+from sifp.repositories.pg.despesa_fixa_repository import DespesaFixaRepository
 from sifp.repositories.pg.goal_repository import GoalRepository
+from sifp.repositories.pg.preferencia_repository import PreferenciaRepository
 from sifp.repositories.pg.transaction_repository import TransactionRepository
 from sifp.services.chat_service import ChatIndisponivel, ChatService
 from sifp.services.dashboard_service import DashboardService
+from sifp.services.despesas_fixas_service import DespesasFixasService
 from sifp.services.formatting import formatar_mes, unescape_currency
 from sifp.services.import_service import ImportService
 from sifp.services.narrativa_service import NarrativaIndisponivel, NarrativaService
@@ -59,7 +62,16 @@ def _repos(conn: psycopg.Connection) -> dict:
         "asset_repo": ConnBound(AssetRepository(), conn),
         "budget_repo": ConnBound(BudgetRepository(), conn),
         "goal_repo": ConnBound(GoalRepository(), conn),
+        "despesa_fixa_repo": ConnBound(DespesaFixaRepository(), conn),
+        "preferencia_repo": ConnBound(PreferenciaRepository(), conn),
     }
+
+
+def _summary_service(r: dict) -> SummaryService:
+    return SummaryService(
+        r["transaction_repo"], r["balance_repo"], r["asset_repo"], r["budget_repo"], r["goal_repo"],
+        r["despesa_fixa_repo"], r["preferencia_repo"],
+    )
 
 
 def _plain_resumo(resumo: dict) -> dict:
@@ -83,9 +95,7 @@ def _plain_resumo(resumo: dict) -> dict:
 @router.get("/resumo")
 def resumo(conn: psycopg.Connection = Depends(get_db)):
     r = _repos(conn)
-    summary_service = SummaryService(
-        r["transaction_repo"], r["balance_repo"], r["asset_repo"], r["budget_repo"], r["goal_repo"]
-    )
+    summary_service = _summary_service(r)
     return _plain_resumo(summary_service.build_resumo(formatar_mes))
 
 
@@ -187,12 +197,78 @@ def excluir_meta(goal_id: int, conn: psycopg.Connection = Depends(get_db)):
     return {"ok": True}
 
 
+class DespesaFixaIn(BaseModel):
+    nome: str
+    categoria: str
+    valor_mensal: float
+    tipo: str  # "recorrente" | "parcelada"
+    data_inicio: str  # "YYYY-MM-DD"
+    parcela_atual: int | None = None
+    parcelas_totais: int | None = None
+
+
+class DespesaFixaParcelaIn(BaseModel):
+    parcela_atual: int
+
+
+class LimiteAlertaIn(BaseModel):
+    pct: float
+
+
+@router.get("/despesas-fixas")
+def despesas_fixas(conn: psycopg.Connection = Depends(get_db)):
+    r = _repos(conn)
+    return DespesasFixasService(r["despesa_fixa_repo"], r["preferencia_repo"], r["transaction_repo"]).build_despesas_fixas()
+
+
+@router.post("/despesas-fixas")
+def criar_despesa_fixa(body: DespesaFixaIn, conn: psycopg.Connection = Depends(get_db)):
+    if not body.nome or body.valor_mensal <= 0:
+        raise HTTPException(status_code=400, detail="Preencha o nome e um valor maior que zero.")
+    if body.tipo not in ("recorrente", "parcelada"):
+        raise HTTPException(status_code=400, detail="Tipo deve ser 'recorrente' ou 'parcelada'.")
+    despesa_id = _repos(conn)["despesa_fixa_repo"].create(
+        body.nome, body.categoria, body.valor_mensal, body.tipo, body.data_inicio,
+        body.parcela_atual, body.parcelas_totais,
+    )
+    return {"id": despesa_id}
+
+
+@router.patch("/despesas-fixas/{despesa_id}/parcela")
+def atualizar_parcela_despesa_fixa(
+    despesa_id: int, body: DespesaFixaParcelaIn, conn: psycopg.Connection = Depends(get_db)
+):
+    _repos(conn)["despesa_fixa_repo"].update_parcela_atual(despesa_id, body.parcela_atual)
+    return {"ok": True}
+
+
+@router.post("/despesas-fixas/{despesa_id}/encerrar")
+def encerrar_despesa_fixa(despesa_id: int, conn: psycopg.Connection = Depends(get_db)):
+    _repos(conn)["despesa_fixa_repo"].set_ativa(despesa_id, False)
+    return {"ok": True}
+
+
+@router.delete("/despesas-fixas/{despesa_id}")
+def excluir_despesa_fixa(despesa_id: int, conn: psycopg.Connection = Depends(get_db)):
+    _repos(conn)["despesa_fixa_repo"].delete(despesa_id)
+    return {"ok": True}
+
+
+@router.put("/despesas-fixas/limite-alerta")
+def definir_limite_alerta(body: LimiteAlertaIn, conn: psycopg.Connection = Depends(get_db)):
+    if body.pct <= 0:
+        raise HTTPException(status_code=400, detail="Informe um percentual maior que zero.")
+    r = _repos(conn)
+    DespesasFixasService(r["despesa_fixa_repo"], r["preferencia_repo"], r["transaction_repo"]).set_limite_alerta_pct(
+        body.pct
+    )
+    return {"ok": True}
+
+
 @router.get("/relatorio")
 def relatorio(month: str | None = None, conn: psycopg.Connection = Depends(get_db)):
     r = _repos(conn)
-    summary_service = SummaryService(
-        r["transaction_repo"], r["balance_repo"], r["asset_repo"], r["budget_repo"], r["goal_repo"]
-    )
+    summary_service = _summary_service(r)
     relatorio_service = RelatorioService(r["transaction_repo"], r["asset_repo"], summary_service)
     return relatorio_service.build_relatorio(month, formatar_mes)
 
@@ -204,9 +280,7 @@ def relatorio_pdf(
     nome_titular: str | None = Depends(get_current_user_name),
 ):
     r = _repos(conn)
-    summary_service = SummaryService(
-        r["transaction_repo"], r["balance_repo"], r["asset_repo"], r["budget_repo"], r["goal_repo"]
-    )
+    summary_service = _summary_service(r)
     relatorio_service = RelatorioService(r["transaction_repo"], r["asset_repo"], summary_service)
     pdf_bytes = relatorio_service.build_relatorio_pdf(month, formatar_mes, nome_titular=nome_titular)
     if pdf_bytes is None:
@@ -309,9 +383,7 @@ def revisao_retreinar(conn: psycopg.Connection = Depends(get_db)):
 @router.post("/narrativa")
 def narrativa(conn: psycopg.Connection = Depends(get_db)):
     r = _repos(conn)
-    summary_service = SummaryService(
-        r["transaction_repo"], r["balance_repo"], r["asset_repo"], r["budget_repo"], r["goal_repo"]
-    )
+    summary_service = _summary_service(r)
     narrativa_service = NarrativaService(summary_service, r["transaction_repo"])
     try:
         texto = narrativa_service.explicar_mes()

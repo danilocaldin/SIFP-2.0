@@ -31,10 +31,13 @@ from sifp.repositories.asset_repository import AssetRepository
 from sifp.repositories.balance_repository import BalanceRepository
 from sifp.repositories.budget_repository import BudgetRepository
 from sifp.repositories.connection import init_db
+from sifp.repositories.despesa_fixa_repository import DespesaFixaRepository
 from sifp.repositories.goal_repository import GoalRepository
+from sifp.repositories.preferencia_repository import PreferenciaRepository
 from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services import indicator_service as ind
 from sifp.services import projection_service as proj
+from sifp.services.despesas_fixas_service import DespesasFixasService
 from sifp.services.formatting import format_brl, format_brl_md, formatar_mes
 from sifp.services.chat_service import ChatIndisponivel, ChatService
 from sifp.services.import_service import ImportService
@@ -56,8 +59,13 @@ balance_repo = BalanceRepository()
 asset_repo = AssetRepository()
 budget_repo = BudgetRepository()
 goal_repo = GoalRepository()
+despesa_fixa_repo = DespesaFixaRepository()
+preferencia_repo = PreferenciaRepository()
 investment_importer = BTGInvestmentImporter()
-summary_service = SummaryService(transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo)
+summary_service = SummaryService(
+    transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo, despesa_fixa_repo, preferencia_repo
+)
+despesas_fixas_service = DespesasFixasService(despesa_fixa_repo, preferencia_repo, transaction_repo)
 narrativa_service = NarrativaService(summary_service, transaction_repo)
 chat_service = ChatService(transaction_repo, asset_repo)
 
@@ -119,10 +127,10 @@ st.caption("Inteligência financeira pessoal • Upload de extratos • Categori
 
 (
     tab_resumo, tab_upload, tab_revisao, tab_dashboard, tab_patrimonio,
-    tab_orcamento, tab_projecoes, tab_diagnosticos, tab_relatorio, tab_chat,
+    tab_orcamento, tab_despesas_fixas, tab_projecoes, tab_diagnosticos, tab_relatorio, tab_chat,
 ) = st.tabs([
     "🏠 Resumo", "📤 Upload", "✏️ Revisão de Categorias", "📊 Dashboard", "💼 Patrimônio",
-    "🎯 Orçamento e Metas", "🔮 Projeções", "🩺 Diagnósticos", "📄 Relatório", "💬 Chat",
+    "🎯 Orçamento e Metas", "📌 Despesas Fixas", "🔮 Projeções", "🩺 Diagnósticos", "📄 Relatório", "💬 Chat",
 ])
 
 # =======================================================================
@@ -832,6 +840,97 @@ with tab_orcamento:
                     st.rerun()
                 if col_excluir.button("Excluir", key=f"goal_del_{row['id']}"):
                     goal_repo.delete(int(row["id"]))
+                    st.rerun()
+                st.divider()
+
+# =======================================================================
+# TAB - DESPESAS FIXAS (Módulo 17)
+# =======================================================================
+with tab_despesas_fixas:
+    st.subheader("Despesas Fixas")
+    st.caption(
+        "Declare seus compromissos recorrentes — assinatura, plano de saúde, psicóloga, compra "
+        "parcelada — pra ver quanto já está comprometido todo mês e decidir com mais segurança "
+        "se cabe assumir mais uma dívida."
+    )
+
+    despesas_fixas_data = despesas_fixas_service.build_despesas_fixas()
+
+    col_resumo_df1, col_resumo_df2, col_resumo_df3 = st.columns(3)
+    col_resumo_df1.metric("Total mensal comprometido", format_brl(despesas_fixas_data["total_mensal"]))
+    if despesas_fixas_data["pct_comprometido"] is not None:
+        col_resumo_df2.metric("% da renda média", f"{despesas_fixas_data['pct_comprometido']:.0f}%")
+        col_resumo_df3.metric("Margem mensal livre", format_brl(despesas_fixas_data["margem_mensal"]))
+    else:
+        col_resumo_df2.metric("% da renda média", "—")
+        col_resumo_df3.metric("Margem mensal livre", "—")
+
+    st.divider()
+    col_novo_df, col_lista_df = st.columns([1, 1])
+
+    with col_novo_df:
+        st.markdown("#### ➕ Nova despesa fixa")
+        with st.form("nova_despesa_fixa"):
+            nome_df = st.text_input("Nome (ex: Plano de saúde, Psicóloga, Notebook parcelado)")
+            categoria_df = st.selectbox("Categoria", despesas_fixas_data["categorias"], key="categoria_despesa_fixa")
+            valor_df = st.number_input("Valor mensal (R$)", min_value=0.0, step=10.0, format="%.2f")
+            tipo_df = st.radio(
+                "Tipo", ["recorrente", "parcelada"], horizontal=True,
+                format_func=lambda t: "Recorrente (sem fim definido)" if t == "recorrente" else "Parcelada (tem fim)",
+            )
+            data_inicio_df = st.date_input("Início")
+            parcelas_totais_df = None
+            parcela_atual_df = None
+            if tipo_df == "parcelada":
+                col_pa, col_pt = st.columns(2)
+                parcela_atual_df = col_pa.number_input("Parcela atual", min_value=1, step=1, value=1)
+                parcelas_totais_df = col_pt.number_input("Total de parcelas", min_value=1, step=1, value=12)
+            if st.form_submit_button("Salvar despesa fixa", type="primary"):
+                if nome_df and valor_df > 0:
+                    despesa_fixa_repo.create(
+                        nome_df, categoria_df, valor_df, tipo_df, data_inicio_df.strftime("%Y-%m-%d"),
+                        int(parcela_atual_df) if parcela_atual_df else None,
+                        int(parcelas_totais_df) if parcelas_totais_df else None,
+                    )
+                    st.success(f"'{nome_df}' cadastrada.")
+                    st.rerun()
+                else:
+                    st.warning("Preencha o nome e um valor maior que zero.")
+
+        st.markdown("#### ⚠️ Limite de alerta")
+        st.caption(
+            "A partir de que % da sua renda média mensal comprometida com despesas fixas o Sifra "
+            "deve te avisar? Fica a seu critério."
+        )
+        limite_atual_df = despesas_fixas_data["limite_alerta_pct"]
+        with st.form("limite_alerta_despesas_fixas"):
+            novo_limite_df = st.number_input(
+                "Alertar acima de (%)", min_value=0.0, max_value=100.0, step=5.0,
+                value=float(limite_atual_df) if limite_atual_df else 30.0,
+            )
+            if st.form_submit_button("Salvar limite"):
+                despesas_fixas_service.set_limite_alerta_pct(novo_limite_df)
+                st.success("Limite de alerta salvo.")
+                st.rerun()
+
+    with col_lista_df:
+        st.markdown("#### 📋 Despesas ativas")
+        if not despesas_fixas_data["despesas"]:
+            st.caption("Nenhuma despesa fixa cadastrada ainda.")
+        else:
+            for despesa in despesas_fixas_data["despesas"]:
+                st.write(f"**{despesa['nome']}** — {format_brl_md(despesa['valor_mensal'])}/mês ({despesa['categoria']})")
+                if despesa["tipo"] == "parcelada" and despesa["parcelas_totais"]:
+                    pct_parcela = min(despesa["parcela_atual"] / despesa["parcelas_totais"], 1.0)
+                    st.progress(pct_parcela, text=f"Parcela {despesa['parcela_atual']} de {despesa['parcelas_totais']}")
+                else:
+                    st.caption("Recorrente, sem fim definido.")
+                col_encerrar_df, col_excluir_df = st.columns(2)
+                if col_encerrar_df.button("Encerrar", key=f"encerrar_df_{despesa['id']}"):
+                    despesa_fixa_repo.set_ativa(despesa["id"], False)
+                    st.rerun()
+                if col_excluir_df.button("Excluir", key=f"excluir_df_{despesa['id']}"):
+                    despesa_fixa_repo.delete(despesa["id"])
                     st.rerun()
                 st.divider()
 

@@ -1,4 +1,11 @@
-import type { ChatMensagem, ChatResponse, NarrativaResponse, UploadPersistSummary, UploadPreview } from "@/lib/types";
+import type {
+  ChatMensagem,
+  ChatResponse,
+  NarrativaResponse,
+  TipoDespesaFixa,
+  UploadPersistSummary,
+  UploadPreview,
+} from "@/lib/types";
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 // Este arquivo é seguro pra importar de Client Components — nunca toca
@@ -80,6 +87,57 @@ export async function excluirMeta(id: number): Promise<void> {
     headers: await authHeadersClient(),
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao excluir a meta."));
+}
+
+export async function criarDespesaFixa(despesa: {
+  nome: string;
+  categoria: string;
+  valor_mensal: number;
+  tipo: TipoDespesaFixa;
+  data_inicio: string;
+  parcela_atual?: number;
+  parcelas_totais?: number;
+}): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/despesas-fixas`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
+    body: JSON.stringify(despesa),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao salvar a despesa fixa."));
+}
+
+export async function atualizarParcelaDespesaFixa(id: number, parcelaAtual: number): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/despesas-fixas/${id}/parcela`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
+    body: JSON.stringify({ parcela_atual: parcelaAtual }),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao atualizar a parcela."));
+}
+
+export async function encerrarDespesaFixa(id: number): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/despesas-fixas/${id}/encerrar`, {
+    method: "POST",
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao encerrar a despesa fixa."));
+}
+
+export async function excluirDespesaFixa(id: number): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/despesas-fixas/${id}`, {
+    method: "DELETE",
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao excluir a despesa fixa."));
+}
+
+export async function definirLimiteAlertaDespesasFixas(pct: number): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/despesas-fixas/limite-alerta`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
+    body: JSON.stringify({ pct }),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao salvar o limite de alerta."));
 }
 
 export async function previewUpload(file: File): Promise<UploadPreview> {

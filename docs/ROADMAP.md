@@ -57,6 +57,17 @@ O app pessoal do Danilo (Streamlit e o frontend de sempre) continua exatamente c
 
 **Estratégia interim de instância isolada por cliente** ([`CLIENTES.md`](CLIENTES.md)) segue documentada como plano B, mas não é mais o caminho principal agora que o SaaS de verdade está no ar.
 
+### Despesas Fixas (23/07/2026)
+Novo módulo pra declarar manualmente compromissos recorrentes — assinatura, plano de saúde,
+psicóloga, compra parcelada — separado dos lançamentos importados do extrato. Mostra o total
+mensal comprometido, o % da renda média e a margem livre, respondendo diretamente "cabe mais uma
+dívida?". Despesas "parceladas" têm parcela atual/total (a barra de progresso encerra sozinha
+quando o usuário avança até o fim); "recorrentes" ficam ativas até serem encerradas manualmente.
+Novo diagnóstico automático (`check_despesas_fixas_altas`) alerta quando o comprometimento passa
+de um limiar — mas o limiar é escolhido pelo próprio usuário (não um valor fixo do sistema), como
+qualquer configuração de Orçamento. Publicado nos dois produtos (app pessoal do Danilo e SaaS),
+seguindo a mesma paridade dos demais módulos.
+
 ## Em andamento
 
 Nada em construção ativa no momento além de refinar a identidade de marca e convidar os primeiros clientes reais pro SaaS.
