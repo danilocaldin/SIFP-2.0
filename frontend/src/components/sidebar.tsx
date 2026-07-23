@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import {
   FileText,
   Home,
   LayoutDashboard,
   ListChecks,
   MessageCircle,
+  Moon,
   PiggyBank,
   Stethoscope,
+  Sun,
   TrendingUp,
   Upload,
   Wallet,
@@ -54,6 +58,10 @@ const GROUPS: NavGroup[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   return (
     <aside className="flex h-screen w-14 flex-shrink-0 flex-col overflow-y-auto bg-brand-ink px-2 py-5 md:w-60 md:px-4">
@@ -95,6 +103,22 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
+
+      <button
+        type="button"
+        onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+        title={mounted && resolvedTheme === "dark" ? "Mudar para modo claro" : "Mudar para modo escuro"}
+        className="mt-2 flex items-center justify-center gap-2.5 rounded-md px-0 py-2 text-sm text-white/65 transition-colors hover:bg-white/5 hover:text-white md:justify-start md:px-2.5 md:py-1.5"
+      >
+        {mounted && resolvedTheme === "dark" ? (
+          <Sun size={17} strokeWidth={2} className="flex-shrink-0" />
+        ) : (
+          <Moon size={17} strokeWidth={2} className="flex-shrink-0" />
+        )}
+        <span className="hidden md:inline">
+          {mounted && resolvedTheme === "dark" ? "Modo claro" : "Modo escuro"}
+        </span>
+      </button>
     </aside>
   );
 }
