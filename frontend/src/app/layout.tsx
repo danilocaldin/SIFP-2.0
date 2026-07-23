@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { ServiceWorkerRegister } from "@/components/sw-register";
 import { Sidebar } from "@/components/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
@@ -8,6 +9,15 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Sifra — Inteligência Financeira Pessoal",
   description: "Como você está financeiramente, agora.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Sifra",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#16211f",
 };
 
 export default function RootLayout({
@@ -23,6 +33,7 @@ export default function RootLayout({
     >
       <body className="flex min-h-full bg-background text-foreground">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <ServiceWorkerRegister />
           <Sidebar />
           <div className="flex min-h-full flex-1 flex-col overflow-x-hidden">{children}</div>
         </ThemeProvider>
