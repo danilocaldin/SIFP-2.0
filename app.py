@@ -1082,8 +1082,11 @@ with tab_relatorio:
                 period_label=period_label_rel,
                 summary=summary_rel,
                 by_cat=by_cat_rel,
+                by_merchant=by_merchant_rel,
                 monthly=monthly_rel,
                 diagnostics=diagnostics_rel,
+                asset_positions=latest_assets_rel,
+                debt_transactions=debt_transactions_rel,
                 patrimonio_total=patrimonio_total_rel,
             )
             st.download_button(

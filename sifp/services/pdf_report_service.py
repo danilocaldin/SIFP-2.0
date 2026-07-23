@@ -3,15 +3,23 @@ pdf_report_service.py
 ----------------------
 Módulo 11 — Relatórios, versão PDF. Mesma regra do report_service (texto):
 nenhuma lógica nova aqui, só formatação do que RelatorioService já compõe —
-o PDF não pode nunca mostrar um número diferente do que a tela de Relatório
-(texto) ou o Resumo mostram.
+o PDF nunca pode mostrar um número diferente do que a tela de Relatório
+(texto) ou o Resumo mostram. Paridade completa com o relatório em texto —
+toda seção que existe lá existe aqui (categorias, estabelecimentos,
+evolução mensal, todos os diagnósticos, patrimônio por ativo, dívidas).
 
-Pensado pra ser curto e simples de ler ("mesmo o usuário mais leigo
-entenda", pedido explícito do Danilo) — não um documento institucional
-denso: capa + resumo do mês + dois gráficos + os 3 diagnósticos mais
-relevantes. Usa reportlab (puro Python, sem dependência nativa de SO) e as
-mesmas cores da identidade visual do frontend (ver globals.css) — os tokens
-do tema claro, já que um PDF é sempre uma superfície clara.
+Acabamento pensado pra cliente private de alta renda: predominantemente
+tabelas (como um extrato de banco de verdade), só UM gráfico nativo bem
+executado (evolução mensal — onde um gráfico realmente ajuda). Gastos por
+categoria e maiores estabelecimentos deliberadamente NÃO são gráfico de
+barras: com uma categoria concentrando a maior parte do gasto (comum em
+extrato real), barras pequenas ficam ilegíveis e o rótulo de valor colide
+com o eixo — tabela não tem esse problema e é mais fácil de ler em
+qualquer distribuição de dados.
+
+Usa reportlab (puro Python, sem dependência nativa de SO) e as mesmas
+cores da identidade visual do frontend (ver globals.css) — os tokens do
+tema claro, já que um PDF é sempre uma superfície clara.
 """
 
 from __future__ import annotations
@@ -28,13 +36,15 @@ from reportlab.platypus import (
     BaseDocTemplate,
     Flowable,
     Frame,
+    KeepTogether,
+    PageBreak,
     PageTemplate,
     Paragraph,
     Spacer,
     Table,
     TableStyle,
 )
-from reportlab.graphics.charts.barcharts import HorizontalBarChart, VerticalBarChart
+from reportlab.graphics.charts.barcharts import VerticalBarChart
 from reportlab.graphics.shapes import Drawing
 
 from sifp.domain.models import Diagnostic, DiagnosticSeverity
@@ -44,39 +54,50 @@ from sifp.services.formatting import format_brl, unescape_currency
 INK = colors.HexColor("#16211f")
 MUTED = colors.HexColor("#52625e")
 BORDER = colors.HexColor("#dde5e2")
-CARD = colors.HexColor("#f6f8f7")
+HEADER_BG = colors.HexColor("#f0f4f2")
 PRIMARY = colors.HexColor("#0d5c63")
-TEAL = colors.HexColor("#7fdcca")
 RECEITA = colors.HexColor("#008300")
 DESPESA = colors.HexColor("#e34948")
 SALDO = colors.HexColor("#2a78d6")
+AMBAR = colors.HexColor("#c98a1c")
 
 _SEVERITY_COLOR = {
     DiagnosticSeverity.CRITICA: DESPESA,
     DiagnosticSeverity.ALTA: DESPESA,
-    DiagnosticSeverity.MEDIA: colors.HexColor("#c98a1c"),
+    DiagnosticSeverity.MEDIA: AMBAR,
     DiagnosticSeverity.BAIXA: MUTED,
 }
+_SEVERITY_LABEL = {
+    DiagnosticSeverity.CRITICA: "Crítico",
+    DiagnosticSeverity.ALTA: "Alta prioridade",
+    DiagnosticSeverity.MEDIA: "Atenção",
+    DiagnosticSeverity.BAIXA: "Observação",
+}
 
-_PAGE_MARGIN = 1.8 * cm
+_PAGE_MARGIN = 1.9 * cm
 
 _STYLES = {
-    "brand": ParagraphStyle("brand", fontName="Helvetica-Bold", fontSize=15, textColor=INK, leading=18),
+    "brand": ParagraphStyle("brand", fontName="Helvetica-Bold", fontSize=16, textColor=INK, leading=19),
     "tagline": ParagraphStyle("tagline", fontName="Helvetica", fontSize=9.5, textColor=MUTED, leading=12),
-    "h1": ParagraphStyle("h1", fontName="Helvetica-Bold", fontSize=12, textColor=INK, spaceBefore=14, spaceAfter=6),
+    "h1": ParagraphStyle("h1", fontName="Helvetica-Bold", fontSize=12.5, textColor=INK, spaceBefore=18, spaceAfter=8),
     "hero_label": ParagraphStyle("hero_label", fontName="Helvetica", fontSize=10, textColor=MUTED, leading=13),
     "hero_number": ParagraphStyle(
-        "hero_number", fontName="Helvetica-Bold", fontSize=30, textColor=PRIMARY, leading=34, spaceBefore=2
+        "hero_number", fontName="Helvetica-Bold", fontSize=32, textColor=PRIMARY, leading=36, spaceBefore=2
     ),
     "stat_label": ParagraphStyle("stat_label", fontName="Helvetica", fontSize=8.5, textColor=MUTED, leading=11),
     "stat_value": ParagraphStyle(
         "stat_value", fontName="Helvetica-Bold", fontSize=14, textColor=INK, leading=17, spaceBefore=2
     ),
-    "diag_title": ParagraphStyle(
-        "diag_title", fontName="Helvetica-Bold", fontSize=10, textColor=INK, leading=13
+    "th": ParagraphStyle("th", fontName="Helvetica-Bold", fontSize=8, textColor=MUTED, leading=10),
+    "td": ParagraphStyle("td", fontName="Helvetica", fontSize=9, textColor=INK, leading=12),
+    "td_muted": ParagraphStyle("td_muted", fontName="Helvetica", fontSize=9, textColor=MUTED, leading=12),
+    "diag_title": ParagraphStyle("diag_title", fontName="Helvetica-Bold", fontSize=10.5, textColor=INK, leading=13),
+    "diag_badge": ParagraphStyle("diag_badge", fontName="Helvetica-Bold", fontSize=7.5, leading=10),
+    "diag_body": ParagraphStyle("diag_body", fontName="Helvetica", fontSize=9, textColor=MUTED, leading=13),
+    "diag_reco_label": ParagraphStyle(
+        "diag_reco_label", fontName="Helvetica-Bold", fontSize=8, textColor=PRIMARY, leading=11, spaceBefore=3
     ),
-    "diag_body": ParagraphStyle("diag_body", fontName="Helvetica", fontSize=9, textColor=MUTED, leading=12.5),
-    "footer": ParagraphStyle("footer", fontName="Helvetica", fontSize=7.5, textColor=MUTED),
+    "empty": ParagraphStyle("empty", fontName="Helvetica-Oblique", fontSize=9, textColor=MUTED, leading=12),
 }
 
 
@@ -95,10 +116,13 @@ class _Rule(Flowable):
         self.canv.line(0, 0, self.width, 0)
 
 
+def _truncate(text: str, max_len: int) -> str:
+    text = str(text)
+    return text if len(text) <= max_len else text[: max_len - 1].rstrip() + "…"
+
+
 def _stat_cell(label: str, value: str, value_color=INK) -> list:
-    style_value = ParagraphStyle(
-        "stat_value_dyn", parent=_STYLES["stat_value"], textColor=value_color
-    )
+    style_value = ParagraphStyle("stat_value_dyn", parent=_STYLES["stat_value"], textColor=value_color)
     return [Paragraph(label, _STYLES["stat_label"]), Paragraph(value, style_value)]
 
 
@@ -125,100 +149,172 @@ def _resumo_table(summary: dict, content_width: float) -> Table:
     return table
 
 
-def _categoria_chart(by_cat: pd.DataFrame, content_width: float) -> Drawing:
-    top = by_cat.head(6).iloc[::-1]  # inverte pra maior categoria ficar no topo do gráfico horizontal
-    labels = [f"{row['category'][:22]}" for _, row in top.iterrows()]
-    values = [float(v) for v in top["value_abs"]]
+def _data_table(
+    headers: list[str], rows: list[list], col_widths: list[float], align: list[str]
+) -> Table:
+    """Tabela padrão do relatório — cabeçalho com fundo sutil, linhas finas
+    entre registros, numérico alinhado à direita. Reaproveitada por todas
+    as seções tabulares (categorias, estabelecimentos, patrimônio, dívidas)."""
+    header_row = [Paragraph(h, _STYLES["th"]) for h in headers]
+    table = Table([header_row] + rows, colWidths=col_widths, repeatRows=1)
+    style = [
+        ("BACKGROUND", (0, 0), (-1, 0), HEADER_BG),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.75, BORDER),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.4, BORDER),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]
+    for col, a in enumerate(align):
+        if a == "right":
+            style.append(("ALIGN", (col, 0), (col, -1), "RIGHT"))
+    table.setStyle(TableStyle(style))
+    return table
 
-    height = max(28 * len(values) + 20, 60)
-    d = Drawing(content_width, height)
 
-    chart = HorizontalBarChart()
-    chart.x = 4
-    chart.y = 4
-    chart.width = content_width - 8
-    chart.height = height - 12
-    chart.data = [values]
-    chart.categoryAxis.categoryNames = labels
-    chart.categoryAxis.labels.fontName = "Helvetica"
-    chart.categoryAxis.labels.fontSize = 8.5
-    chart.categoryAxis.labels.fillColor = INK
-    chart.valueAxis.visible = False
-    chart.valueAxis.valueMin = 0
-    chart.bars[0].fillColor = DESPESA
-    chart.bars.strokeColor = None
-    chart.barWidth = 10
-    chart.barSpacing = 6
-    chart.groupSpacing = 0
-    chart.barLabelFormat = lambda v: format_brl(v)
-    chart.barLabels.fontName = "Helvetica-Bold"
-    chart.barLabels.fontSize = 8
-    chart.barLabels.fillColor = INK
-    chart.barLabels.nudge = 10
-    chart.barLabels.dx = 0
-    d.add(chart)
-    return d
+def _categoria_table(by_cat: pd.DataFrame, content_width: float) -> Table:
+    rows = []
+    for _, row in by_cat.iterrows():
+        rows.append(
+            [
+                Paragraph(_truncate(row["category"], 34), _STYLES["td"]),
+                Paragraph(format_brl(row["value_abs"]), _STYLES["td"]),
+                Paragraph(f"{row['pct']:.0f}%", _STYLES["td_muted"]),
+            ]
+        )
+    w = content_width
+    return _data_table(
+        ["Categoria", "Valor", "% do total"], rows, [w * 0.56, w * 0.28, w * 0.16], ["left", "right", "right"]
+    )
+
+
+def _estabelecimentos_table(by_merchant: pd.DataFrame, content_width: float) -> Table:
+    rows = []
+    for _, row in by_merchant.head(10).iterrows():
+        rows.append(
+            [
+                Paragraph(_truncate(row["merchant"], 42), _STYLES["td"]),
+                Paragraph(format_brl(row["value_abs"]), _STYLES["td"]),
+                Paragraph(f"{int(row['n_transacoes'])}x", _STYLES["td_muted"]),
+            ]
+        )
+    w = content_width
+    return _data_table(
+        ["Estabelecimento", "Valor", "Transações"], rows, [w * 0.58, w * 0.26, w * 0.16], ["left", "right", "right"]
+    )
+
+
+def _patrimonio_table(asset_positions: pd.DataFrame, content_width: float) -> Table:
+    rows = []
+    for _, row in asset_positions.iterrows():
+        rows.append(
+            [
+                Paragraph(_truncate(row["nome"], 30), _STYLES["td"]),
+                Paragraph(_truncate(row.get("tipo") or "—", 28), _STYLES["td_muted"]),
+                Paragraph(format_brl(row["saldo_liquido"]), _STYLES["td"]),
+            ]
+        )
+    w = content_width
+    return _data_table(
+        ["Ativo", "Tipo", "Valor"], rows, [w * 0.42, w * 0.34, w * 0.24], ["left", "left", "right"]
+    )
+
+
+def _dividas_table(debt_transactions: pd.DataFrame, content_width: float) -> Table:
+    rows = []
+    for _, row in debt_transactions.iterrows():
+        data_str = pd.to_datetime(row["date"]).strftime("%d/%m/%Y")
+        rows.append(
+            [
+                Paragraph(data_str, _STYLES["td_muted"]),
+                Paragraph(_truncate(row["description"], 40), _STYLES["td"]),
+                Paragraph(format_brl(abs(row["value"])), _STYLES["td"]),
+            ]
+        )
+    w = content_width
+    return _data_table(
+        ["Data", "Descrição", "Valor"], rows, [w * 0.18, w * 0.56, w * 0.26], ["left", "left", "right"]
+    )
 
 
 def _evolucao_chart(monthly: pd.DataFrame, content_width: float) -> Drawing:
-    recent = monthly.tail(6)
+    recent = monthly.tail(12)
     months = [str(m).split("-")[-1] + "/" + str(m).split("-")[0][2:] for m in recent["month"]]
     receitas = [float(v) for v in recent["Receitas"]]
     despesas = [float(v) for v in recent["Despesas"]]
 
-    height = 130
+    height = 155
     d = Drawing(content_width, height)
 
     chart = VerticalBarChart()
-    chart.x = 30
-    chart.y = 20
-    chart.width = content_width - 40
-    chart.height = height - 30
+    chart.x = 8
+    chart.y = 24
+    chart.width = content_width - 16
+    chart.height = height - 44
     chart.data = [receitas, despesas]
     chart.categoryAxis.categoryNames = months
     chart.categoryAxis.labels.fontName = "Helvetica"
     chart.categoryAxis.labels.fontSize = 8
     chart.categoryAxis.labels.fillColor = MUTED
+    chart.categoryAxis.strokeColor = BORDER
     chart.valueAxis.visible = False
     chart.valueAxis.valueMin = 0
     chart.bars[0].fillColor = RECEITA
     chart.bars[1].fillColor = DESPESA
     chart.bars.strokeColor = None
-    chart.barWidth = 8
-    chart.groupSpacing = 14
-    chart.barSpacing = 2
+    # Largura/espaçamento reagem à quantidade de meses (12 vs 3) pra nunca
+    # espremer ou esticar demais as barras.
+    chart.barWidth = max(5, min(9, 90 // max(len(months), 1)))
+    chart.groupSpacing = chart.barWidth * 1.6
+    chart.barSpacing = 1.5
     d.add(chart)
     return d
 
 
 def _diagnosticos_section(diagnostics: list[Diagnostic], content_width: float) -> list:
     story: list = []
-    principais = sorted(diagnostics, key=lambda d: d.prioridade)[:3]
-    if not principais:
-        story.append(Paragraph("Nenhum diagnóstico relevante neste período.", _STYLES["diag_body"]))
+    ordenados = sorted(diagnostics, key=lambda d: d.prioridade)
+    if not ordenados:
+        story.append(Paragraph("Nenhum diagnóstico relevante neste período.", _STYLES["empty"]))
         return story
 
-    for d in principais:
-        dot_color = _SEVERITY_COLOR[d.severidade]
-        dot_style = ParagraphStyle("dot", parent=_STYLES["diag_title"], textColor=dot_color)
-        row = Table(
-            [[Paragraph("●", dot_style), Paragraph(d.titulo, _STYLES["diag_title"])]],
-            colWidths=[12, content_width - 12],
+    for d in ordenados:
+        badge_color = _SEVERITY_COLOR[d.severidade]
+        badge_style = ParagraphStyle(
+            "badge_dyn", parent=_STYLES["diag_badge"], textColor=colors.white, backColor=badge_color
         )
-        row.setStyle(
+        header = Table(
+            [
+                [
+                    Paragraph(f" {_SEVERITY_LABEL[d.severidade]} ", badge_style),
+                    Paragraph(d.titulo, _STYLES["diag_title"]),
+                ]
+            ],
+            colWidths=[78, content_width - 78],
+        )
+        header.setStyle(
             TableStyle(
                 [
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (0, 0), 0),
+                    ("RIGHTPADDING", (0, 0), (0, 0), 6),
+                    ("LEFTPADDING", (1, 0), (1, 0), 0),
                     ("TOPPADDING", (0, 0), (-1, -1), 0),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
                 ]
             )
         )
-        story.append(row)
-        story.append(Paragraph(unescape_currency(d.recomendacao), _STYLES["diag_body"]))
-        story.append(Spacer(1, 10))
+        block = [
+            header,
+            Spacer(1, 5),
+            Paragraph(unescape_currency(d.descricao), _STYLES["diag_body"]),
+            Paragraph("Recomendação", _STYLES["diag_reco_label"]),
+            Paragraph(unescape_currency(d.recomendacao), _STYLES["diag_body"]),
+            Spacer(1, 14),
+        ]
+        story.append(KeepTogether(block))
     return story
 
 
@@ -226,8 +322,11 @@ def generate_pdf_report(
     period_label: str,
     summary: dict,
     by_cat: pd.DataFrame,
+    by_merchant: pd.DataFrame,
     monthly: pd.DataFrame,
     diagnostics: list[Diagnostic],
+    asset_positions: pd.DataFrame,
+    debt_transactions: pd.DataFrame,
     patrimonio_total: float,
 ) -> bytes:
     buffer = BytesIO()
@@ -263,39 +362,68 @@ def generate_pdf_report(
     # Cabeçalho de marca
     story.append(Paragraph("SIFRA", _STYLES["brand"]))
     story.append(Paragraph(f"Relatório financeiro · {period_label}", _STYLES["tagline"]))
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 16))
 
     # Hero — patrimônio
     story.append(Paragraph("Patrimônio total", _STYLES["hero_label"]))
     story.append(Paragraph(format_brl(patrimonio_total), _STYLES["hero_number"]))
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 16))
     story.append(_Rule(content_width))
-    story.append(Spacer(1, 10))
 
     # Resumo do mês
     story.append(Paragraph("Resumo do mês", _STYLES["h1"]))
     story.append(_resumo_table(summary, content_width))
-    story.append(Spacer(1, 6))
 
     # Gastos por categoria
-    if not by_cat.empty:
-        story.append(Paragraph("Gastos por categoria", _STYLES["h1"]))
-        story.append(_categoria_chart(by_cat, content_width))
+    story.append(Paragraph("Gastos por categoria", _STYLES["h1"]))
+    if by_cat.empty:
+        story.append(Paragraph("Sem despesas registradas no período.", _STYLES["empty"]))
+    else:
+        story.append(_categoria_table(by_cat, content_width))
+
+    # Maiores estabelecimentos
+    story.append(Paragraph("Maiores estabelecimentos", _STYLES["h1"]))
+    if by_merchant.empty:
+        story.append(Paragraph("Sem dados de estabelecimento no período.", _STYLES["empty"]))
+    else:
+        story.append(_estabelecimentos_table(by_merchant, content_width))
 
     # Evolução mensal
-    if not monthly.empty:
-        story.append(Paragraph("Evolução mensal", _STYLES["h1"]))
+    story.append(Paragraph("Evolução mensal", _STYLES["h1"]))
+    if monthly.empty:
+        story.append(Paragraph("Sem histórico suficiente ainda.", _STYLES["empty"]))
+    else:
         legend = Table(
-            [[Paragraph("● Receitas", ParagraphStyle("lr", parent=_STYLES["stat_label"], textColor=RECEITA)),
-              Paragraph("● Despesas", ParagraphStyle("ld", parent=_STYLES["stat_label"], textColor=DESPESA))]],
+            [
+                [
+                    Paragraph("● Receitas", ParagraphStyle("lr", parent=_STYLES["stat_label"], textColor=RECEITA)),
+                    Paragraph("● Despesas", ParagraphStyle("ld", parent=_STYLES["stat_label"], textColor=DESPESA)),
+                ]
+            ],
             colWidths=[80, 80],
         )
         legend.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 0)]))
         story.append(legend)
+        story.append(Spacer(1, 4))
         story.append(_evolucao_chart(monthly, content_width))
 
-    # Diagnósticos
-    story.append(Paragraph("Principais diagnósticos", _STYLES["h1"]))
+    # Patrimônio e investimentos
+    story.append(Paragraph("Patrimônio e investimentos", _STYLES["h1"]))
+    if asset_positions.empty:
+        story.append(Paragraph("Nenhum ativo importado ainda.", _STYLES["empty"]))
+    else:
+        story.append(_patrimonio_table(asset_positions, content_width))
+
+    # Dívidas
+    story.append(Paragraph("Dívidas", _STYLES["h1"]))
+    if debt_transactions.empty:
+        story.append(Paragraph("Nenhuma transação categorizada como dívida no período.", _STYLES["empty"]))
+    else:
+        story.append(_dividas_table(debt_transactions, content_width))
+
+    # Diagnósticos — página própria, lista completa
+    story.append(PageBreak())
+    story.append(Paragraph("Diagnósticos", _STYLES["h1"]))
     story += _diagnosticos_section(diagnostics, content_width)
 
     doc.build(story)

@@ -110,7 +110,10 @@ class RelatorioService:
             period_label=dados["period_label"],
             summary=dados["summary"],
             by_cat=dados["by_cat"],
+            by_merchant=dados["by_merchant"],
             monthly=dados["monthly"],
             diagnostics=dados["diagnostics"],
+            asset_positions=dados["latest_assets"],
+            debt_transactions=dados["debt_transactions"],
             patrimonio_total=patrimonio_total,
         )
