@@ -91,6 +91,7 @@ _STYLES = {
     "th": ParagraphStyle("th", fontName="Helvetica-Bold", fontSize=8, textColor=MUTED, leading=10),
     "td": ParagraphStyle("td", fontName="Helvetica", fontSize=9, textColor=INK, leading=12),
     "td_muted": ParagraphStyle("td_muted", fontName="Helvetica", fontSize=9, textColor=MUTED, leading=12),
+    "td_strong": ParagraphStyle("td_strong", fontName="Helvetica-Bold", fontSize=9, textColor=INK, leading=12),
     "diag_title": ParagraphStyle("diag_title", fontName="Helvetica-Bold", fontSize=10.5, textColor=INK, leading=13),
     "diag_badge": ParagraphStyle("diag_badge", fontName="Helvetica-Bold", fontSize=7.5, leading=10),
     "diag_body": ParagraphStyle("diag_body", fontName="Helvetica", fontSize=9, textColor=MUTED, leading=13),
@@ -231,10 +232,28 @@ def _patrimonio_table(asset_positions: pd.DataFrame, content_width: float) -> Ta
                 Paragraph(format_brl(row["saldo_liquido"]), _STYLES["td"]),
             ]
         )
+    total = asset_positions["saldo_liquido"].sum()
+    rows.append(
+        [
+            Paragraph("TOTAL", _STYLES["td_strong"]),
+            Paragraph("", _STYLES["td_muted"]),
+            Paragraph(format_brl(total), _STYLES["td_strong"]),
+        ]
+    )
     w = content_width
-    return _data_table(
+    table = _data_table(
         ["Ativo", "Tipo", "Valor"], rows, [w * 0.42, w * 0.34, w * 0.24], ["left", "left", "right"]
     )
+    last_row = len(rows)
+    table.setStyle(
+        TableStyle(
+            [
+                ("LINEABOVE", (0, last_row), (-1, last_row), 0.8, INK),
+                ("TOPPADDING", (0, last_row), (-1, last_row), 7),
+            ]
+        )
+    )
+    return table
 
 
 def _dividas_table(debt_transactions: pd.DataFrame, content_width: float) -> Table:
@@ -406,73 +425,72 @@ def generate_pdf_report(
     def _draw_cover(canvas, doc):
         """Capa em página própria — desenhada inteira no canvas (não flui
         por Platypus): é conteúdo fixo, então dá mais controle de
-        composição do que lutar com Frame pra uma página só. Painel escuro
-        assimétrico no topo (marca + período), motivo decorativo grande
-        (as mesmas barras ascendentes do ícone, em baixa opacidade) e
-        bastante espaço em branco embaixo — padrão de capa de relatório
-        institucional: um elemento visual dominante, texto mínimo,
-        respiro generoso, nunca a página inteira ocupada."""
-        canvas.saveState()
-        panel_h = A4[1] * 0.40
-        panel_y = A4[1] - panel_h
+        composição do que lutar com Frame pra uma página só.
 
+        Fundo claro, marca no canto superior esquerdo, título grande,
+        bloco de informação simples (nome, período, data de geração) —
+        sem número nenhum aqui, só identificação do documento (pedido
+        explícito do Danilo). Faixa vertical na borda direita em três
+        tons da marca (do mais claro ao mais escuro) é o único elemento
+        gráfico de destaque — mesma ideia de "um foco visual, resto em
+        branco" de antes, só que mais discreta."""
+        canvas.saveState()
+
+        strip_w = 26
+        band_h = A4[1] / 3
+        canvas.setFillColor(TEAL)
+        canvas.rect(A4[0] - strip_w, A4[1] - band_h, strip_w, band_h, fill=1, stroke=0)
+        canvas.setFillColor(PRIMARY)
+        canvas.rect(A4[0] - strip_w, A4[1] - 2 * band_h, strip_w, band_h, fill=1, stroke=0)
         canvas.setFillColor(INK)
-        canvas.rect(0, panel_y, A4[0], panel_h, fill=1, stroke=0)
+        canvas.rect(A4[0] - strip_w, 0, strip_w, A4[1] - 2 * band_h, fill=1, stroke=0)
 
-        # Motivo decorativo: barras ascendentes grandes, em opacidade baixa,
-        # ancoradas na quina inferior direita do painel — segundo foco
-        # visual, assimétrico em relação à marca (canto superior esquerdo).
-        canvas.saveState()
-        canvas.setFillAlpha(0.16)
-        _draw_mark(canvas, A4[0] - _PAGE_MARGIN - 150, panel_y - 40, 190, badge=False)
-        canvas.restoreState()
-
-        # Marca, canto superior esquerdo do painel.
-        mark_size = 30
+        # Marca, canto superior esquerdo.
+        mark_size = 24
         mark_x = _PAGE_MARGIN
         mark_y = A4[1] - _PAGE_MARGIN - mark_size
         _draw_mark(canvas, mark_x, mark_y, mark_size)
-        canvas.setFont("Helvetica-Bold", 19)
-        canvas.setFillColor(colors.white)
-        canvas.drawString(mark_x + mark_size + 10, mark_y + mark_size * 0.28, "SIFRA")
+        canvas.setFont("Helvetica-Bold", 15)
+        canvas.setFillColor(INK)
+        canvas.drawString(mark_x + mark_size + 8, mark_y + mark_size * 0.3, "SIFRA")
 
-        # Período, canto superior direito do painel — equilibra a
-        # composição sem competir com a marca.
-        canvas.setFont("Helvetica", 9.5)
-        canvas.setFillColor(TEAL)
-        canvas.drawRightString(A4[0] - _PAGE_MARGIN, A4[1] - _PAGE_MARGIN - 4, period_label.upper())
-
-        # Título, base do painel.
-        canvas.setFont("Helvetica", 12)
-        canvas.setFillColor(colors.HexColor("#c9ded9"))
-        canvas.drawString(_PAGE_MARGIN, panel_y + 26, "Relatório financeiro")
-
-        canvas.restoreState()
-
-        # Abaixo do painel: quem é o titular, e só o número que mais
-        # importa — o resto da página fica em branco de propósito.
-        y = panel_y - 60
-        if nome_titular:
-            canvas.setFont("Helvetica-Bold", 13)
-            canvas.setFillColor(INK)
-            canvas.drawString(_PAGE_MARGIN, y, f"Preparado para {nome_titular}")
-            y -= 46
-        else:
-            y -= 14
+        # Título — duas linhas, grande, mesma composição do relatório de
+        # referência (título grande, subtítulo pequeno logo abaixo).
+        title_y = A4[1] * 0.58
+        canvas.setFont("Helvetica-Bold", 34)
+        canvas.setFillColor(INK)
+        canvas.drawString(_PAGE_MARGIN, title_y, "Relatório")
+        canvas.drawString(_PAGE_MARGIN, title_y - 42, "financeiro")
 
         canvas.setFont("Helvetica", 10.5)
         canvas.setFillColor(MUTED)
-        canvas.drawString(_PAGE_MARGIN, y, "Patrimônio total")
-        canvas.setFont("Helvetica-Bold", 40)
-        canvas.setFillColor(PRIMARY)
-        canvas.drawString(_PAGE_MARGIN, y - 46, format_brl(patrimonio_total))
+        canvas.drawString(
+            _PAGE_MARGIN, title_y - 70, "Resumo do mês, diagnósticos automáticos e evolução do seu patrimônio."
+        )
 
-        canvas.setStrokeColor(BORDER)
-        canvas.setLineWidth(0.6)
-        gerado_em = datetime.now().strftime("%d/%m/%Y")
+        # Bloco de identificação — só texto, sem número nenhum.
+        y = title_y - 118
+        gerado_em = datetime.now().strftime("%d/%m/%Y, às %Hh%M")
+
+        def _campo(rotulo: str, valor: str, y: float) -> float:
+            canvas.setFont("Helvetica", 8)
+            canvas.setFillColor(MUTED)
+            canvas.drawString(_PAGE_MARGIN, y, rotulo.upper())
+            canvas.setFont("Helvetica-Bold", 11)
+            canvas.setFillColor(INK)
+            canvas.drawString(_PAGE_MARGIN, y - 14, valor)
+            return y - 34
+
+        if nome_titular:
+            y = _campo("Nome", nome_titular, y)
+        y = _campo("Período", period_label, y)
+        _campo("Gerado em", gerado_em, y)
+
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(MUTED)
-        canvas.drawString(_PAGE_MARGIN, _PAGE_MARGIN - 4, f"Sifra — Inteligência Financeira Pessoal · gerado em {gerado_em}")
+        canvas.drawString(_PAGE_MARGIN, _PAGE_MARGIN - 4, "Sifra — Inteligência Financeira Pessoal")
+
+        canvas.restoreState()
 
     doc = BaseDocTemplate(
         buffer,
