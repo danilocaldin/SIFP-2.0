@@ -105,6 +105,20 @@ create table if not exists preferencias (
     primary key (user_id, chave)
 );
 
+-- Endereço de encaminhamento de e-mail (Módulo 18 — importação
+-- automática via e-mail): token opaco, um por usuário, usado como sufixo
+-- "+token" no endereço de recebimento. O worker (sifp/workers/
+-- email_import_worker.py) consulta essa tabela com uma conexão SEM
+-- escopo de usuário (bypassa RLS de propósito — é a única peça do
+-- sistema que precisa mapear "token" -> "de quem é" antes de saber quem
+-- é o usuário) — nunca exposta como endpoint público, só o processo
+-- agendado interno lê assim.
+create table if not exists import_aliases (
+    token text primary key,
+    user_id uuid not null unique default auth.uid() references auth.users(id) on delete cascade,
+    criado_em timestamptz default now()
+);
+
 -- RLS: habilita e cria uma política única por tabela (cobre SELECT/INSERT/
 -- UPDATE/DELETE — USING filtra leitura, WITH CHECK filtra escrita, ambos
 -- exigindo user_id = auth.uid()). auth.uid() já existe em todo projeto
@@ -114,7 +128,7 @@ do $$
 declare
     t text;
 begin
-    foreach t in array array['transactions', 'daily_balances', 'assets', 'budgets', 'goals', 'despesas_fixas', 'preferencias']
+    foreach t in array array['transactions', 'daily_balances', 'assets', 'budgets', 'goals', 'despesas_fixas', 'preferencias', 'import_aliases']
     loop
         execute format('alter table %I enable row level security', t);
         execute format('drop policy if exists tenant_isolation on %I', t);

@@ -20,6 +20,8 @@ não dado financeiro sensível.
 
 from __future__ import annotations
 
+import os
+
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
 from pydantic import BaseModel
@@ -35,6 +37,7 @@ from sifp.repositories.pg.bound import ConnBound
 from sifp.repositories.pg.budget_repository import BudgetRepository
 from sifp.repositories.pg.despesa_fixa_repository import DespesaFixaRepository
 from sifp.repositories.pg.goal_repository import GoalRepository
+from sifp.repositories.pg.import_alias_repository import ImportAliasRepository
 from sifp.repositories.pg.preferencia_repository import PreferenciaRepository
 from sifp.repositories.pg.transaction_repository import TransactionRepository
 from sifp.services.chat_service import ChatIndisponivel, ChatService
@@ -64,6 +67,7 @@ def _repos(conn: psycopg.Connection) -> dict:
         "goal_repo": ConnBound(GoalRepository(), conn),
         "despesa_fixa_repo": ConnBound(DespesaFixaRepository(), conn),
         "preferencia_repo": ConnBound(PreferenciaRepository(), conn),
+        "import_alias_repo": ConnBound(ImportAliasRepository(), conn),
     }
 
 
@@ -263,6 +267,20 @@ def definir_limite_alerta(body: LimiteAlertaIn, conn: psycopg.Connection = Depen
         body.pct
     )
     return {"ok": True}
+
+
+@router.get("/perfil/email-importacao")
+def email_importacao(conn: psycopg.Connection = Depends(get_db)):
+    """Endereço pessoal de encaminhamento (Módulo 18) — o usuário
+    configura no próprio provedor de e-mail um encaminhamento automático
+    do extrato do BTG pra esse endereço; o worker (sifp/workers/
+    email_import_worker.py) identifica de quem é pelo "+token"."""
+    base = os.environ.get("EMAIL_IMPORT_BASE")
+    if not base:
+        raise HTTPException(status_code=503, detail="Importação por e-mail ainda não configurada.")
+    local, _, domain = base.partition("@")
+    token = _repos(conn)["import_alias_repo"].get_or_create()
+    return {"email": f"{local}+{token}@{domain}"}
 
 
 @router.get("/relatorio")

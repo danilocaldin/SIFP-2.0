@@ -46,6 +46,14 @@ async function parseErrorDetail(res: Response, fallback: string): Promise<string
   }
 }
 
+export async function getEmailImportacao(): Promise<{ email: string } | null> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/perfil/email-importacao`, {
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function criarLimite(category: string, valor: number): Promise<void> {
   const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/orcamento/limites`, {
     method: "POST",

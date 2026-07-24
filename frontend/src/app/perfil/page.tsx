@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getEmailImportacao } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 
 const SAAS_MODE = process.env.NEXT_PUBLIC_SAAS_MODE === "true";
@@ -88,6 +89,51 @@ function PerfilForm() {
           </form>
         </CardContent>
       </Card>
+
+      <EmailImportacaoCard />
     </main>
+  );
+}
+
+function EmailImportacaoCard() {
+  const [email, setEmail] = useState<string | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    getEmailImportacao()
+      .then((r) => setEmail(r?.email ?? null))
+      .finally(() => setCarregando(false));
+  }, []);
+
+  async function handleCopiar() {
+    if (!email) return;
+    await navigator.clipboard.writeText(email);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  }
+
+  if (carregando || !email) return null;
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="text-base">Importação automática por e-mail</CardTitle>
+        <CardDescription>
+          Configure um encaminhamento automático no seu e-mail para este endereço — assim, o
+          extrato mensal do BTG entra no Sifra sozinho, sem precisar baixar e subir o arquivo.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 rounded-md border border-border bg-muted px-3 py-2 text-sm break-all">
+            {email}
+          </code>
+          <Button type="button" variant="outline" onClick={handleCopiar}>
+            {copiado ? "Copiado!" : "Copiar"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
