@@ -18,7 +18,18 @@ const SAAS_MODE = process.env.NEXT_PUBLIC_SAAS_MODE === "true";
 // Route Handlers gerados (sem extensão na URL, ex: /icons/icon-192), então
 // precisam de uma exceção explícita ou caem no redirect de login como
 // qualquer outra página protegida.
-const PUBLIC_PATHS = new Set(["/manifest.webmanifest", "/sw.js", "/apple-icon", "/icons/icon-192", "/icons/icon-512"]);
+// /auth/confirm também precisa ser público pelo mesmo motivo: é a rota
+// que ESTABELECE a sessão (convite, "esqueci a senha") — o visitante
+// ainda não está logado quando chega nela, então cai no mesmo redirect
+// pro /login antes até de rodar o verifyOtp() se não abrir exceção aqui.
+const PUBLIC_PATHS = new Set([
+  "/manifest.webmanifest",
+  "/sw.js",
+  "/apple-icon",
+  "/icons/icon-192",
+  "/icons/icon-512",
+  "/auth/confirm",
+]);
 
 export async function proxy(request: NextRequest) {
   // No deploy pessoal (sem SAAS_MODE) as credenciais do Supabase nem

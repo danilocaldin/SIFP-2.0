@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,16 +9,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+function LoginPageContent() {
   const router = useRouter();
-  // O Supabase Auth manda o link de convite/recuperação de senha com um
-  // token no fragmento da URL (#access_token=...) — o cliente já
-  // autentica a sessão sozinho ao ser criado (detectSessionInUrl). Dois
-  // casos possíveis: PASSWORD_RECOVERY (convite ou "esqueci a senha" —
-  // sessão válida, mas ainda sem senha definida, então mostra o
-  // formulário de "defina sua senha") ou SIGNED_IN direto (ex: link de
-  // entrada mágica, que já autentica sem exigir senha nenhuma — nesse
-  // caso só falta levar pra dentro do app).
-  const [modo, setModo] = useState<"login" | "definir-senha">("login");
+  const searchParams = useSearchParams();
+  // Convite e "esqueci a senha" passam por /auth/confirm (verificação no
+  // servidor, ver route.ts ali) e chegam aqui com ?modo=definir-senha na
+  // URL — a sessão já está autenticada via cookie nesse ponto, só falta
+  // uma senha de verdade. onAuthStateChange continua como reforço pra
+  // qualquer sessão detectada puramente no navegador (ex: um link de
+  // entrada mágica de outro fluxo, que autentica direto sem exigir senha).
+  const [modo, setModo] = useState<"login" | "definir-senha">(
+    searchParams.get("modo") === "definir-senha" ? "definir-senha" : "login"
+  );
+  const linkInvalido = searchParams.get("erro") === "link_invalido";
 
   useEffect(() => {
     const supabase = createClient();
@@ -51,6 +61,12 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {linkInvalido && (
+            <p className="mb-4 text-sm text-destructive">
+              Esse link expirou ou já foi usado. Peça um novo convite ou clique em "esqueci minha
+              senha".
+            </p>
+          )}
           {modo === "definir-senha" ? <DefinirSenhaForm /> : <LoginForm />}
         </CardContent>
       </Card>
