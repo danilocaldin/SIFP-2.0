@@ -68,6 +68,19 @@ de um limiar — mas o limiar é escolhido pelo próprio usuário (não um valor
 qualquer configuração de Orçamento. Publicado nos dois produtos (app pessoal do Danilo e SaaS),
 seguindo a mesma paridade dos demais módulos.
 
+### Instalável como app / PWA (23/07/2026)
+O Sifra pode ser instalado no computador ou celular como um aplicativo (Chrome/Edge no
+computador, "Adicionar à tela inicial" no Android/iPhone) — ícone próprio, abre em janela
+dedicada, sem as abas do navegador. Deliberadamente não guarda nada offline: um app financeiro
+nunca deveria mostrar saldo desatualizado sem internet, então ele sempre busca tudo da rede.
+
+### Importação automática por e-mail (23/07/2026, SaaS)
+Resolve a fricção de ter que baixar e subir o extrato manualmente, sem o custo de uma integração
+de Open Finance de verdade (pesquisado e adiado — caro demais pra fase de validação atual). Cada
+usuário recebe um endereço pessoal (visível na tela Perfil); configura um encaminhamento
+automático no próprio e-mail pro extrato mensal do BTG, e ele entra sozinho no Sifra a cada ~15
+minutos, pelo mesmo importador que o upload manual já usa.
+
 ## Em andamento
 
 Nada em construção ativa no momento além de refinar a identidade de marca e convidar os primeiros clientes reais pro SaaS.

@@ -18,6 +18,7 @@ Duas frentes, mesmo código-fonte e mesma API: o app pessoal do Danilo continua 
 - **API** (FastAPI) → **Railway**, projeto `zooming-motivation`, serviço `SIFP-2.0`, buildado a partir do `Dockerfile` na raiz do repositório. Serve os dois frontends ao mesmo tempo.
 - **Banco de dados do app pessoal** (SQLite) → arquivo num **volume persistente** do Railway, montado em `/data`. Sobrevive a redeploys porque fica fora da imagem Docker.
 - **Banco de dados do SaaS** (Postgres + Auth) → **Supabase**, projeto `sifra-saas` (org `danilocaldin`, região `sa-east-1`). Row Level Security isola os dados de cada cliente no próprio banco — ver `sifp/repositories/pg/schema.sql`.
+- **Worker de importação por e-mail** (SaaS only) → **Railway**, mesmo projeto `zooming-motivation`, serviço separado (mesma imagem/`Dockerfile`, `startCommand` e `cronSchedule` diferentes — roda `python -m sifp.workers.email_import_worker` a cada 15 minutos). Lê a caixa `extratos.sifra@gmail.com` via IMAP e importa extratos encaminhados automaticamente — ver `sifp/workers/email_import_worker.py`.
 
 ### Variáveis de ambiente
 
@@ -29,6 +30,8 @@ Duas frentes, mesmo código-fonte e mesma API: o app pessoal do Danilo continua 
 | Railway | `SUPABASE_URL` | `https://nkusahedzogplsjknijj.supabase.co` |
 | Railway | `SUPABASE_PUBLISHABLE_KEY` | chave pública do Supabase (safe, não é segredo) |
 | Railway | `SUPABASE_DB_URL` | connection string do Postgres (transaction pooler, porta 6543 — IPv4, Railway não tem IPv6) |
+| Railway (API) | `EMAIL_IMPORT_BASE` | `extratos.sifra@gmail.com` — usado só pra montar o endereço "+token" exibido na tela Perfil |
+| Railway (worker de e-mail) | `SUPABASE_DB_URL`, `IMAP_USER`, `IMAP_APP_PASSWORD` | mesma connection string do Postgres + credenciais IMAP da caixa dedicada (senha de app do Google, não a senha normal da conta) |
 | Vercel (app pessoal) | `SIFP_API_URL` / `NEXT_PUBLIC_SIFP_API_URL` | `https://sifp-20-production.up.railway.app` |
 | Vercel (SaaS) | mesmas duas acima, **mais** `NEXT_PUBLIC_SAAS_MODE=true`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | |
 
