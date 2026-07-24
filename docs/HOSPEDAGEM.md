@@ -25,7 +25,7 @@ Duas frentes, mesmo código-fonte e mesma API: o app pessoal do Danilo continua 
 | Onde | Variável | Valor |
 |---|---|---|
 | Railway | `SIFP_DB_PATH` | `/data/financas.db` |
-| Railway | `CORS_ORIGINS` | `https://frontend-seven-virid-91.vercel.app` |
+| Railway | `CORS_ORIGINS` | `https://frontend-seven-virid-91.vercel.app,https://sifra-saas.vercel.app` (lista separada por vírgula — **precisa incluir os dois domínios**, senão qualquer chamada que o navegador faz direto da API a partir do domínio que faltar é bloqueada silenciosamente pelo CORS) |
 | Railway | `ANTHROPIC_API_KEY` | chave da Anthropic (console.anthropic.com) — sem ela, o botão "Explicar este mês" fica indisponível, mas o resto do sistema funciona normalmente |
 | Railway | `SUPABASE_URL` | `https://nkusahedzogplsjknijj.supabase.co` |
 | Railway | `SUPABASE_PUBLISHABLE_KEY` | chave pública do Supabase (safe, não é segredo) |
