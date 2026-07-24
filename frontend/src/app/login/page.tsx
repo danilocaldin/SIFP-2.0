@@ -67,19 +67,28 @@ function LoginPageContent() {
     if (!accessToken || !refreshToken) return;
 
     const supabase = createClient();
-    supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }).then(({ error }) => {
-      if (error) {
+    supabase.auth
+      .setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(({ error }) => {
+        if (error) {
+          setErroHash("Não foi possível validar o link. Tente pedir um novo.");
+          setModo("login");
+          return;
+        }
+        if (type === "invite" || type === "recovery") {
+          setModo("definir-senha");
+        } else {
+          router.push("/");
+          router.refresh();
+        }
+      })
+      // Nunca deixa a tela travada em "carregando" pra sempre — qualquer
+      // falha inesperada (token malformado, rede fora do ar) cai de volta
+      // pro formulário normal de login com uma mensagem de erro.
+      .catch(() => {
         setErroHash("Não foi possível validar o link. Tente pedir um novo.");
         setModo("login");
-        return;
-      }
-      if (type === "invite" || type === "recovery") {
-        setModo("definir-senha");
-      } else {
-        router.push("/");
-        router.refresh();
-      }
-    });
+      });
   }, [router]);
 
   if (modo === "carregando") {
