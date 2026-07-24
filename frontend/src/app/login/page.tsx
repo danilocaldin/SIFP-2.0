@@ -9,14 +9,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  // O Supabase Auth manda o link de convite (e o de "esqueci a senha")
-  // com um token no fragmento da URL (#access_token=...) — o cliente
-  // já autentica a sessão sozinho ao ser criado (detectSessionInUrl),
-  // mas ainda falta uma senha de verdade. onAuthStateChange dispara o
-  // evento PASSWORD_RECOVERY nesse caso (mesmo evento pros dois fluxos,
-  // convite e recuperação) — é o sinal pra trocar o formulário de login
-  // por um de "defina sua senha", em vez de pedir uma senha que o
-  // usuário convidado ainda não tem.
+  const router = useRouter();
+  // O Supabase Auth manda o link de convite/recuperação de senha com um
+  // token no fragmento da URL (#access_token=...) — o cliente já
+  // autentica a sessão sozinho ao ser criado (detectSessionInUrl). Dois
+  // casos possíveis: PASSWORD_RECOVERY (convite ou "esqueci a senha" —
+  // sessão válida, mas ainda sem senha definida, então mostra o
+  // formulário de "defina sua senha") ou SIGNED_IN direto (ex: link de
+  // entrada mágica, que já autentica sem exigir senha nenhuma — nesse
+  // caso só falta levar pra dentro do app).
   const [modo, setModo] = useState<"login" | "definir-senha">("login");
 
   useEffect(() => {
@@ -26,10 +27,13 @@ export default function LoginPage() {
     } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
         setModo("definir-senha");
+      } else if (event === "SIGNED_IN") {
+        router.push("/");
+        router.refresh();
       }
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [router]);
 
   return (
     <main className="flex min-h-screen w-full flex-1 items-center justify-center bg-background px-6">
