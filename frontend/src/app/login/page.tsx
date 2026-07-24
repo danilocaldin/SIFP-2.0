@@ -127,6 +127,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const [recuperar, setRecuperar] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -144,6 +145,10 @@ function LoginForm() {
 
     router.push("/");
     router.refresh();
+  }
+
+  if (recuperar) {
+    return <RecuperarSenhaForm emailInicial={email} onVoltar={() => setRecuperar(false)} />;
   }
 
   return (
@@ -174,6 +179,80 @@ function LoginForm() {
       <Button type="submit" disabled={carregando} className="mt-1">
         {carregando ? "Entrando…" : "Entrar"}
       </Button>
+      <button
+        type="button"
+        onClick={() => setRecuperar(true)}
+        className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+      >
+        Esqueci minha senha
+      </button>
+    </form>
+  );
+}
+
+function RecuperarSenhaForm({ emailInicial, onVoltar }: { emailInicial: string; onVoltar: () => void }) {
+  const [email, setEmail] = useState(emailInicial);
+  const [enviado, setEnviado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [carregando, setCarregando] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErro(null);
+    setCarregando(true);
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+    setCarregando(false);
+    if (error) {
+      setErro("Não foi possível enviar o link. Tente novamente.");
+      return;
+    }
+    setEnviado(true);
+  }
+
+  if (enviado) {
+    return (
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-muted-foreground">
+          Se esse e-mail estiver cadastrado, você vai receber um link pra definir uma senha nova.
+        </p>
+        <button
+          type="button"
+          onClick={onVoltar}
+          className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+        >
+          Voltar pro login
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="email-recuperar">E-mail</Label>
+        <Input
+          id="email-recuperar"
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+        />
+      </div>
+      {erro && <p className="text-sm text-destructive">{erro}</p>}
+      <Button type="submit" disabled={carregando} className="mt-1">
+        {carregando ? "Enviando…" : "Enviar link de recuperação"}
+      </Button>
+      <button
+        type="button"
+        onClick={onVoltar}
+        className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+      >
+        Voltar pro login
+      </button>
     </form>
   );
 }
