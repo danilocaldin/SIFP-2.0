@@ -39,7 +39,7 @@ class PatrimonioService:
             "has_data": True,
             "patrimonio_total": patrimonio_total,
             "assets": latest[
-                ["nome", "tipo", "instituicao", "data_referencia", "saldo_liquido",
+                ["position_key", "nome", "tipo", "instituicao", "data_referencia", "saldo_liquido",
                  "rentabilidade_12m_pct", "benchmark", "benchmark_12m_pct"]
             ].to_dict("records"),
             "net_worth_history": net_worth_records,

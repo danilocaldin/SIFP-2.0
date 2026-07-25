@@ -403,3 +403,15 @@ def revisao_confirmar(body: RevisaoConfirmarIn):
 @app.post("/api/revisao/retreinar")
 def revisao_retreinar():
     return {"mensagem": _refresh_model()}
+
+
+@app.delete("/api/transacoes/{tx_hash}")
+def excluir_transacao(tx_hash: str):
+    transaction_repo.delete(tx_hash)
+    return {"ok": True}
+
+
+@app.delete("/api/patrimonio/{position_key}")
+def excluir_ativo(position_key: str):
+    asset_repo.delete(position_key)
+    return {"ok": True}

@@ -69,6 +69,9 @@ class AssetRepository:
             "SELECT * FROM assets ORDER BY data_referencia DESC", conn, parse_dates=["data_referencia"]
         )
 
+    def delete(self, conn: psycopg.Connection, position_key: str) -> None:
+        conn.cursor().execute("DELETE FROM assets WHERE position_key = %s", (position_key,))
+
     def get_latest_positions(self, conn: psycopg.Connection) -> pd.DataFrame:
         """Última posição conhecida de cada ativo (por identificador) —
         usado para o patrimônio atual, em vez de somar todo o histórico."""

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { confirmarRevisao, retreinarModelo } from "@/lib/api";
+import { confirmarRevisao, excluirTransacao, retreinarModelo } from "@/lib/api";
 import { formatBRL } from "@/lib/format";
 import type { RevisaoTransaction } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ export function RevisaoTable({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deletingHash, setDeletingHash] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     return transactions.filter((tx) => {
@@ -55,6 +56,22 @@ export function RevisaoTable({
       setError(err instanceof Error ? err.message : "Erro desconhecido.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete(tx: RevisaoTransaction) {
+    if (!window.confirm(`Excluir a transação "${tx.description}" (${formatBRL(tx.value)})? Essa ação não pode ser desfeita.`)) {
+      return;
+    }
+    setDeletingHash(tx.tx_hash);
+    setError(null);
+    try {
+      await excluirTransacao(tx.tx_hash);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido.");
+    } finally {
+      setDeletingHash(null);
     }
   }
 
@@ -110,6 +127,7 @@ export function RevisaoTable({
               <th className="p-2 font-medium">Situação</th>
               <th className="p-2 font-medium">Categoria</th>
               <th className="p-2 font-medium">Confiança</th>
+              <th className="p-2 font-medium"></th>
             </tr>
           </thead>
           <tbody>
@@ -135,6 +153,17 @@ export function RevisaoTable({
                 </td>
                 <td className="w-24 p-2">
                   <Progress value={tx.confidence * 100} />
+                </td>
+                <td className="p-2 text-right">
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-red-500 disabled:opacity-50"
+                    disabled={deletingHash === tx.tx_hash}
+                    onClick={() => handleDelete(tx)}
+                    title="Excluir transação"
+                  >
+                    {deletingHash === tx.tx_hash ? "…" : "🗑️"}
+                  </button>
                 </td>
               </tr>
             ))}

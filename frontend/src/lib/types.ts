@@ -109,6 +109,7 @@ export type Dashboard = DashboardData | DashboardEmpty;
 // Espelha GET /api/patrimonio (sifp/services/patrimonio_service.py).
 
 export interface AssetPosition {
+  position_key: string;
   nome: string;
   tipo: string;
   instituicao: string;

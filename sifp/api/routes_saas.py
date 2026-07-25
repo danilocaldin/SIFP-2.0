@@ -398,6 +398,18 @@ def revisao_retreinar(conn: psycopg.Connection = Depends(get_db)):
     return {"mensagem": _refresh_model(_repos(conn))}
 
 
+@router.delete("/transacoes/{tx_hash}")
+def excluir_transacao(tx_hash: str, conn: psycopg.Connection = Depends(get_db)):
+    _repos(conn)["transaction_repo"].delete(tx_hash)
+    return {"ok": True}
+
+
+@router.delete("/patrimonio/{position_key}")
+def excluir_ativo(position_key: str, conn: psycopg.Connection = Depends(get_db)):
+    _repos(conn)["asset_repo"].delete(position_key)
+    return {"ok": True}
+
+
 @router.post("/narrativa")
 def narrativa(conn: psycopg.Connection = Depends(get_db)):
     r = _repos(conn)

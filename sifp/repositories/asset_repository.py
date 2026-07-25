@@ -65,6 +65,12 @@ class AssetRepository:
         conn.close()
         return df
 
+    def delete(self, position_key: str) -> None:
+        conn = self._connect()
+        conn.execute("DELETE FROM assets WHERE position_key = ?", (position_key,))
+        conn.commit()
+        conn.close()
+
     def get_latest_positions(self) -> pd.DataFrame:
         """Última posição conhecida de cada ativo (por identificador) —
         usado para o patrimônio atual, em vez de somar todo o histórico."""

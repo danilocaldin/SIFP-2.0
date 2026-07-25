@@ -389,11 +389,12 @@ with tab_revisao:
         )
 
         df_view["value"] = df_view["value"].apply(format_brl)
+        df_view["excluir"] = False
 
         edited_df = st.data_editor(
             df_view[
                 ["tx_hash", "date", "description", "value", "bank_category",
-                 "situacao", "category", "confidence"]
+                 "situacao", "category", "confidence", "excluir"]
             ],
             column_config={
                 "tx_hash": None,  # coluna técnica, oculta
@@ -413,6 +414,9 @@ with tab_revisao:
                 "confidence": st.column_config.ProgressColumn(
                     "Confiança da IA", min_value=0.0, max_value=1.0, format="%.0f%%"
                 ),
+                "excluir": st.column_config.CheckboxColumn(
+                    "🗑️ Excluir", help="Marque e clique em 'Excluir selecionadas' abaixo."
+                ),
             },
             hide_index=True,
             use_container_width=True,
@@ -420,7 +424,18 @@ with tab_revisao:
             key="editor",
         )
 
-        if st.button("💾 Salvar e confirmar linhas visíveis", type="primary"):
+        col_save, col_delete = st.columns(2)
+        if col_delete.button("🗑️ Excluir selecionadas"):
+            to_delete = edited_df.loc[edited_df["excluir"], "tx_hash"].tolist()
+            if not to_delete:
+                st.warning("Nenhuma linha marcada para exclusão.")
+            else:
+                for h in to_delete:
+                    transaction_repo.delete(h)
+                st.success(f"{len(to_delete)} transação(ões) excluída(s).")
+                st.rerun()
+
+        if col_save.button("💾 Salvar e confirmar linhas visíveis", type="primary"):
             old_categories = df_view["category"].values
             new_categories = edited_df["category"].values
             n_changed = int((old_categories != new_categories).sum())
@@ -683,24 +698,44 @@ with tab_patrimonio:
         st.metric("Patrimônio total (Ativos)", format_brl(patrimonio_total))
 
         latest_assets["saldo_liquido"] = latest_assets["saldo_liquido"].apply(format_brl)
-        st.dataframe(
+        latest_assets["excluir"] = False
+        edited_assets = st.data_editor(
             latest_assets[
-                ["nome", "tipo", "instituicao", "data_referencia", "saldo_liquido",
-                 "rentabilidade_12m_pct", "benchmark", "benchmark_12m_pct"]
+                ["position_key", "nome", "tipo", "instituicao", "data_referencia", "saldo_liquido",
+                 "rentabilidade_12m_pct", "benchmark", "benchmark_12m_pct", "excluir"]
             ],
             column_config={
-                "nome": st.column_config.TextColumn("Ativo"),
-                "tipo": st.column_config.TextColumn("Tipo"),
-                "instituicao": st.column_config.TextColumn("Instituição"),
-                "data_referencia": st.column_config.TextColumn("Data ref."),
-                "saldo_liquido": st.column_config.TextColumn("Saldo líquido (R$)"),
-                "rentabilidade_12m_pct": st.column_config.NumberColumn("Rent. 12m (%)", format="%.2f%%"),
-                "benchmark": st.column_config.TextColumn("Benchmark"),
-                "benchmark_12m_pct": st.column_config.NumberColumn("Benchmark 12m (%)", format="%.2f%%"),
+                "position_key": None,  # coluna técnica, oculta
+                "nome": st.column_config.TextColumn("Ativo", disabled=True),
+                "tipo": st.column_config.TextColumn("Tipo", disabled=True),
+                "instituicao": st.column_config.TextColumn("Instituição", disabled=True),
+                "data_referencia": st.column_config.TextColumn("Data ref.", disabled=True),
+                "saldo_liquido": st.column_config.TextColumn("Saldo líquido (R$)", disabled=True),
+                "rentabilidade_12m_pct": st.column_config.NumberColumn(
+                    "Rent. 12m (%)", format="%.2f%%", disabled=True
+                ),
+                "benchmark": st.column_config.TextColumn("Benchmark", disabled=True),
+                "benchmark_12m_pct": st.column_config.NumberColumn(
+                    "Benchmark 12m (%)", format="%.2f%%", disabled=True
+                ),
+                "excluir": st.column_config.CheckboxColumn(
+                    "🗑️ Excluir", help="Marque e clique em 'Excluir selecionados' abaixo."
+                ),
             },
             hide_index=True,
             use_container_width=True,
+            num_rows="fixed",
+            key="editor_assets",
         )
+        if st.button("🗑️ Excluir ativos selecionados"):
+            to_delete = edited_assets.loc[edited_assets["excluir"], "position_key"].tolist()
+            if not to_delete:
+                st.warning("Nenhum ativo marcado para exclusão.")
+            else:
+                for key in to_delete:
+                    asset_repo.delete(key)
+                st.success(f"{len(to_delete)} ativo(s) excluído(s).")
+                st.rerun()
 
         st.divider()
         st.markdown("**Evolução do patrimônio**")

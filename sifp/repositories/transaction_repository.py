@@ -148,6 +148,12 @@ class TransactionRepository:
         conn.commit()
         conn.close()
 
+    def delete(self, tx_hash: str) -> None:
+        conn = self._connect()
+        conn.execute("DELETE FROM transactions WHERE tx_hash = ?", (tx_hash,))
+        conn.commit()
+        conn.close()
+
     def get_learned_categories(self) -> dict:
         """
         Constrói a "memória" do sistema a partir de todas as transações

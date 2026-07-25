@@ -1,16 +1,9 @@
 import { NetWorthChart } from "@/components/charts/net-worth-chart";
+import { PatrimonioAssetsTable } from "@/components/patrimonio-assets-table";
 import { PatrimonioUpload } from "@/components/patrimonio-upload";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { getPatrimonio } from "@/lib/api-server";
-import { formatBRL, formatPct } from "@/lib/format";
+import { formatBRL } from "@/lib/format";
 
 export default async function PatrimonioPage() {
   const patrimonio = await getPatrimonio();
@@ -45,39 +38,7 @@ export default async function PatrimonioPage() {
 
           <div className="mt-8">
             <h2 className="mb-3 text-sm font-medium text-muted-foreground">Ativos atuais</h2>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ativo</TableHead>
-                  <TableHead>Instituição</TableHead>
-                  <TableHead>Data ref.</TableHead>
-                  <TableHead className="text-right">Saldo líquido</TableHead>
-                  <TableHead className="text-right">Rent. 12m</TableHead>
-                  <TableHead className="text-right">Benchmark</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {patrimonio.assets.map((a) => (
-                  <TableRow key={`${a.nome}-${a.data_referencia}`}>
-                    <TableCell>
-                      {a.nome}
-                      <span className="block text-xs text-muted-foreground">{a.tipo}</span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{a.instituicao}</TableCell>
-                    <TableCell className="text-muted-foreground">{a.data_referencia}</TableCell>
-                    <TableCell className="text-right">{formatBRL(a.saldo_liquido)}</TableCell>
-                    <TableCell className="text-right">
-                      {a.rentabilidade_12m_pct !== null ? formatPct(a.rentabilidade_12m_pct, 2) : "—"}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {a.benchmark && a.benchmark_12m_pct !== null
-                        ? `${a.benchmark} ${formatPct(a.benchmark_12m_pct, 2)}`
-                        : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <PatrimonioAssetsTable assets={patrimonio.assets} />
           </div>
 
           <div className="mt-10">

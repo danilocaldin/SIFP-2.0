@@ -197,6 +197,22 @@ export async function confirmarRevisao(
   return res.json();
 }
 
+export async function excluirTransacao(txHash: string): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/transacoes/${txHash}`, {
+    method: "DELETE",
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao excluir a transação."));
+}
+
+export async function excluirPatrimonio(positionKey: string): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/patrimonio/${positionKey}`, {
+    method: "DELETE",
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao excluir o ativo."));
+}
+
 export async function retreinarModelo(): Promise<{ mensagem: string }> {
   const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/revisao/retreinar`, {
     method: "POST",

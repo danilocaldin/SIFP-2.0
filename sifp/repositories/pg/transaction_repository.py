@@ -102,6 +102,9 @@ class TransactionRepository:
                 unresolved,
             )
 
+    def delete(self, conn: psycopg.Connection, tx_hash: str) -> None:
+        conn.cursor().execute("DELETE FROM transactions WHERE tx_hash = %s", (tx_hash,))
+
     def get_learned_categories(self, conn: psycopg.Connection) -> dict:
         """Ver docstring completa na versão SQLite — mesma lógica, só a
         fonte da conexão muda."""
