@@ -90,8 +90,112 @@ function PerfilForm() {
         </CardContent>
       </Card>
 
+      <PasskeyCard />
       <EmailImportacaoCard />
     </main>
+  );
+}
+
+type PasskeyItem = {
+  id: string;
+  friendly_name?: string;
+  created_at: string;
+  last_used_at?: string;
+};
+
+function PasskeyCard() {
+  const [passkeys, setPasskeys] = useState<PasskeyItem[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [registrando, setRegistrando] = useState(false);
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function buscarPasskeys(): Promise<PasskeyItem[]> {
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.passkey.list();
+    return error ? [] : (data ?? []);
+  }
+
+  useEffect(() => {
+    buscarPasskeys()
+      .then(setPasskeys)
+      .finally(() => setCarregando(false));
+  }, []);
+
+  async function handleRegistrar() {
+    setRegistrando(true);
+    setErro(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.registerPasskey();
+    setRegistrando(false);
+    if (error) {
+      // Usuário cancelou o prompt do Face ID/Touch ID — não é um erro real.
+      const cancelado = "code" in error && error.code === "ERROR_CEREMONY_ABORTED";
+      if (!cancelado) {
+        setErro("Não foi possível cadastrar. Tente novamente.");
+      }
+      return;
+    }
+    setPasskeys(await buscarPasskeys());
+  }
+
+  async function handleExcluir(passkeyId: string) {
+    setExcluindoId(passkeyId);
+    setErro(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.passkey.delete({ passkeyId });
+    setExcluindoId(null);
+    if (error) {
+      setErro("Não foi possível excluir. Tente novamente.");
+      return;
+    }
+    setPasskeys((prev) => prev.filter((p) => p.id !== passkeyId));
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="text-base">Entrar com Face ID / Touch ID</CardTitle>
+        <CardDescription>
+          Cadastre este dispositivo para entrar no Sifra com biometria, sem digitar senha. Cada
+          dispositivo (celular, notebook) precisa ser cadastrado separadamente.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!carregando && passkeys.length > 0 && (
+          <ul className="space-y-2">
+            {passkeys.map((p) => (
+              <li
+                key={p.id}
+                className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+              >
+                <span>
+                  {p.friendly_name || "Dispositivo sem nome"}
+                  <span className="block text-xs text-muted-foreground">
+                    Cadastrado em {new Date(p.created_at).toLocaleDateString("pt-BR")}
+                    {p.last_used_at &&
+                      ` · último uso em ${new Date(p.last_used_at).toLocaleDateString("pt-BR")}`}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-red-500 disabled:opacity-50"
+                  disabled={excluindoId === p.id}
+                  onClick={() => handleExcluir(p.id)}
+                  title="Excluir passkey"
+                >
+                  {excluindoId === p.id ? "…" : "🗑️"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {erro && <p className="text-sm text-destructive">{erro}</p>}
+        <Button type="button" variant="outline" disabled={registrando} onClick={handleRegistrar}>
+          {registrando ? "Aguardando confirmação…" : "+ Cadastrar este dispositivo"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

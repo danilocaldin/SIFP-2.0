@@ -127,6 +127,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const [entrandoComPasskey, setEntrandoComPasskey] = useState(false);
   const [recuperar, setRecuperar] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -147,46 +148,84 @@ function LoginForm() {
     router.refresh();
   }
 
+  async function handlePasskeyLogin() {
+    setErro(null);
+    setEntrandoComPasskey(true);
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPasskey();
+
+    setEntrandoComPasskey(false);
+    if (error) {
+      // Usuário cancelou o prompt do sistema — não é um erro pra mostrar.
+      const cancelado = "code" in error && error.code === "ERROR_CEREMONY_ABORTED";
+      if (!cancelado) {
+        setErro("Não foi possível entrar com Face ID/Touch ID. Use e-mail e senha.");
+      }
+      return;
+    }
+
+    router.push("/");
+    router.refresh();
+  }
+
   if (recuperar) {
     return <RecuperarSenhaForm emailInicial={email} onVoltar={() => setRecuperar(false)} />;
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="email">E-mail</Label>
-        <Input
-          id="email"
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="password">Senha</Label>
-        <Input
-          id="password"
-          type="password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-        />
-      </div>
-      {erro && <p className="text-sm text-destructive">{erro}</p>}
-      <Button type="submit" disabled={carregando} className="mt-1">
-        {carregando ? "Entrando…" : "Entrar"}
-      </Button>
-      <button
+    <div className="flex flex-col gap-4">
+      <Button
         type="button"
-        onClick={() => setRecuperar(true)}
-        className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+        variant="outline"
+        disabled={entrandoComPasskey}
+        onClick={handlePasskeyLogin}
       >
-        Esqueci minha senha
-      </button>
-    </form>
+        {entrandoComPasskey ? "Aguardando confirmação…" : "🆔 Entrar com Face ID / Touch ID"}
+      </Button>
+
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="h-px flex-1 bg-border" />
+        ou
+        <div className="h-px flex-1 bg-border" />
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="email">E-mail</Label>
+          <Input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="password">Senha</Label>
+          <Input
+            id="password"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+        </div>
+        {erro && <p className="text-sm text-destructive">{erro}</p>}
+        <Button type="submit" disabled={carregando} className="mt-1">
+          {carregando ? "Entrando…" : "Entrar"}
+        </Button>
+        <button
+          type="button"
+          onClick={() => setRecuperar(true)}
+          className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+        >
+          Esqueci minha senha
+        </button>
+      </form>
+    </div>
   );
 }
 

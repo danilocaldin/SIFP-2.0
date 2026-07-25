@@ -6,6 +6,10 @@ import { createBrowserClient } from "@supabase/ssr";
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    // Passkeys (Face ID/Touch ID/Windows Hello) — beta da Supabase, precisa
+    // desse opt-in explícito ou os métodos registerPasskey()/signInWithPasskey()
+    // lançam erro. Login por senha continua funcionando normalmente.
+    { auth: { experimental: { passkey: true } } }
   );
 }
