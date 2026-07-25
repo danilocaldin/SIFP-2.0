@@ -74,6 +74,12 @@ computador, "Adicionar à tela inicial" no Android/iPhone) — ícone próprio, 
 dedicada, sem as abas do navegador. Deliberadamente não guarda nada offline: um app financeiro
 nunca deveria mostrar saldo desatualizado sem internet, então ele sempre busca tudo da rede.
 
+### Excluir transação e ativo de patrimônio (24/07/2026)
+Lacuna encontrada numa QA sistemática do SaaS antes de convidar mais clientes: não existia
+nenhuma forma de excluir uma transação ou um ativo importado errado/duplicado, nem pela tela
+nem pela API — só dava pra corrigir a categoria. Botão de excluir (🗑️) por linha nas telas
+Revisão e Patrimônio, nos dois produtos (app pessoal e SaaS), com confirmação antes de excluir.
+
 ### Importação automática por e-mail (23/07/2026, SaaS)
 Resolve a fricção de ter que baixar e subir o extrato manualmente, sem o custo de uma integração
 de Open Finance de verdade (pesquisado e adiado — caro demais pra fase de validação atual). Cada
