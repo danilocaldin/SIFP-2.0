@@ -321,7 +321,11 @@ function DefinirSenhaForm() {
     const { error } = await supabase.auth.updateUser({ password: senha });
 
     if (error) {
-      setErro("Não foi possível salvar a senha. Tente novamente.");
+      // Sessão de recuperação pode ter expirado (link antigo, ex: um
+      // pedido de reset anterior enquanto esperava o e-mail atrasar) —
+      // mostra a mensagem real do Supabase em vez de um genérico, pra dar
+      // pro usuário (e pra depuração) o motivo de verdade.
+      setErro(`Não foi possível salvar a senha: ${error.message}. Peça um novo link e tente de novo.`);
       setCarregando(false);
       return;
     }
