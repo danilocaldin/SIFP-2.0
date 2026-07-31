@@ -241,7 +241,12 @@ function RecuperarSenhaForm({ emailInicial, onVoltar }: { emailInicial: string; 
     setCarregando(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    // Sem redirectTo, o Supabase manda pra "Site URL" do projeto (a raiz
+    // do site) — só /login sabe ler o token do link e virar a tela de
+    // definir senha nova, então precisa apontar pra lá explicitamente.
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login`,
+    });
 
     setCarregando(false);
     if (error) {
