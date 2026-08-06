@@ -10,7 +10,8 @@ testável sem UI nenhuma.
 
 import pandas as pd
 
-from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO, CATEGORIAS_PADRAO
+from sifp.domain.categories import CATEGORIAS_PADRAO
+from sifp.domain.models import CategorySource
 from sifp.importers.base import StatementImporter
 from sifp.intelligence.categorization import CategorizationService, is_pix_or_transfer
 from sifp.intelligence.merchant_normalizer import MerchantNormalizer
@@ -85,11 +86,18 @@ class ImportService:
         seleciona o que vale a pena perguntar pro usuário logo após o
         upload: toda transferência pra outra pessoa (Pix/Transferência
         sempre pode significar algo diferente a cada vez, mesmo pra mesma
-        pessoa) e todo estabelecimento que o sistema não teve confiança
-        suficiente pra categorizar sozinho (o BTG nem sempre categoriza
-        certo). Transferência entre contas do próprio usuário
-        (self_transfer) fica de fora — já é detectada com certeza e
-        categorizada automaticamente, perguntar de novo seria ruído."""
+        pessoa) e todo estabelecimento que ainda não foi confirmado por
+        você alguma vez (category_source fora de LEARNED_STABLE/
+        LEARNED_VARIABLE) — mesmo quando uma regra de palavra-chave ou a
+        categoria do banco acha que sabe a resposta com confiança alta,
+        ela pode estar errada pro seu critério (ex: "bar" pode ser Lazer
+        ou Alimentação dependendo de quem pergunta), então a primeira
+        ocorrência de cada estabelecimento sempre passa por você.
+        Confirmar uma vez guarda na memória (LEARNED_STABLE) e as
+        próximas ocorrências da mesma descrição não pedem de novo.
+        Transferência entre contas do próprio usuário (self_transfer)
+        fica de fora — já é detectada com certeza e categorizada
+        automaticamente, perguntar de novo seria ruído."""
         df = df_final.copy()
         df["date"] = df["date"].apply(normalize_tx_date)
         df["tx_hash"] = df.apply(
@@ -102,9 +110,13 @@ class ImportService:
         # sobre pandas 3.0 + PyArrow em CLAUDE do projeto.
         is_transfer = novos["description"].apply(is_pix_or_transfer).astype(bool)
         is_self_transfer = novos["self_transfer"].astype(bool)
+        ja_confirmado = novos["category_source"].isin(
+            [CategorySource.LEARNED_STABLE.value, CategorySource.LEARNED_VARIABLE.value]
+        )
         novos = novos.assign(is_transfer=is_transfer)
         precisa_revisao = novos[
-            (is_transfer & ~is_self_transfer) | (novos["category"] == CATEGORIA_NAO_CATEGORIZADO)
+            (is_transfer & ~is_self_transfer)
+            | (~is_self_transfer & ~ja_confirmado)
         ]
         records = precisa_revisao[
             ["tx_hash", "date", "description", "value", "category", "is_transfer"]

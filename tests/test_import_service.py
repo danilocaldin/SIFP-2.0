@@ -95,6 +95,47 @@ def test_revisao_pendente_inclui_estabelecimento_sem_confianca(import_service, s
         assert desc in revisao_descricoes
 
 
+def test_revisao_pendente_inclui_estabelecimento_novo_mesmo_com_regra_confiante(
+    import_service, sample_btg_xlsx_bytes
+):
+    """Uma regra de palavra-chave (ex: "UBER" -> Transporte) é confiante,
+    mas isso não significa que o usuário já confirmou essa categoria pra
+    esse estabelecimento específico -- a primeira ocorrência sempre entra
+    na fila de revisão, pra dar chance de corrigir antes de virar hábito
+    silencioso (ver categorization.py sobre "bar" -> Alimentação vs Lazer)."""
+    upload = FakeUploadedFile(sample_btg_xlsx_bytes, "extrato.xlsx")
+    summary = import_service.import_and_persist(upload)
+
+    revisao_descricoes = {r["description"] for r in summary["revisao_pendente"]}
+    assert any("Uber" in d for d in revisao_descricoes), revisao_descricoes
+
+
+def test_revisao_pendente_nao_inclui_estabelecimento_ja_aprendido(
+    import_service, sample_btg_xlsx_bytes
+):
+    """Depois que o usuário confirma manualmente a categoria de uma
+    descrição (vira LEARNED_STABLE), uma nova transação com a mesma
+    descrição não deve pedir revisão de novo -- só a primeira vez."""
+    upload1 = FakeUploadedFile(sample_btg_xlsx_bytes, "extrato.xlsx")
+    import_service.import_and_persist(upload1)
+
+    all_tx = import_service.transaction_repo.get_all()
+    uber_hash = all_tx.loc[all_tx["description"].str.contains("Uber"), "tx_hash"].iloc[0]
+    uber_desc = all_tx.loc[all_tx["description"].str.contains("Uber"), "description"].iloc[0]
+    import_service.transaction_repo.bulk_update_categories([(uber_hash, "Transporte")])
+
+    import pandas as pd
+
+    nova_df = pd.DataFrame(
+        [{"date": "2026-07-01 10:00", "description": uber_desc, "value": -9.99, "self_transfer": False}]
+    )
+    balances_vazio = pd.DataFrame(columns=["date", "balance"])
+    summary2 = import_service.persist(nova_df, balances_vazio, source_file="extrato2.xlsx")
+
+    revisao_descricoes = {r["description"] for r in summary2["revisao_pendente"]}
+    assert uber_desc not in revisao_descricoes
+
+
 def test_revisao_pendente_vazia_quando_tudo_ja_existia(import_service, sample_btg_xlsx_bytes):
     upload1 = FakeUploadedFile(sample_btg_xlsx_bytes, "extrato.xlsx")
     import_service.import_and_persist(upload1)
