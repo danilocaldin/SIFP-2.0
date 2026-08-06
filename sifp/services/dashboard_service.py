@@ -77,3 +77,25 @@ class DashboardService:
             "top_expenses": top_gastos_records,
             "top_merchants": by_merchant.to_dict("records"),
         }
+
+    def list_category_transactions(self, month: str | None, categoria: str) -> list[dict]:
+        """Transações individuais de uma categoria (só despesas, mesmo filtro
+        de category_breakdown) num mês — usado no drill-down ao clicar numa
+        barra do gráfico "Gastos por categoria"."""
+        all_tx = self.transaction_repo.get_all()
+        if all_tx.empty:
+            return []
+
+        all_tx["date"] = pd.to_datetime(all_tx["date"])
+        all_tx["month"] = all_tx["date"].dt.to_period("M").astype(str)
+        all_tx_real = ind.exclude_self_transfers(all_tx)
+        df_period_real = all_tx_real if month is None else all_tx_real[all_tx_real["month"] == month]
+
+        gastos = df_period_real[
+            (df_period_real["category"] == categoria) & (df_period_real["value"] < 0)
+        ].copy()
+        if gastos.empty:
+            return []
+        gastos = gastos.sort_values("value")  # mais negativo (maior gasto) primeiro
+        gastos["date"] = gastos["date"].dt.strftime("%Y-%m-%d")
+        return gastos[["date", "description", "value"]].to_dict("records")

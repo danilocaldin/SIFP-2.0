@@ -33,7 +33,15 @@ function ChartTooltip({
   );
 }
 
-export function CategoryBarChart({ data }: { data: CategoryBreakdown[] }) {
+export function CategoryBarChart({
+  data,
+  selected,
+  onCategoryClick,
+}: {
+  data: CategoryBreakdown[];
+  selected?: string | null;
+  onCategoryClick?: (category: string) => void;
+}) {
   // já vem ordenado do maior pro menor (category_breakdown) — mantém a
   // categoria de maior gasto no topo, como no dashboard Streamlit.
   const chartData = [...data].reverse();
@@ -56,11 +64,28 @@ export function CategoryBarChart({ data }: { data: CategoryBreakdown[] }) {
           width={120}
         />
         <Tooltip content={<ChartTooltip />} cursor={{ fill: "var(--muted)" }} />
-        <Bar dataKey="value_abs" radius={[0, 4, 4, 0]} maxBarSize={18}>
+        <Bar
+          dataKey="value_abs"
+          radius={[0, 4, 4, 0]}
+          maxBarSize={18}
+          cursor={onCategoryClick ? "pointer" : undefined}
+          onClick={(row: { payload?: CategoryBreakdown }) => {
+            if (row.payload) onCategoryClick?.(row.payload.category);
+          }}
+        >
           {chartData.map((row, i) => {
             const rank = n - 1 - i; // i=0 é o menor valor (revertido) -> rank maior = mais escuro
             const step = Math.round((rank / Math.max(n - 1, 1)) * (SEQUENTIAL_STEPS.length - 1));
-            return <Cell key={row.category} fill={SEQUENTIAL_STEPS[step]} />;
+            const isSelected = selected === row.category;
+            return (
+              <Cell
+                key={row.category}
+                fill={SEQUENTIAL_STEPS[step]}
+                fillOpacity={selected && !isSelected ? 0.4 : 1}
+                stroke={isSelected ? "var(--foreground)" : undefined}
+                strokeWidth={isSelected ? 1 : 0}
+              />
+            );
           })}
           <LabelList
             dataKey="value_abs"

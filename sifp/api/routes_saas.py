@@ -110,6 +110,13 @@ def dashboard(month: str | None = None, conn: psycopg.Connection = Depends(get_d
     return dashboard_service.build_dashboard(month, formatar_mes)
 
 
+@router.get("/dashboard/categoria")
+def dashboard_categoria(categoria: str, month: str | None = None, conn: psycopg.Connection = Depends(get_db)):
+    r = _repos(conn)
+    dashboard_service = DashboardService(r["transaction_repo"], r["balance_repo"])
+    return {"transacoes": dashboard_service.list_category_transactions(month, categoria)}
+
+
 @router.get("/patrimonio")
 def patrimonio(conn: psycopg.Connection = Depends(get_db)):
     r = _repos(conn)

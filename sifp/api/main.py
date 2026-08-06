@@ -171,6 +171,11 @@ def dashboard(month: str | None = None):
     return dashboard_service.build_dashboard(month, formatar_mes)
 
 
+@app.get("/api/dashboard/categoria")
+def dashboard_categoria(categoria: str, month: str | None = None):
+    return {"transacoes": dashboard_service.list_category_transactions(month, categoria)}
+
+
 @app.get("/api/patrimonio")
 def patrimonio():
     return patrimonio_service.build_patrimonio()

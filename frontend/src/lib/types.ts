@@ -62,6 +62,12 @@ export interface CategoryBreakdown {
   pct: number;
 }
 
+export interface CategoryTransaction {
+  date: string;
+  description: string;
+  value: number;
+}
+
 export interface MonthlyEvolution {
   month: string;
   mes_label: string;

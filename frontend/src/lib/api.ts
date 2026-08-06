@@ -1,4 +1,5 @@
 import type {
+  CategoryTransaction,
   ChatMensagem,
   ChatResponse,
   NarrativaResponse,
@@ -195,6 +196,20 @@ export async function confirmarRevisao(
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao confirmar a revisão."));
   return res.json();
+}
+
+export async function getDashboardCategoria(
+  categoria: string,
+  month: string | null
+): Promise<CategoryTransaction[]> {
+  const params = new URLSearchParams({ categoria });
+  if (month) params.set("month", month);
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/dashboard/categoria?${params}`, {
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao buscar as transações da categoria."));
+  const data = await res.json();
+  return data.transacoes;
 }
 
 export async function excluirTransacao(txHash: string): Promise<void> {

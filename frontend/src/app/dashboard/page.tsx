@@ -1,5 +1,5 @@
-import { CategoryBarChart } from "@/components/charts/category-bar-chart";
 import { MonthlyEvolutionChart } from "@/components/charts/monthly-evolution-chart";
+import { CategoryBreakdownSection } from "@/components/category-breakdown-section";
 import { MonthSelect } from "@/components/month-select";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -84,9 +84,12 @@ export default async function DashboardPage({
 
       <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div>
-          <h2 className="mb-3 text-sm font-medium text-muted-foreground">Gastos por categoria</h2>
+          <h2 className="mb-1 text-sm font-medium text-muted-foreground">Gastos por categoria</h2>
+          {dashboard.by_category.length > 0 && (
+            <p className="mb-2 text-xs text-muted-foreground">Clique numa categoria pra ver as transações.</p>
+          )}
           {dashboard.by_category.length > 0 ? (
-            <CategoryBarChart data={dashboard.by_category} />
+            <CategoryBreakdownSection data={dashboard.by_category} month={dashboard.selected_month} />
           ) : (
             <p className="text-sm text-muted-foreground">Sem despesas no período selecionado.</p>
           )}
