@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getEmailImportacao } from "@/lib/api";
+import { getEmailImportacao, resetarRemetenteEmailImportacao } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 
 const SAAS_MODE = process.env.NEXT_PUBLIC_SAAS_MODE === "true";
@@ -201,12 +201,20 @@ function PasskeyCard() {
 
 function EmailImportacaoCard() {
   const [email, setEmail] = useState<string | null>(null);
+  const [remetenteConfiavel, setRemetenteConfiavel] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [copiado, setCopiado] = useState(false);
+  const [resetando, setResetando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  function aplicarResultado(r: Awaited<ReturnType<typeof getEmailImportacao>>) {
+    setEmail(r?.email ?? null);
+    setRemetenteConfiavel(r?.remetente_confiavel ?? null);
+  }
 
   useEffect(() => {
     getEmailImportacao()
-      .then((r) => setEmail(r?.email ?? null))
+      .then(aplicarResultado)
       .finally(() => setCarregando(false));
   }, []);
 
@@ -215,6 +223,19 @@ function EmailImportacaoCard() {
     await navigator.clipboard.writeText(email);
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2000);
+  }
+
+  async function handleResetar() {
+    setResetando(true);
+    setErro(null);
+    try {
+      await resetarRemetenteEmailImportacao();
+      aplicarResultado(await getEmailImportacao());
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro desconhecido.");
+    } finally {
+      setResetando(false);
+    }
   }
 
   if (carregando || !email) return null;
@@ -228,7 +249,7 @@ function EmailImportacaoCard() {
           extrato mensal do BTG entra no Sifra sozinho, sem precisar baixar e subir o arquivo.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
         <div className="flex items-center gap-2">
           <code className="flex-1 rounded-md border border-border bg-muted px-3 py-2 text-sm break-all">
             {email}
@@ -237,6 +258,30 @@ function EmailImportacaoCard() {
             {copiado ? "Copiado!" : "Copiar"}
           </Button>
         </div>
+
+        <div className="text-xs text-muted-foreground">
+          {remetenteConfiavel ? (
+            <p>
+              Por segurança, só e-mails vindos de <strong>{remetenteConfiavel}</strong> são
+              aceitos nesse endereço.{" "}
+              <button
+                type="button"
+                onClick={handleResetar}
+                disabled={resetando}
+                className="underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+              >
+                {resetando ? "Trocando…" : "Mudei de e-mail de encaminhamento"}
+              </button>
+            </p>
+          ) : (
+            <p>
+              Ainda não recebemos nenhum e-mail nesse endereço. O primeiro remetente que enviar
+              um extrato aqui vira o único aceito daqui pra frente (proteção contra alguém tentar
+              enviar um extrato falso, mesmo que descubra esse endereço).
+            </p>
+          )}
+        </div>
+        {erro && <p className="text-xs text-destructive">⚠️ {erro}</p>}
       </CardContent>
     </Card>
   );

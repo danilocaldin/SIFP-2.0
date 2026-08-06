@@ -36,6 +36,7 @@ injetado (em vez de módulo global) para ficar testável sem tocar disco.
 Se nada bater, 'Não categorizado' com confiança 0.
 """
 
+import re
 from pathlib import Path
 
 import joblib
@@ -60,7 +61,7 @@ KEYWORD_RULES = {
     "Alimentação": ["IFOOD", "RAPPI", "RESTAURANTE", "LANCHONETE", "PADARIA",
                     "PIZZARIA", "BURGER", "MCDONALD", "STARBUCKS"],
     "Lazer": ["CINEMA", "INGRESSO", "STEAM", "PLAYSTATION", "XBOX", "SPOTIFY",
-              "SHOW ", "TEATRO", "BALADA", "BAR "],
+              "SHOW", "TEATRO", "BALADA", "BAR"],
     "Moradia": ["ALUGUEL", "CONDOMINIO", "IPTU", "IMOBILIARIA", "REFORMA"],
     "Saúde": ["FARMACIA", "DROGARIA", "HOSPITAL", "CLINICA", "PLANO DE SAUDE",
               "UNIMED", "AMIL", "LABORATORIO"],
@@ -98,12 +99,29 @@ BTG_CATEGORY_MAP = {
 
 
 def apply_keyword_rules(description: str) -> str | None:
+    """
+    Casa cada palavra-chave respeitando LIMITE DE PALAVRA (\\b), não
+    substring solta — sem isso, "AMIL" (Saúde) casava dentro de
+    "FAMILIA", "METRO" (Transporte) dentro de "METROPOLE", "CURSO"
+    (Educação) dentro de "CONCURSO"/"RECURSOS".
+
+    Quando MAIS DE UMA palavra-chave bate (de categorias diferentes), a
+    mais ESPECÍFICA (mais longa) vence — sem isso, "MERCADO" (Mercado)
+    sempre ganhava de "MERCADO LIVRE" (Compras) só por a categoria
+    Mercado vir primeiro no dicionário, mesmo a segunda sendo o termo
+    mais específico pra esse caso.
+    """
     desc_upper = strip_accents(description).upper()
+    matches: list[tuple[int, str]] = []
     for category, keywords in KEYWORD_RULES.items():
         for kw in keywords:
-            if strip_accents(kw).upper() in desc_upper:
-                return category
-    return None
+            kw_norm = strip_accents(kw).upper().strip()
+            if re.search(rf"\b{re.escape(kw_norm)}\b", desc_upper):
+                matches.append((len(kw_norm), category))
+    if not matches:
+        return None
+    matches.sort(key=lambda m: m[0], reverse=True)
+    return matches[0][1]
 
 
 def map_bank_category(bank_category: str | None) -> str | None:

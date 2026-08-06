@@ -4,7 +4,7 @@ IMAP/Postgres real; mensagens sintéticas via email.message.EmailMessage."""
 
 from email.message import EmailMessage
 
-from sifp.workers.email_import_worker import _extract_attachments, _extract_token
+from sifp.workers.email_import_worker import _extract_attachments, _extract_sender, _extract_token
 
 
 def _build_message(headers: dict, attachments: list[tuple[str, bytes]] | None = None) -> EmailMessage:
@@ -53,3 +53,18 @@ def test_extract_attachments_finds_named_parts():
 def test_extract_attachments_empty_when_no_attachment():
     msg = _build_message({"To": "x+y@gmail.com"})
     assert _extract_attachments(msg) == []
+
+
+def test_extract_sender_plain_address():
+    msg = _build_message({"From": "danilo@gmail.com", "To": "x+y@gmail.com"})
+    assert _extract_sender(msg) == "danilo@gmail.com"
+
+
+def test_extract_sender_strips_display_name():
+    msg = _build_message({"From": "Danilo Caldin <Danilo@Gmail.com>", "To": "x+y@gmail.com"})
+    assert _extract_sender(msg) == "danilo@gmail.com"
+
+
+def test_extract_sender_empty_when_no_from_header():
+    msg = _build_message({"To": "x+y@gmail.com"})
+    assert _extract_sender(msg) == ""

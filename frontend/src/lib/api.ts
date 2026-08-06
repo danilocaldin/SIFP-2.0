@@ -47,12 +47,22 @@ async function parseErrorDetail(res: Response, fallback: string): Promise<string
   }
 }
 
-export async function getEmailImportacao(): Promise<{ email: string } | null> {
+export async function getEmailImportacao(): Promise<
+  { email: string; remetente_confiavel: string | null } | null
+> {
   const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/perfil/email-importacao`, {
     headers: await authHeadersClient(),
   });
   if (!res.ok) return null;
   return res.json();
+}
+
+export async function resetarRemetenteEmailImportacao(): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/perfil/email-importacao/resetar-remetente`, {
+    method: "POST",
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao resetar o remetente confiável."));
 }
 
 export async function criarLimite(category: string, valor: number): Promise<void> {

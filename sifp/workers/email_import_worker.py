@@ -23,6 +23,7 @@ import io
 import os
 import re
 from email.message import Message
+from email.utils import parseaddr
 
 import psycopg
 from dotenv import load_dotenv
@@ -69,6 +70,26 @@ def _lookup_user_id(conn: psycopg.Connection, token: str) -> str | None:
     cur.execute("SELECT user_id FROM import_aliases WHERE token = %s", (token,))
     row = cur.fetchone()
     return str(row[0]) if row else None
+
+
+def _extract_sender(msg: Message) -> str:
+    """E-mail de quem enviou (só o endereço, sem nome de exibição)."""
+    _, addr = parseaddr(msg.get("From", ""))
+    return addr.strip().lower()
+
+
+def _remetente_confiavel(conn: psycopg.Connection, token: str) -> str | None:
+    cur = conn.cursor()
+    cur.execute("SELECT remetente_confiavel FROM import_aliases WHERE token = %s", (token,))
+    row = cur.fetchone()
+    return row[0] if row and row[0] else None
+
+
+def _registrar_remetente_confiavel(conn: psycopg.Connection, token: str, remetente: str) -> None:
+    conn.cursor().execute(
+        "UPDATE import_aliases SET remetente_confiavel = %s WHERE token = %s", (remetente, token)
+    )
+    conn.commit()
 
 
 def _extract_attachments(msg: Message) -> list[tuple[str, bytes]]:
@@ -151,6 +172,23 @@ def run() -> None:
             user_id = _lookup_user_id(lookup_conn, token)
             if not user_id:
                 print(f"  [{label}] token '{token}' não corresponde a nenhum usuário — ignorado.")
+                imap.store(msg_id, "+FLAGS", "\\Seen")
+                continue
+
+            remetente = _extract_sender(msg)
+            confiavel = _remetente_confiavel(lookup_conn, token)
+            if confiavel is None:
+                # Primeiro e-mail que chega nesse alias -- "confiar no
+                # primeiro uso": registra esse remetente como o único
+                # aceito daqui pra frente pra esse token.
+                if remetente:
+                    _registrar_remetente_confiavel(lookup_conn, token, remetente)
+                    print(f"  [{label}] usuário {user_id}: remetente '{remetente}' registrado como confiável pra esse alias.")
+            elif remetente != confiavel:
+                print(
+                    f"  [{label}] usuário {user_id}: remetente '{remetente}' não é o remetente "
+                    f"confiável ('{confiavel}') desse alias — ignorado por segurança."
+                )
                 imap.store(msg_id, "+FLAGS", "\\Seen")
                 continue
 

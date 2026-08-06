@@ -286,8 +286,18 @@ def email_importacao(conn: psycopg.Connection = Depends(get_db)):
     if not base:
         raise HTTPException(status_code=503, detail="Importação por e-mail ainda não configurada.")
     local, _, domain = base.partition("@")
-    token = _repos(conn)["import_alias_repo"].get_or_create()
-    return {"email": f"{local}+{token}@{domain}"}
+    r = _repos(conn)
+    token = r["import_alias_repo"].get_or_create()
+    remetente = r["import_alias_repo"].get_remetente_confiavel()
+    return {"email": f"{local}+{token}@{domain}", "remetente_confiavel": remetente}
+
+
+@router.post("/perfil/email-importacao/resetar-remetente")
+def resetar_remetente_email_importacao(conn: psycopg.Connection = Depends(get_db)):
+    """"Esquece" o remetente aprendido — próximo e-mail que chegar,
+    de qualquer remetente, vira o novo remetente confiável."""
+    _repos(conn)["import_alias_repo"].resetar_remetente_confiavel()
+    return {"ok": True}
 
 
 @router.get("/relatorio")

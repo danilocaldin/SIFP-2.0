@@ -116,8 +116,18 @@ create table if not exists preferencias (
 create table if not exists import_aliases (
     token text primary key,
     user_id uuid not null unique default auth.uid() references auth.users(id) on delete cascade,
-    criado_em timestamptz default now()
+    criado_em timestamptz default now(),
+    -- "Confiar no primeiro uso": o primeiro e-mail que chega nesse alias
+    -- registra o remetente aqui; e-mails seguintes só são processados se
+    -- vierem do MESMO remetente (ver email_import_worker.py). Sem isso,
+    -- qualquer pessoa que descubra o alias de alguém (vazamento,
+    -- encaminhamento) podia injetar um extrato falso na conta da vítima.
+    remetente_confiavel text
 );
+
+-- Migração idempotente: garante a coluna em bancos que já tinham a
+-- tabela antes dessa mudança (rodar este arquivo de novo é seguro).
+alter table import_aliases add column if not exists remetente_confiavel text;
 
 -- RLS: habilita e cria uma política única por tabela (cobre SELECT/INSERT/
 -- UPDATE/DELETE — USING filtra leitura, WITH CHECK filtra escrita, ambos

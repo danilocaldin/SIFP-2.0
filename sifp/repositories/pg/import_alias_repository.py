@@ -23,6 +23,25 @@ class ImportAliasRepository:
         row = cur.fetchone()
         if row:
             return row[0]
-        token = secrets.token_urlsafe(6)
+        # token_urlsafe(32) = 256 bits -- padrão recomendado pra token
+        # opaco usado como credencial (o token FAZ PARTE do endereço de
+        # e-mail de importação, então precisa ser difícil de adivinhar).
+        token = secrets.token_urlsafe(32)
         cur.execute("INSERT INTO import_aliases (token) VALUES (%s) RETURNING token", (token,))
         return cur.fetchone()[0]
+
+    def get_remetente_confiavel(self, conn: psycopg.Connection) -> str | None:
+        cur = conn.cursor()
+        cur.execute("SELECT remetente_confiavel FROM import_aliases WHERE user_id = auth.uid()")
+        row = cur.fetchone()
+        return row[0] if row and row[0] else None
+
+    def resetar_remetente_confiavel(self, conn: psycopg.Connection) -> None:
+        """Esquece o remetente aprendido (confiar-no-primeiro-uso) — usado
+        quando o usuário muda a forma como encaminha o extrato (troca de
+        e-mail, passa a usar regra automática em vez de encaminhar na mão
+        etc.) e o próximo e-mail de um remetente novo passaria a ser
+        bloqueado como suspeito sem essa opção."""
+        conn.cursor().execute(
+            "UPDATE import_aliases SET remetente_confiavel = NULL WHERE user_id = auth.uid()"
+        )

@@ -28,6 +28,33 @@ def test_no_rule_match_returns_none():
     assert apply_keyword_rules("Lançamento totalmente desconhecido XYZ") is None
 
 
+def test_keyword_rule_respeita_limite_de_palavra_amil_dentro_de_familia():
+    # "AMIL" (Saúde) não pode casar dentro de "FAMILIA"
+    assert apply_keyword_rules("Pix enviado - Familia Silva") != "Saúde"
+    assert apply_keyword_rules("Compra no débito autorizada - Amil Saude") == "Saúde"
+
+
+def test_keyword_rule_respeita_limite_de_palavra_metro_dentro_de_metropole():
+    # "METRO" (Transporte) não pode casar dentro de "METROPOLE OTICAS"
+    assert apply_keyword_rules("Compra no débito autorizada - Metropole Oticas") != "Transporte"
+    assert apply_keyword_rules("Compra no débito autorizada - Metro Sp") == "Transporte"
+
+
+def test_keyword_rule_respeita_limite_de_palavra_curso_dentro_de_concurso_recursos():
+    # "CURSO" (Educação) não pode casar dentro de "CONCURSO" ou "RECURSOS"
+    assert apply_keyword_rules("Compra no débito autorizada - Concurso Publico Edital") != "Educação"
+    assert apply_keyword_rules("Pix enviado - Recursos Humanos Ltda") != "Educação"
+    assert apply_keyword_rules("Compra no débito autorizada - Curso Ingles") == "Educação"
+
+
+def test_keyword_rule_termo_mais_especifico_vence_mercado_livre_vs_mercado():
+    # "MERCADO LIVRE" (Compras) precisa vencer "MERCADO" (Mercado) --
+    # mesmo "Mercado" vindo antes no dicionário, o termo mais específico
+    # (mais longo) é o que decide.
+    assert apply_keyword_rules("Compra no débito autorizada - Mercado Livre*Camiseta") == "Compras"
+    assert apply_keyword_rules("Compra no débito autorizada - Mercado Sao Jose") == "Mercado"
+
+
 def test_precedence_keyword_rule_beats_bank_category(service):
     result = service.predict("Compra no débito autorizada - Uber", bank_category="Outra Categoria")
     assert result.category == "Transporte"
