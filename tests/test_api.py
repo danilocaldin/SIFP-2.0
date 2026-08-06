@@ -22,6 +22,50 @@ def test_health():
     assert resp.json() == {"status": "ok"}
 
 
+def test_health_nao_exige_chave_mesmo_com_chave_configurada(monkeypatch):
+    monkeypatch.setenv("SIFP_PERSONAL_API_KEY", "segredo-teste")
+    resp = client.get("/health")
+    assert resp.status_code == 200
+
+
+def test_rota_pessoal_sem_chave_configurada_continua_aberta():
+    """Sem SIFP_PERSONAL_API_KEY no ambiente (caso do dev local e da
+    suíte de testes), as rotas pessoais continuam funcionando sem
+    exigir nada -- não quebra quem nunca configurou a variável."""
+    resp = client.get("/api/resumo")
+    assert resp.status_code == 200
+
+
+def test_rota_pessoal_com_chave_configurada_bloqueia_sem_header(monkeypatch):
+    monkeypatch.setenv("SIFP_PERSONAL_API_KEY", "segredo-teste")
+    resp = client.get("/api/resumo")
+    assert resp.status_code == 401
+    assert "Chave de API" in resp.json()["detail"]
+
+
+def test_rota_pessoal_com_chave_configurada_bloqueia_header_errado(monkeypatch):
+    monkeypatch.setenv("SIFP_PERSONAL_API_KEY", "segredo-teste")
+    resp = client.get("/api/resumo", headers={"X-API-Key": "chave-errada"})
+    assert resp.status_code == 401
+
+
+def test_rota_pessoal_com_chave_correta_funciona(monkeypatch):
+    monkeypatch.setenv("SIFP_PERSONAL_API_KEY", "segredo-teste")
+    resp = client.get("/api/resumo", headers={"X-API-Key": "segredo-teste"})
+    assert resp.status_code == 200
+
+
+def test_rota_saas_nao_e_bloqueada_pela_chave_pessoal(monkeypatch):
+    """/api/v2/... tem sua própria autenticação (JWT do Supabase, ver
+    routes_saas.py) -- a chave da API pessoal não deve interferir nela.
+    Sem token de sessão, a rota ainda falha, mas por outro motivo (não
+    a mensagem "Chave de API" do middleware pessoal)."""
+    monkeypatch.setenv("SIFP_PERSONAL_API_KEY", "segredo-teste")
+    resp = client.get("/api/v2/resumo")
+    assert resp.status_code != 200
+    assert "Chave de API" not in resp.text
+
+
 def test_resumo_returns_json_with_has_data_flag():
     resp = client.get("/api/resumo")
     assert resp.status_code == 200

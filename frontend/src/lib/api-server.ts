@@ -22,7 +22,15 @@ import { createClient as createServerSupabaseClient } from "@/lib/supabase/serve
 const API_URL = process.env.SIFP_API_URL ?? "http://localhost:8000";
 
 async function authHeadersServer(): Promise<Record<string, string>> {
-  if (!SAAS_MODE) return {};
+  if (!SAAS_MODE) {
+    // App pessoal: chamadas server-to-server (Server Components) usam a
+    // variável SEM prefixo NEXT_PUBLIC_ -- fica só no servidor do Next,
+    // nunca chega no bundle do navegador (mais forte que a versão
+    // pública usada em api.ts, que só existe pra chamadas que saem
+    // direto do navegador, ex: upload). Ver sifp/api/main.py.
+    const key = process.env.SIFP_API_KEY;
+    return key ? { "X-API-Key": key } : {};
+  }
   const supabase = await createServerSupabaseClient();
   const {
     data: { session },

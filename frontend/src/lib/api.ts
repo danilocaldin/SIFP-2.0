@@ -30,7 +30,15 @@ export const SAAS_MODE = process.env.NEXT_PUBLIC_SAAS_MODE === "true";
 export const API_PREFIX = SAAS_MODE ? "/api/v2" : "/api";
 
 async function authHeadersClient(): Promise<Record<string, string>> {
-  if (!SAAS_MODE) return {};
+  if (!SAAS_MODE) {
+    // App pessoal: sem login, protegido por uma chave compartilhada em
+    // vez de sessão de usuário (ver sifp/api/main.py). A chave PRECISA
+    // ser NEXT_PUBLIC_ porque algumas chamadas (ex: upload) saem direto
+    // do navegador — não é segredo forte (fica visível no bundle), só
+    // barra quem não passou pelo site (scanners, URL descoberta à toa).
+    const key = process.env.NEXT_PUBLIC_SIFP_API_KEY;
+    return key ? { "X-API-Key": key } : {};
+  }
   const supabase = createBrowserSupabaseClient();
   const {
     data: { session },

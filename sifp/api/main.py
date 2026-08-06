@@ -18,8 +18,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, Response, UploadFile
+from fastapi import FastAPI, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from sifp.api.routes_saas import router as saas_router
@@ -96,6 +97,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# As rotas pessoais (/api/..., sem o /v2) nunca tiveram autenticação —
+# aceitável enquanto só existia o app pessoal do Danilo (a "segurança"
+# era só ninguém saber a URL). Deixou de ser aceitável quando essa MESMA
+# API passou a servir o SaaS também: a URL fica embutida no bundle
+# público do site, então qualquer um que a descubra podia ler/apagar os
+# dados financeiros reais do Danilo sem login nenhum. As rotas /api/v2/...
+# (SaaS) já têm autenticação de verdade via JWT do Supabase (ver
+# routes_saas.py) e ficam de fora dessa checagem. Lida do ambiente A CADA
+# request (não numa constante de módulo) de propósito — deixa testável
+# via monkeypatch.setenv sem precisar reimportar o módulo, e o custo de
+# um os.environ.get() por request é irrelevante.
+
+
+@app.middleware("http")
+async def require_personal_api_key(request: Request, call_next):
+    path = request.url.path
+    is_personal_route = path.startswith("/api/") and not path.startswith("/api/v2/")
+    expected_key = os.environ.get("SIFP_PERSONAL_API_KEY")
+    if is_personal_route and expected_key:
+        if request.headers.get("X-API-Key") != expected_key:
+            return JSONResponse(status_code=401, content={"detail": "Chave de API inválida ou ausente."})
+    return await call_next(request)
 
 
 @app.get("/health")
