@@ -50,7 +50,10 @@ class SummaryService:
         by_cat = ind.category_breakdown(period_df)
         latest_assets = self.asset_repo.get_latest_positions()
         patrimonio_total = float(latest_assets["saldo_liquido"].sum()) if not latest_assets.empty else 0.0
-        despesa_media_mensal = float(monthly["Despesas"].mean()) if not monthly.empty else 0.0
+        monthly_fechados = ind.exclude_current_month(monthly)
+        despesa_media_mensal = (
+            float(monthly_fechados["Despesas"].mean()) if not monthly_fechados.empty else 0.0
+        )
 
         despesas_fixas = DespesasFixasService(
             self.despesa_fixa_repo, self.preferencia_repo, self.transaction_repo

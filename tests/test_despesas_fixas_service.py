@@ -131,6 +131,29 @@ def test_build_despesas_fixas_calcula_total_pct_e_margem(repos):
     assert parcelada["parcelas_restantes"] == 7
 
 
+def test_receita_media_mensal_ignora_mes_corrente_incompleto(repos):
+    """Um salário que ainda não caiu (mês em andamento) não pode puxar
+    a receita média pra baixo -- inflaria pct_comprometido artificialmente."""
+    despesa_fixa_repo, preferencia_repo, transaction_repo = repos
+    _com_receita(transaction_repo)  # abr/mai/jun 2026, R$5000 cada -> media 5000
+
+    hoje = pd.Timestamp.now()
+    tx_mes_atual = pd.DataFrame([{
+        "date": hoje.strftime("%Y-%m-01"),
+        "description": "Salario parcial",
+        "value": 200.0,  # bem menor que 5000 -- só entrou uma parte até agora
+        "category": "Salário/Receita",
+    }])
+    transaction_repo.insert_new(tx_mes_atual)
+
+    svc = DespesasFixasService(despesa_fixa_repo, preferencia_repo, transaction_repo)
+    result = svc.build_despesas_fixas()
+
+    # se o mes corrente (com só 200) entrasse na janela de 3, a media cairia
+    # bem abaixo de 5000 -- continua 5000 porque só os 3 meses fechados contam.
+    assert result["receita_media_mensal"] == pytest.approx(5000.0)
+
+
 def test_build_despesas_fixas_despesa_inativa_nao_conta(repos):
     despesa_fixa_repo, preferencia_repo, transaction_repo = repos
     _com_receita(transaction_repo)

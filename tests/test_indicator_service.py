@@ -139,6 +139,49 @@ def test_category_trend_empty_when_no_expenses():
     assert ind.category_trend(df).empty
 
 
+def test_exclude_current_month_remove_mes_em_andamento():
+    hoje = pd.Timestamp.now()
+    mes_atual = hoje.strftime("%Y-%m")
+    mes_passado = (hoje - pd.DateOffset(months=1)).strftime("%Y-%m")
+    df = pd.DataFrame({"month": [mes_passado, mes_atual], "Despesas": [100.0, 999.0]})
+
+    result = ind.exclude_current_month(df)
+
+    assert list(result["month"]) == [mes_passado]
+
+
+def test_exclude_current_month_mantem_original_se_so_sobrar_mes_atual():
+    """Sem nenhum mês fechado ainda, algum número é melhor que nenhum."""
+    mes_atual = pd.Timestamp.now().strftime("%Y-%m")
+    df = pd.DataFrame({"month": [mes_atual], "Despesas": [50.0]})
+
+    result = ind.exclude_current_month(df)
+
+    assert list(result["month"]) == [mes_atual]
+
+
+def test_exclude_current_month_vazio():
+    assert ind.exclude_current_month(pd.DataFrame(columns=["month"])).empty
+
+
+def test_average_spend_by_category_ignora_mes_corrente_incompleto():
+    """Mês em andamento não deve entrar na média -- um gasto parcial
+    (poucos dias) puxaria a média pra baixo artificialmente."""
+    hoje = pd.Timestamp.now()
+    mes_atual = hoje.strftime("%Y-%m-15")
+    mes_1 = (hoje - pd.DateOffset(months=1)).strftime("%Y-%m-15")
+    mes_2 = (hoje - pd.DateOffset(months=2)).strftime("%Y-%m-15")
+    df = pd.DataFrame({
+        "date": [mes_2, mes_1, mes_atual],
+        "value": [-100.0, -200.0, -5.0],  # mes corrente com gasto ainda baixo (poucos dias)
+        "category": ["Lazer", "Lazer", "Lazer"],
+    })
+    result = ind.average_spend_by_category(df, janela=3)
+    lazer = result[result["category"] == "Lazer"].iloc[0]
+    # sem o mes corrente: (100+200)/2 = 150. Incluindo, seria (100+200+5)/3 = 101.67
+    assert lazer["media_mensal"] == pytest.approx(150.0)
+
+
 def test_average_spend_by_category_uses_last_n_months():
     df = pd.DataFrame({
         "date": ["2026-04-01", "2026-05-01", "2026-06-01", "2026-06-15"],

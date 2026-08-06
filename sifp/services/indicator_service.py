@@ -17,6 +17,21 @@ import pandas as pd
 from sifp.domain.categories import SELF_TRANSFER_CATEGORY
 
 
+def exclude_current_month(df: pd.DataFrame, month_col: str = "month") -> pd.DataFrame:
+    """Remove o mês corrente (ainda em andamento) de uma tabela agrupada
+    por mês. Médias/tendências sobre um mês incompleto distorcem o
+    número — infla (poucos dias, gasto ainda baixo) ou reduz (salário
+    ainda não caiu) dependendo de quando no mês o cálculo roda. Usado
+    antes de qualquer média móvel sobre `monthly_evolution`/`category_trend`.
+    Se sobrar vazio (só há dados do mês corrente ainda), devolve o
+    DataFrame original sem filtrar — algum número é melhor que nenhum."""
+    if df.empty:
+        return df
+    mes_atual = pd.Timestamp.now().strftime("%Y-%m")
+    fechados = df[df[month_col] != mes_atual]
+    return fechados if not fechados.empty else df
+
+
 def exclude_self_transfers(df: pd.DataFrame) -> pd.DataFrame:
     """
     Remove transferências entre contas próprias do titular (ex: indo para
@@ -142,7 +157,7 @@ def average_spend_by_category(df: pd.DataFrame, janela: int = 3) -> pd.DataFrame
     Base para sugerir limites de orçamento a partir do histórico real, em
     vez de o usuário ter que adivinhar um valor do zero.
     """
-    trend = category_trend(df)
+    trend = exclude_current_month(category_trend(df))
     if trend.empty:
         return pd.DataFrame(columns=["category", "media_mensal"])
     meses_recentes = sorted(trend["month"].unique())[-janela:]

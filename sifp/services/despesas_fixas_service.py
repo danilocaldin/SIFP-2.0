@@ -33,7 +33,7 @@ class DespesasFixasService:
         all_tx["date"] = pd.to_datetime(all_tx["date"])
         all_tx["month"] = all_tx["date"].dt.to_period("M").astype(str)
         real = ind.exclude_self_transfers(all_tx)
-        monthly = ind.monthly_evolution(real)
+        monthly = ind.exclude_current_month(ind.monthly_evolution(real))
         if monthly.empty:
             return 0.0
         return float(monthly["Receitas"].tail(_JANELA_RECEITA_MESES).mean())

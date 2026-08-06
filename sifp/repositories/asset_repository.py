@@ -72,14 +72,22 @@ class AssetRepository:
         conn.close()
 
     def get_latest_positions(self) -> pd.DataFrame:
-        """Última posição conhecida de cada ativo (por identificador) —
-        usado para o patrimônio atual, em vez de somar todo o histórico."""
+        """Posições do extrato mais recente de cada instituição — usado
+        pro patrimônio atual, em vez de somar todo o histórico.
+
+        Antes pegava a última linha de CADA ativo (groupby identificador
+        + tail(1)), sem checar se ele ainda aparece no extrato mais
+        recente. Isso fazia um ativo resgatado (que sai dos extratos
+        seguintes, sem nenhum sinal explícito de "encerrado") continuar
+        contando no patrimônio pra sempre. Agora só entra quem apareceu
+        no snapshot mais recente da PRÓPRIA instituição (instituições
+        diferentes podem ter sido importadas em datas diferentes, então
+        o corte é por instituição, não uma data global única)."""
         all_positions = self.get_all()
         if all_positions.empty:
             return all_positions
+        data_mais_recente = all_positions.groupby("instituicao")["data_referencia"].transform("max")
         return (
-            all_positions.sort_values("data_referencia")
-            .groupby("identificador", as_index=False)
-            .tail(1)
+            all_positions[all_positions["data_referencia"] == data_mais_recente]
             .reset_index(drop=True)
         )

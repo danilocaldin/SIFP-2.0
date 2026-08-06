@@ -73,14 +73,17 @@ class AssetRepository:
         conn.cursor().execute("DELETE FROM assets WHERE position_key = %s", (position_key,))
 
     def get_latest_positions(self, conn: psycopg.Connection) -> pd.DataFrame:
-        """Última posição conhecida de cada ativo (por identificador) —
-        usado para o patrimônio atual, em vez de somar todo o histórico."""
+        """Posições do extrato mais recente de cada instituição — ver
+        docstring completa na versão SQLite (mesma lógica: um ativo
+        resgatado que some dos extratos seguintes não fica contando no
+        patrimônio pra sempre; o corte é por instituição, não por data
+        global, porque instituições diferentes podem ter extratos de
+        datas diferentes)."""
         all_positions = self.get_all(conn)
         if all_positions.empty:
             return all_positions
+        data_mais_recente = all_positions.groupby("instituicao")["data_referencia"].transform("max")
         return (
-            all_positions.sort_values("data_referencia")
-            .groupby("identificador", as_index=False)
-            .tail(1)
+            all_positions[all_positions["data_referencia"] == data_mais_recente]
             .reset_index(drop=True)
         )
