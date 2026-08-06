@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { PUBLIC_API_URL } from "@/lib/api";
+import { importPatrimonio } from "@/lib/api";
 
 type Status = { kind: "idle" } | { kind: "loading" } | { kind: "success"; message: string } | { kind: "error"; message: string };
 
@@ -17,21 +17,12 @@ export function PatrimonioUpload() {
     if (!file) return;
 
     setStatus({ kind: "loading" });
-    const formData = new FormData();
-    formData.append("file", file);
 
     try {
-      const res = await fetch(`${PUBLIC_API_URL}/api/patrimonio/import`, {
-        method: "POST",
-        body: formData,
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        throw new Error(body.detail ?? "Falha ao importar o extrato.");
-      }
+      const inserted = await importPatrimonio(file);
       setStatus({
         kind: "success",
-        message: `${body.inserted} posição(ões) importada(s)/atualizada(s). Reimportar o mesmo extrato atualiza o snapshot da data em vez de duplicar.`,
+        message: `${inserted} posição(ões) importada(s)/atualizada(s). Reimportar o mesmo extrato atualiza o snapshot da data em vez de duplicar.`,
       });
       router.refresh();
     } catch (err) {

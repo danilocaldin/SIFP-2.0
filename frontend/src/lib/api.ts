@@ -173,6 +173,19 @@ export async function persistUpload(file: File): Promise<UploadPersistSummary> {
   return res.json();
 }
 
+export async function importPatrimonio(file: File): Promise<number> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/patrimonio/import`, {
+    method: "POST",
+    body: formData,
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao importar o extrato."));
+  const data = await res.json();
+  return data.inserted;
+}
+
 export async function aplicarCategoriaEmLote(
   description: string,
   category: string

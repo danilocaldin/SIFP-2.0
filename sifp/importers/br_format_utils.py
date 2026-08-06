@@ -35,7 +35,9 @@ def find_column(columns_normalized: list[str], aliases: list[str]) -> int | None
 def parse_brl_number(value) -> float:
     """
     Converte string de moeda no formato brasileiro para float.
-    Exemplos aceitos: '1.234,56' | 'R$ 1.234,56' | '-45,00' | '45,00 D'
+    Exemplos aceitos: '1.234,56' | 'R$ 1.234,56' | '-45,00' | '45,00 D' |
+    '1.500' (sem decimais) | '500 D' (débito sem decimais) | '(150,00)'
+    (negativo entre parênteses, convenção contábil).
     Números já numéricos (int/float, como vêm de células do Excel) passam
     direto, sem tentar re-interpretar o separador decimal.
     """
@@ -47,7 +49,11 @@ def parse_brl_number(value) -> float:
     s = str(value).strip()
     negative = False
 
-    if re.search(r"\bD\b", s.upper()) and "," in s:
+    if s.startswith("(") and s.endswith(")"):
+        negative = True
+        s = s[1:-1]
+
+    if re.search(r"\bD\b", s.upper()):
         negative = True
     if "-" in s:
         negative = True
@@ -57,9 +63,14 @@ def parse_brl_number(value) -> float:
     s = re.sub(r"[A-Za-z]", "", s)  # remove sufixos tipo 'D'/'C'
     s = s.replace("-", "")
 
-    # formato brasileiro: milhar com ponto, decimal com vírgula
+    # formato brasileiro: ponto SEMPRE separa milhar (nunca é decimal),
+    # vírgula é o separador decimal quando presente. Precisa remover o
+    # ponto incondicionalmente -- não só quando há vírgula -- senão um
+    # valor redondo em milhares sem decimais ('1.500') vira 1.5 (float()
+    # interpreta o ponto como decimal), erro de 3 ordens de grandeza.
+    s = s.replace(".", "")
     if "," in s:
-        s = s.replace(".", "").replace(",", ".")
+        s = s.replace(",", ".")
 
     try:
         num = float(s) if s else 0.0
