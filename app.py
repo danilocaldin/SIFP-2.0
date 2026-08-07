@@ -44,8 +44,7 @@ from sifp.services.formatting import format_brl, format_brl_md, formatar_mes
 from sifp.services.chat_service import ChatIndisponivel, ChatService
 from sifp.services.import_service import ImportService
 from sifp.services.narrativa_service import NarrativaIndisponivel, NarrativaService
-from sifp.services.pdf_report_service import generate_pdf_report
-from sifp.services.report_service import generate_text_report
+from sifp.services.relatorio_service import RelatorioService
 from sifp.services.summary_service import SummaryService
 
 st.set_page_config(
@@ -68,6 +67,7 @@ summary_service = SummaryService(
     transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo, despesa_fixa_repo, preferencia_repo
 )
 despesas_fixas_service = DespesasFixasService(despesa_fixa_repo, preferencia_repo, transaction_repo)
+relatorio_service = RelatorioService(transaction_repo, asset_repo, summary_service)
 narrativa_service = NarrativaService(summary_service, transaction_repo)
 chat_service = ChatService(transaction_repo, asset_repo)
 
@@ -1176,37 +1176,13 @@ with tab_relatorio:
     else:
         all_tx_rel["date"] = pd.to_datetime(all_tx_rel["date"])
         all_tx_rel["month"] = all_tx_rel["date"].dt.to_period("M").astype(str)
-        all_tx_rel_real = ind.exclude_self_transfers(all_tx_rel)
-
         months_rel = sorted(all_tx_rel["month"].unique())
         selected_month_rel = st.selectbox(
             "Mês do relatório", options=list(reversed(months_rel)), key="report_month"
         )
-        period_label_rel = _formatar_mes(selected_month_rel)
 
-        period_df_rel = all_tx_rel[all_tx_rel["month"] == selected_month_rel]
-        period_df_rel_real = all_tx_rel_real[all_tx_rel_real["month"] == selected_month_rel]
-
-        summary_rel = ind.period_summary(period_df_rel_real)
-        by_cat_rel = ind.category_breakdown(period_df_rel_real)
-        by_merchant_rel = ind.merchant_concentration(period_df_rel_real)
-        monthly_rel = ind.monthly_evolution(all_tx_rel_real)
-        latest_assets_rel = asset_repo.get_latest_positions()
-
-        diagnostics_rel = summary_service.diagnostics_for_month(all_tx_rel, all_tx_rel_real, selected_month_rel, period_label_rel)
-
-        debt_transactions_rel = period_df_rel[period_df_rel["category"] == "Dívida"]
-
-        report_text = generate_text_report(
-            period_label=period_label_rel,
-            summary=summary_rel,
-            by_cat=by_cat_rel,
-            by_merchant=by_merchant_rel,
-            monthly=monthly_rel,
-            diagnostics=diagnostics_rel,
-            asset_positions=latest_assets_rel,
-            debt_transactions=debt_transactions_rel,
-        )
+        relatorio_payload = relatorio_service.build_relatorio(selected_month_rel, _formatar_mes)
+        report_text = relatorio_payload["report_text"]
 
         st.text_area("Relatório", report_text, height=500, label_visibility="collapsed")
 
@@ -1215,22 +1191,12 @@ with tab_relatorio:
             st.download_button(
                 "⬇️ Baixar relatório (.txt)",
                 data=report_text,
-                file_name=f"relatorio_sifp_{selected_month_rel}.txt",
+                file_name=f"relatorio_sifra_{selected_month_rel}.txt",
                 mime="text/plain",
             )
         with col_pdf:
-            patrimonio_total_rel = float(latest_assets_rel["saldo_liquido"].sum()) if not latest_assets_rel.empty else 0.0
-            pdf_bytes_rel = generate_pdf_report(
-                period_label=period_label_rel,
-                summary=summary_rel,
-                by_cat=by_cat_rel,
-                by_merchant=by_merchant_rel,
-                monthly=monthly_rel,
-                diagnostics=diagnostics_rel,
-                asset_positions=latest_assets_rel,
-                debt_transactions=debt_transactions_rel,
-                patrimonio_total=patrimonio_total_rel,
-                nome_titular=os.environ.get("SIFP_TITULAR_NOME") or None,
+            pdf_bytes_rel = relatorio_service.build_relatorio_pdf(
+                selected_month_rel, _formatar_mes, nome_titular=os.environ.get("SIFP_TITULAR_NOME") or None
             )
             st.download_button(
                 "⬇️ Baixar relatório (PDF)",
