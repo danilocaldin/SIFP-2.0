@@ -88,7 +88,13 @@ def project_patrimonio_com_rendimento(
     """Projeta o patrimônio compondo mensalmente a rentabilidade anualizada
     informada (ex: `weighted_avg_rentabilidade` dos ativos atuais) e somando
     o aporte médio mensal de poupança em cima."""
-    taxa_mensal = (1 + taxa_anual_pct / 100) ** (1 / 12) - 1
+    # taxa_anual_pct <= -100% faria a base da potência fracionária ficar
+    # negativa, o que em Python devolve um número complexo em vez de
+    # levantar erro -- trava tudo mais adiante (float(), formatação, etc).
+    # Uma perda anual de 100%+ já significa "zerou o investimento", então
+    # a base é limitada a 0 (perda total) em vez de deixar virar complexo.
+    base = max(1 + taxa_anual_pct / 100, 0.0)
+    taxa_mensal = base ** (1 / 12) - 1
     rows = []
     acumulado = patrimonio_atual
     for offset in range(1, meses + 1):

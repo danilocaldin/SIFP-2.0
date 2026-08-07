@@ -124,3 +124,25 @@ def test_project_patrimonio_com_rendimento_applies_monthly_rate():
     # taxa mensal equivalente a 12.68% a.a. -> ~1% a.m.
     taxa_mensal = (1 + 12.68 / 100) ** (1 / 12) - 1
     assert result.iloc[0]["patrimonio_projetado"] == pytest.approx(1000.0 * (1 + taxa_mensal))
+
+
+def test_project_patrimonio_com_rendimento_taxa_abaixo_de_menos_100_nao_gera_numero_complexo():
+    # taxa_anual_pct <= -100% deixaria a base da potência fracionária
+    # negativa -- em Python isso devolve complex em vez de levantar erro.
+    # Deve ser tratado como perda total (base zerada), não travar.
+    result = proj.project_patrimonio_com_rendimento(
+        patrimonio_atual=1000.0, saldo_medio_mensal=100.0, taxa_anual_pct=-150.0, meses=2
+    )
+    valores = list(result["patrimonio_projetado"])
+    assert all(isinstance(v, float) for v in valores)
+    # base zerada -> patrimonio anterior "some" a cada mes, só sobra o
+    # aporte mensal daquele mes (nao acumula, porque o mes anterior
+    # tambem zera antes de somar o proximo aporte)
+    assert valores == pytest.approx([100.0, 100.0])
+
+
+def test_project_patrimonio_com_rendimento_taxa_exatamente_menos_100():
+    result = proj.project_patrimonio_com_rendimento(
+        patrimonio_atual=1000.0, saldo_medio_mensal=0.0, taxa_anual_pct=-100.0, meses=1
+    )
+    assert result.iloc[0]["patrimonio_projetado"] == pytest.approx(0.0)
