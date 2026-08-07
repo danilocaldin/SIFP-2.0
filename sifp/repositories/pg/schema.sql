@@ -96,6 +96,15 @@ create table if not exists despesas_fixas (
     user_id uuid not null default auth.uid() references auth.users(id) on delete cascade
 );
 
+-- Achado real de auditoria: diferente das outras tabelas, essas duas têm
+-- chave primária só em "id" (sem user_id), então sem um índice explícito
+-- qualquer leitura filtrada por RLS (toda leitura é) varre a tabela
+-- inteira de TODOS os clientes em vez de ir direto nas linhas do usuário
+-- -- e "goals" ainda faz ORDER BY prazo, que sem índice lê tudo antes de
+-- ordenar e só então descartar o que não é do usuário.
+create index if not exists goals_user_idx on goals (user_id);
+create index if not exists despesas_fixas_user_idx on despesas_fixas (user_id);
+
 -- Configurações do usuário de valor único (ex: limiar de alerta de
 -- despesas fixas) — chave-valor genérica, mesmo motivo da versão SQLite.
 create table if not exists preferencias (

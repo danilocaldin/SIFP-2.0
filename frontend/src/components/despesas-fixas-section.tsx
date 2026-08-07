@@ -255,6 +255,9 @@ function DespesaRow({ despesa }: { despesa: DespesaFixa }) {
   }
 
   async function handleEncerrar() {
+    if (!window.confirm(`Encerrar "${despesa.nome}"? Ela para de contar no total mensal comprometido.`)) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -268,6 +271,9 @@ function DespesaRow({ despesa }: { despesa: DespesaFixa }) {
   }
 
   async function handleExcluir() {
+    if (!window.confirm(`Excluir "${despesa.nome}"? Essa ação apaga o registro e não pode ser desfeita — se só quer parar de contá-la, use "Encerrar".`)) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {

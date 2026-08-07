@@ -84,6 +84,20 @@ export function CategoryBarChart({
                 fillOpacity={selected && !isSelected ? 0.4 : 1}
                 stroke={isSelected ? "var(--foreground)" : undefined}
                 strokeWidth={isSelected ? 1 : 0}
+                tabIndex={onCategoryClick ? 0 : undefined}
+                role={onCategoryClick ? "button" : undefined}
+                aria-label={onCategoryClick ? `${row.category}: ${formatBRL(row.value_abs)}` : undefined}
+                aria-pressed={onCategoryClick ? isSelected : undefined}
+                onKeyDown={
+                  onCategoryClick
+                    ? (e: React.KeyboardEvent) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onCategoryClick(row.category);
+                        }
+                      }
+                    : undefined
+                }
               />
             );
           })}

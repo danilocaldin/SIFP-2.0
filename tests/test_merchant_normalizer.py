@@ -39,6 +39,20 @@ def test_normalize_empty_description_returns_placeholder(normalizer):
     assert normalizer.normalize(None) == "Desconhecido"
 
 
+@pytest.mark.parametrize(
+    "description,expected",
+    [
+        # Achado real de auditoria: o match por alias era substring solta
+        # (mesmo bug já corrigido em apply_keyword_rules, escapou aqui) --
+        # "UBER" dentro de "UBERABA"/"UBERLANDIA" virava "Uber".
+        ("Compra no débito autorizada - Posto Uberaba", "Posto Uberaba"),
+        ("Compra no débito autorizada - Supermercado Uberlandia", "Supermercado Uberlandia"),
+    ],
+)
+def test_normalize_nao_casa_alias_dentro_de_outra_palavra(normalizer, description, expected):
+    assert normalizer.normalize(description) == expected
+
+
 def test_normalize_unknown_merchant_falls_back_to_title_case(normalizer):
     assert normalizer.normalize("Pix enviado - Maria Jose Vieira") == "Maria Jose Vieira"
 

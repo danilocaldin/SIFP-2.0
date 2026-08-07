@@ -55,6 +55,28 @@ def test_rota_pessoal_com_chave_correta_funciona(monkeypatch):
     assert resp.status_code == 200
 
 
+def test_preflight_cors_nao_e_bloqueado_pela_chave_de_api(monkeypatch):
+    """Achado real de auditoria: a checagem da chave de API pessoal rodava
+    ANTES do CORSMiddleware (a ordem de app.add_middleware importa -- o
+    último registrado fica mais externo, e a checagem de chave era
+    registrada depois do CORS). Isso fazia o preflight OPTIONS do
+    navegador (que nunca manda X-API-Key, só a requisição real manda)
+    levar 401 em vez de ser respondido pelo CORSMiddleware, quebrando
+    toda mutação (upload, exclusão, chat) do app pessoal feita pelo
+    navegador quando SIFP_PERSONAL_API_KEY está configurada."""
+    monkeypatch.setenv("SIFP_PERSONAL_API_KEY", "segredo-teste")
+    resp = client.options(
+        "/api/upload/persist",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "x-api-key",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
 def test_rota_saas_nao_e_bloqueada_pela_chave_pessoal(monkeypatch):
     """/api/v2/... tem sua própria autenticação (JWT do Supabase, ver
     routes_saas.py) -- a chave da API pessoal não deve interferir nela.

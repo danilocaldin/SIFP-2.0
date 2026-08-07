@@ -55,6 +55,9 @@ export function BudgetSection({ data }: { data: OrcamentoData }) {
   }
 
   async function handleRemove(category: string) {
+    if (!window.confirm(`Remover o limite de "${category}"? Essa ação não pode ser desfeita.`)) {
+      return;
+    }
     try {
       await removerLimite(category);
       router.refresh();

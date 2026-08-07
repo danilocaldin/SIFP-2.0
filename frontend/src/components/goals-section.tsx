@@ -100,6 +100,9 @@ function GoalRow({ goal }: { goal: Goal }) {
   }
 
   async function handleDelete() {
+    if (!window.confirm(`Excluir a meta "${goal.nome}"? Essa ação não pode ser desfeita.`)) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {

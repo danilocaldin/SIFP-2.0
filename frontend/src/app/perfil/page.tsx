@@ -140,6 +140,9 @@ function PasskeyCard() {
   }
 
   async function handleExcluir(passkeyId: string) {
+    if (!window.confirm("Excluir esta passkey? Você não vai mais conseguir entrar com biometria neste dispositivo.")) {
+      return;
+    }
     setExcluindoId(passkeyId);
     setErro(null);
     const supabase = createClient();

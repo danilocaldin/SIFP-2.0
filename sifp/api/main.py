@@ -90,17 +90,6 @@ def _refresh_model() -> str:
 app = FastAPI(title="SIFP API")
 app.include_router(saas_router)
 
-# Origem(s) do frontend, via env var — sem isso, hospedar em outra máquina
-# (ou domínio de produção) exigiria editar código-fonte. CORS_ORIGINS
-# aceita uma lista separada por vírgula; default cobre o dev local.
-_cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # As rotas pessoais (/api/..., sem o /v2) nunca tiveram autenticação —
 # aceitável enquanto só existia o app pessoal do Danilo (a "segurança"
 # era só ninguém saber a URL). Deixou de ser aceitável quando essa MESMA
@@ -123,6 +112,24 @@ async def require_personal_api_key(request: Request, call_next):
         if request.headers.get("X-API-Key") != expected_key:
             return JSONResponse(status_code=401, content={"detail": "Chave de API inválida ou ausente."})
     return await call_next(request)
+
+
+# CORSMiddleware precisa ser o ÚLTIMO registrado (não o primeiro): o
+# Starlette usa app.add_middleware(...) como pilha -- o último a ser
+# registrado fica mais externo e roda primeiro na requisição. Registrado
+# antes da checagem de chave (como estava), o preflight OPTIONS do
+# navegador (que nunca manda X-API-Key -- só a requisição real manda)
+# caía na checagem de chave antes de chegar no CORSMiddleware e levava
+# 401 em vez de ser respondido, quebrando upload/exclusão/chat do app
+# pessoal feitos pelo navegador sempre que SIFP_PERSONAL_API_KEY está
+# configurada (ver test_preflight_cors_nao_e_bloqueado_pela_chave_de_api).
+_cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")

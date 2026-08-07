@@ -25,8 +25,9 @@ from sifp.importers.br_format_utils import strip_accents
 LEGAL_SUFFIXES = ["LTDA", "EIRELI", "EPP", "ME", "S/A", "SA", "CIA"]
 
 # Nome canônico por token identificador. A busca é feita tanto por
-# igualdade quanto por substring (ver normalize()), então uma chave como
-# "UBER" também casa com "UBER TRIP", "UBER*RIDE" (já sem o código), etc.
+# igualdade quanto por palavra dentro do texto (ver normalize(), \b nos
+# dois lados), então uma chave como "UBER" também casa com "UBER TRIP",
+# "UBER*RIDE" (já sem o código), etc — mas não com "UBERABA"/"UBERLANDIA".
 # Sinta-se à vontade para estender — mesmo espírito de KEYWORD_RULES.
 MERCHANT_ALIASES = {
     "UBER": "Uber",
@@ -107,7 +108,10 @@ class MerchantNormalizer:
         if lookup_key in MERCHANT_ALIASES:
             return MERCHANT_ALIASES[lookup_key]
         for alias_key, canonical in MERCHANT_ALIASES.items():
-            if alias_key in lookup_key:
+            # Limite de palavra (\b), não substring solta -- mesmo motivo
+            # de apply_keyword_rules (categorization.py): sem isso, "UBER"
+            # casava dentro de "UBERABA"/"UBERLANDIA".
+            if re.search(rf"\b{re.escape(alias_key)}\b", lookup_key):
                 return canonical
 
         return text.title()
