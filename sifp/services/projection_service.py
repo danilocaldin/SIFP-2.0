@@ -107,11 +107,16 @@ def project_goal_eta_months(valor_necessario: float, valor_acumulado: float, sal
     """Meses até atingir a meta no ritmo médio de poupança atual.
 
     Retorna 0 se já atingida, None se o ritmo atual nunca chega lá
-    (saldo médio <= 0 com valor ainda faltando).
+    (saldo médio <= 0 com valor ainda faltando, ou um saldo médio tão
+    próximo de zero que o ETA passaria de 100 anos -- na prática é a
+    mesma coisa que "nunca", e sem esse teto o número vira grande demais
+    pra caber num pd.DateOffset(months=...) mais adiante, o que levanta
+    OverflowError em vez de um valor exibível).
     """
     faltante = valor_necessario - valor_acumulado
     if faltante <= 0:
         return 0
     if saldo_medio_mensal <= 0:
         return None
-    return math.ceil(faltante / saldo_medio_mensal)
+    eta = math.ceil(faltante / saldo_medio_mensal)
+    return eta if eta <= 1200 else None

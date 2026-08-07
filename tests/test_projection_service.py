@@ -72,6 +72,23 @@ def test_project_goal_eta_months_never_reaches_with_zero_or_negative_saldo():
     assert proj.project_goal_eta_months(valor_necessario=1000.0, valor_acumulado=0.0, saldo_medio_mensal=-50.0) is None
 
 
+def test_project_goal_eta_months_saldo_medio_desprezivel_retorna_none_em_vez_de_eta_absurdo():
+    """Achado real de auditoria: saldo médio de poucos centavos frente a
+    uma meta grande produz um ETA de bilhões de meses -- que não quebra
+    aqui, mas quebra mais adiante (pd.Timestamp.today() +
+    pd.DateOffset(months=eta) levanta OverflowError). Precisa virar None
+    (mesma semântica de "no ritmo atual, nunca chega lá") bem antes
+    disso."""
+    eta = proj.project_goal_eta_months(valor_necessario=50000.0, valor_acumulado=0.0, saldo_medio_mensal=1e-9)
+    assert eta is None
+
+
+def test_project_goal_eta_months_dentro_do_teto_continua_normal():
+    # 1200 meses = 100 anos e o teto -- checa que ainda funciona logo abaixo dele
+    eta = proj.project_goal_eta_months(valor_necessario=1200.0, valor_acumulado=0.0, saldo_medio_mensal=1.0)
+    assert eta == 1200
+
+
 def test_weighted_avg_rentabilidade_ponders_by_saldo():
     assets = pd.DataFrame({
         "saldo_liquido": [1000.0, 3000.0],

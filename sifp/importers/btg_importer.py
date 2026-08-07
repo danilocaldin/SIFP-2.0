@@ -155,7 +155,22 @@ def _read_btg_csv(uploaded_file) -> tuple[pd.DataFrame, pd.DataFrame]:
     else:
         df["bank_category"] = df["bank_category"].fillna("").astype(str).str.strip()
 
+    linhas_antes_da_data = len(df)
     df = df.dropna(subset=["date"])
+    # No CSV (diferente do Excel), toda linha da tabela É uma transação --
+    # não existe bloco de metadados nem "Saldo Diário" misturado no meio,
+    # então uma data que não parseia aqui é sinal de problema real no
+    # arquivo, não ruído esperado. Um punhado de linhas cai por acaso
+    # (célula vazia isolada); uma fração grande caindo em silêncio é
+    # exatamente o bug que já aconteceu: coluna com formatos de data
+    # diferentes por linha, sem nenhum aviso de que faltam lançamentos.
+    linhas_descartadas = linhas_antes_da_data - len(df)
+    if linhas_antes_da_data > 0 and linhas_descartadas >= max(2, linhas_antes_da_data * 0.02):
+        raise ValueError(
+            f"{linhas_descartadas} de {linhas_antes_da_data} linhas do CSV têm uma data que não "
+            "foi possível interpretar (dd/mm/aaaa) e seriam ignoradas na importação. Verifique se "
+            "a coluna de data não tem formatos misturados ou células corrompidas."
+        )
     df = df[df["description"] != ""]
     df = df[df["description"].str.lower() != "nan"]
 

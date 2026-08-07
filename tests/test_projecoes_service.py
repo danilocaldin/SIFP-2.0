@@ -134,6 +134,31 @@ def test_build_projecoes_mostra_grafico_quando_melhor_mes_e_positivo_mesmo_com_m
     assert result["patrimonio_final_melhor"] > result["patrimonio_final_pior"]
 
 
+def test_build_projecoes_meta_com_saldo_medio_quase_zero_nao_quebra(repos):
+    """Achado real de auditoria: receita quase igual à despesa (saldo
+    médio de centavos) fazia o ETA da meta virar um número absurdo de
+    meses, e pd.Timestamp.today() + pd.DateOffset(months=eta) levantava
+    OverflowError -- a tela de Projeções quebrava inteira."""
+    tx = pd.DataFrame([
+        {"date": "2026-04-01", "description": "Salario", "value": 5000.00, "category": "Salário/Receita"},
+        {"date": "2026-04-05", "description": "Mercado", "value": -4999.99, "category": "Mercado"},
+        {"date": "2026-05-01", "description": "Salario", "value": 5000.00, "category": "Salário/Receita"},
+        {"date": "2026-05-05", "description": "Mercado", "value": -4999.99, "category": "Mercado"},
+        {"date": "2026-06-01", "description": "Salario", "value": 5000.00, "category": "Salário/Receita"},
+        {"date": "2026-06-05", "description": "Mercado", "value": -4999.99, "category": "Mercado"},
+    ])
+    repos["transaction_repo"].insert_new(tx)
+    repos["goal_repo"].create("Reserva grande", 50000.0, "2030-01-01")
+    service = ProjecoesService(repos["transaction_repo"], repos["asset_repo"], repos["goal_repo"])
+
+    result = service.build_projecoes()  # não pode levantar OverflowError
+
+    goal = result["goals"][0]
+    assert goal["eta_meses"] is None
+    assert goal["data_prevista"] is None
+    assert goal["dentro_do_prazo"] is None
+
+
 def test_build_projecoes_goal_already_reached(repos):
     _seed_positive_saldo(repos)
     repos["goal_repo"].create("Meta feita", 100.0, "2030-01-01")

@@ -136,6 +136,25 @@ def test_build_resumo_excludes_self_transfer_from_saldo(tmp_db_path):
     assert resumo["saldo"] == pytest.approx(5000.0)  # nao 4000 - self-transfer nao conta como despesa
 
 
+def test_build_resumo_sem_dados_reais_quando_so_ha_self_transfer(tmp_db_path):
+    """Primeiro mês de uso onde a única movimentação foi um aporte pra
+    conta investimento -- todas as transações são self-transfer, então
+    all_tx_real fica vazio e monthly_evolution() também. Sem essa
+    checagem, monthly.iloc[-1] levanta IndexError e a tela inteira cai."""
+    init_db(tmp_db_path)
+    transaction_repo = TransactionRepository(tmp_db_path)
+    tx = pd.DataFrame([
+        {"date": "2026-06-02", "description": "Transferencia p/ investimento", "value": -1000.0, "category": SELF_TRANSFER_CATEGORY},
+    ])
+    transaction_repo.insert_new(tx)
+    svc = SummaryService(
+        transaction_repo, BalanceRepository(tmp_db_path), AssetRepository(tmp_db_path),
+        BudgetRepository(tmp_db_path), GoalRepository(tmp_db_path),
+        DespesaFixaRepository(tmp_db_path), PreferenciaRepository(tmp_db_path),
+    )
+    assert svc.build_resumo(_mes) == {"has_data": False}
+
+
 def test_build_resumo_projeta_mesmo_com_saldo_medio_negativo(tmp_db_path):
     """Quem gasta mais do que ganha é quem mais precisa ver a
     trajetória (patrimônio caindo) -- a projeção não pode sumir só

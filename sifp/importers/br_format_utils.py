@@ -81,5 +81,13 @@ def parse_brl_number(value) -> float:
 
 
 def parse_brl_date(value):
-    """Converte data em formato brasileiro (dd/mm/aaaa[ hh:mm]) para datetime."""
-    return pd.to_datetime(value, dayfirst=True, errors="coerce")
+    """Converte data em formato brasileiro (dd/mm/aaaa[ hh:mm]) para datetime.
+
+    format="mixed" é essencial aqui: sem ele, pd.to_datetime infere o
+    formato a partir do PRIMEIRO valor da coluna e aplica esse mesmo
+    formato a todos os outros -- uma coluna real com "05/01/2026 14:30"
+    e "06/01/2026" misturados (com/sem horário) faz a linha minoritária
+    virar NaT e ser descartada em silêncio pelo importador, mesmo sendo
+    uma data brasileira perfeitamente válida.
+    """
+    return pd.to_datetime(value, dayfirst=True, format="mixed", errors="coerce")

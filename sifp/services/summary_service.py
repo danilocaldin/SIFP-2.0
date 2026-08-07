@@ -92,6 +92,11 @@ class SummaryService:
         all_tx_real = ind.exclude_self_transfers(all_tx)
 
         monthly = ind.monthly_evolution(all_tx_real)
+        if monthly.empty:
+            # Existem transações, mas todas foram self-transfer (ex:
+            # primeiro mês de uso com só um aporte pra conta investimento)
+            # -- não há nada "real" ainda pra resumir.
+            return {"has_data": False}
         latest_month = monthly.iloc[-1]["month"]
         latest_label = month_label_fmt(latest_month)
         latest_df = all_tx_real[all_tx_real["month"] == latest_month]

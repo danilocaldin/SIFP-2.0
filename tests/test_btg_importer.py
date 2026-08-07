@@ -54,6 +54,37 @@ def test_csv_unsupported_columns_raises(importer):
         importer.read(upload)
 
 
+def test_csv_datas_com_e_sem_horario_misturadas_nao_somem(importer):
+    """Achado real de auditoria: pd.to_datetime infere o formato do
+    PRIMEIRO valor da coluna e descarta (NaT) qualquer linha com formato
+    diferente -- uma coluna real com "01/06/2026 14:30" (com horário) e
+    "02/06/2026" (sem horário) misturados fazia a linha minoritária
+    desaparecer da importação em silêncio."""
+    content = (
+        "Data;Descrição;Valor\n"
+        "01/06/2026 14:30;PIX RECEBIDO JOAO SILVA;2500,00\n"
+        "02/06/2026;SUPERMERCADO PAO DE ACUCAR;-345,67\n"
+        "03/06/2026 09:00;UBER TRIP SAO PAULO;-28,50\n"
+        "04/06/2026;NETFLIX.COM;-55,90\n"
+    )
+    upload = FakeUploadedFile(content.encode("utf-8-sig"), "extrato.csv")
+    df, _ = importer.read(upload)
+    assert len(df) == 4  # nenhuma linha descartada por formato de data diferente
+
+
+def test_csv_muitas_datas_invalidas_levanta_erro_em_vez_de_importar_parcial(importer):
+    content = (
+        "Data;Descrição;Valor\n"
+        "data-invalida;PIX RECEBIDO JOAO SILVA;2500,00\n"
+        "tambem-invalida;SUPERMERCADO PAO DE ACUCAR;-345,67\n"
+        "03/06/2026;UBER TRIP SAO PAULO;-28,50\n"
+        "04/06/2026;NETFLIX.COM;-55,90\n"
+    )
+    upload = FakeUploadedFile(content.encode("utf-8-sig"), "extrato.csv")
+    with pytest.raises(ValueError, match="linhas do CSV têm uma data"):
+        importer.read(upload)
+
+
 def test_xlsx_transaction_count_excludes_balance_snapshots(importer, sample_btg_xlsx_bytes):
     upload = FakeUploadedFile(sample_btg_xlsx_bytes, "extrato.xlsx")
     df, balances = importer.read(upload)
