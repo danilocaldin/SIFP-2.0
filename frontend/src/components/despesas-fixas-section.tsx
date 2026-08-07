@@ -184,7 +184,7 @@ function NovaDespesaForm({ categorias }: { categorias: string[] }) {
         <Button type="submit" disabled={saving}>
           {saving ? "Salvando…" : "Salvar despesa fixa"}
         </Button>
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-700 dark:text-red-400">{error}</p>}
       </form>
     </div>
   );
@@ -225,7 +225,7 @@ function LimiteAlertaForm({ limiteAtual }: { limiteAtual: number | null }) {
           {saving ? "Salvando…" : "Salvar limite"}
         </Button>
       </form>
-      {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="mt-2 text-sm text-red-700 dark:text-red-400">{error}</p>}
     </div>
   );
 }
@@ -309,7 +309,7 @@ function DespesaRow({ despesa }: { despesa: DespesaFixa }) {
           Excluir
         </Button>
       </div>
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-700 dark:text-red-400">{error}</p>}
     </div>
   );
 }

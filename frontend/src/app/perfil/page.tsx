@@ -179,7 +179,7 @@ function PasskeyCard() {
                 </span>
                 <button
                   type="button"
-                  className="text-xs text-muted-foreground hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
+                  className="text-xs text-muted-foreground hover:text-red-700 dark:hover:text-red-400 disabled:opacity-50"
                   disabled={excluindoId === p.id}
                   onClick={() => handleExcluir(p.id)}
                   title="Excluir passkey"

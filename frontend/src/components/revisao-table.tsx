@@ -157,7 +157,7 @@ export function RevisaoTable({
                 <td className="p-2 text-right">
                   <button
                     type="button"
-                    className="text-xs text-muted-foreground hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
+                    className="text-xs text-muted-foreground hover:text-red-700 dark:hover:text-red-400 disabled:opacity-50"
                     disabled={deletingHash === tx.tx_hash}
                     onClick={() => handleDelete(tx)}
                     title="Excluir transação"
@@ -180,7 +180,7 @@ export function RevisaoTable({
         </Button>
       </div>
       {message && <p className="text-sm text-emerald-700 dark:text-emerald-400">✅ {message}</p>}
-      {error && <p className="text-sm text-red-600 dark:text-red-400">⚠️ {error}</p>}
+      {error && <p className="text-sm text-red-700 dark:text-red-400">⚠️ {error}</p>}
     </div>
   );
 }

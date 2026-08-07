@@ -47,7 +47,7 @@ export function NarrativaButton() {
       )}
 
       {status.kind === "error" && (
-        <p className="text-sm text-red-600 dark:text-red-400">⚠️ {status.message}</p>
+        <p className="text-sm text-red-700 dark:text-red-400">⚠️ {status.message}</p>
       )}
     </div>
   );

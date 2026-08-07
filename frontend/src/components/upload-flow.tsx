@@ -94,7 +94,7 @@ export function UploadFlow() {
 
       {status.kind === "loading" && <p className="text-sm text-muted-foreground">Lendo arquivo…</p>}
 
-      {status.kind === "error" && <p className="text-sm text-red-600 dark:text-red-400">⚠️ {status.message}</p>}
+      {status.kind === "error" && <p className="text-sm text-red-700 dark:text-red-400">⚠️ {status.message}</p>}
 
       {(status.kind === "previewed" || status.kind === "persisting") && (
         <div className="space-y-3">

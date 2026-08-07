@@ -61,7 +61,7 @@ export function GoalsSection({ goals }: { goals: Goal[] }) {
         <Button type="submit" disabled={saving}>
           {saving ? "Criando…" : "Criar meta"}
         </Button>
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-700 dark:text-red-400">{error}</p>}
       </form>
 
       <div className="mt-6 space-y-4">
@@ -135,7 +135,7 @@ function GoalRow({ goal }: { goal: Goal }) {
           Excluir
         </Button>
       </div>
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-700 dark:text-red-400">{error}</p>}
     </div>
   );
 }

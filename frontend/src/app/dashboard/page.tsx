@@ -60,7 +60,7 @@ export default async function DashboardPage({
           </>
         ) : (
           <>
-            ficou <span className="font-semibold text-red-600 dark:text-red-400">{formatBRL(Math.abs(dashboard.saldo))} no vermelho</span>.
+            ficou <span className="font-semibold text-red-700 dark:text-red-400">{formatBRL(Math.abs(dashboard.saldo))} no vermelho</span>.
           </>
         )}
       </p>
@@ -233,7 +233,7 @@ function StatCard({
         <p className="text-sm text-muted-foreground">{label}</p>
         <p className="text-2xl font-semibold tracking-tight">{value}</p>
         {delta !== null && (
-          <p className={`text-xs font-medium ${positive ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+          <p className={`text-xs font-medium ${positive ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"}`}>
             {formatPctSigned(delta)} vs mês anterior
           </p>
         )}

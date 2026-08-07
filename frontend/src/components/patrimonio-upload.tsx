@@ -54,7 +54,7 @@ export function PatrimonioUpload() {
       {status.kind === "success" && (
         <p className="text-sm text-emerald-700 dark:text-emerald-400">✅ {status.message}</p>
       )}
-      {status.kind === "error" && <p className="text-sm text-red-600 dark:text-red-400">⚠️ {status.message}</p>}
+      {status.kind === "error" && <p className="text-sm text-red-700 dark:text-red-400">⚠️ {status.message}</p>}
     </div>
   );
 }
