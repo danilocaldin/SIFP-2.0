@@ -86,3 +86,46 @@ def test_build_dashboard_top_expenses_dates_are_strings(service):
     result = service.build_dashboard("2026-06", _mes)
     for row in result["top_expenses"]:
         assert isinstance(row["date"], str)
+
+
+def test_build_dashboard_all_transactions_includes_full_period_sorted_desc(service):
+    result = service.build_dashboard("2026-06", _mes)
+    dates = [row["date"] for row in result["all_transactions"]]
+    assert dates == sorted(dates, reverse=True)
+    descriptions = {row["description"] for row in result["all_transactions"]}
+    assert descriptions == {"Salario", "Mercado", "Uber", "Transferencia p/ investimento"}
+
+
+def test_build_dashboard_all_transactions_dates_are_strings(service):
+    result = service.build_dashboard(None, _mes)
+    for row in result["all_transactions"]:
+        assert isinstance(row["date"], str)
+
+
+def test_build_dashboard_daily_balance_empty_without_balance_data(service):
+    result = service.build_dashboard("2026-06", _mes)
+    assert result["daily_balance"] == []
+
+
+def test_build_dashboard_daily_balance_filtered_by_month(tmp_db_path):
+    init_db(tmp_db_path)
+    transaction_repo = TransactionRepository(tmp_db_path)
+    balance_repo = BalanceRepository(tmp_db_path)
+
+    tx = pd.DataFrame([
+        {"date": "2026-06-05", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
+    ])
+    transaction_repo.insert_new(tx)
+    balances = pd.DataFrame([
+        {"date": "2026-05-30", "balance": 100.0},
+        {"date": "2026-06-01", "balance": 200.0},
+        {"date": "2026-06-02", "balance": 250.0},
+    ])
+    balance_repo.insert_many(balances)
+
+    svc = DashboardService(transaction_repo, balance_repo)
+    result = svc.build_dashboard("2026-06", _mes)
+    assert result["daily_balance"] == [
+        {"date": "2026-06-01", "balance": 200.0},
+        {"date": "2026-06-02", "balance": 250.0},
+    ]

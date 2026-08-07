@@ -2,8 +2,16 @@ import { NetWorthChart } from "@/components/charts/net-worth-chart";
 import { PatrimonioAssetsTable } from "@/components/patrimonio-assets-table";
 import { PatrimonioUpload } from "@/components/patrimonio-upload";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { getPatrimonio } from "@/lib/api-server";
-import { formatBRL } from "@/lib/format";
+import { formatBRL, formatPct } from "@/lib/format";
 
 export default async function PatrimonioPage() {
   const patrimonio = await getPatrimonio();
@@ -52,6 +60,41 @@ export default async function PatrimonioPage() {
               </p>
             )}
           </div>
+
+          <details className="mt-10 rounded-lg border border-border p-4 text-sm">
+            <summary className="cursor-pointer font-medium text-foreground">
+              Ver histórico completo (todos os snapshots importados)
+            </summary>
+            <div className="mt-4 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data ref.</TableHead>
+                    <TableHead>Ativo</TableHead>
+                    <TableHead>Instituição</TableHead>
+                    <TableHead className="text-right">Saldo líquido</TableHead>
+                    <TableHead className="text-right">Rent. 12m</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {patrimonio.all_snapshots.map((s, i) => (
+                    <TableRow key={`${s.position_key}-${s.data_referencia}-${i}`}>
+                      <TableCell className="text-muted-foreground">{s.data_referencia}</TableCell>
+                      <TableCell>
+                        {s.nome}
+                        <span className="block text-xs text-muted-foreground">{s.tipo}</span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{s.instituicao}</TableCell>
+                      <TableCell className="text-right">{formatBRL(s.saldo_liquido)}</TableCell>
+                      <TableCell className="text-right">
+                        {s.rentabilidade_12m_pct !== null ? formatPct(s.rentabilidade_12m_pct, 2) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </details>
         </>
       )}
     </main>

@@ -54,6 +54,10 @@ def test_build_patrimonio_with_assets(asset_repo):
     for row in result["net_worth_history"]:
         assert row["data_referencia"] in ("2026-05-31", "2026-06-30")  # "YYYY-MM-DD", nao timestamp ISO completo
 
+    assert len(result["all_snapshots"]) == 2  # os 2 snapshots individuais, nao so o mais recente
+    for row in result["all_snapshots"]:
+        assert row["data_referencia"] in ("2026-05-31", "2026-06-30")
+
 
 def test_import_pdf_persists_positions(asset_repo):
     positions = [

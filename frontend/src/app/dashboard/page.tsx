@@ -1,4 +1,5 @@
 import { MonthlyEvolutionChart } from "@/components/charts/monthly-evolution-chart";
+import { DailyBalanceChart } from "@/components/charts/daily-balance-chart";
 import { CategoryBreakdownSection } from "@/components/category-breakdown-section";
 import { MonthSelect } from "@/components/month-select";
 import { Card, CardContent } from "@/components/ui/card";
@@ -102,6 +103,18 @@ export default async function DashboardPage({
         </div>
       </div>
 
+      <div className="mt-10">
+        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Evolução do saldo</h2>
+        {dashboard.daily_balance.length > 0 ? (
+          <DailyBalanceChart data={dashboard.daily_balance} />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Sem dados de saldo diário para este período. Essa evolução só está disponível em
+            extratos importados no formato XLS/XLSX do BTG.
+          </p>
+        )}
+      </div>
+
       <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div>
           <h2 className="mb-3 text-sm font-medium text-muted-foreground">
@@ -113,6 +126,7 @@ export default async function DashboardPage({
                 <TableRow>
                   <TableHead>Data</TableHead>
                   <TableHead>Descrição</TableHead>
+                  <TableHead>Categoria</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                 </TableRow>
               </TableHeader>
@@ -121,6 +135,7 @@ export default async function DashboardPage({
                   <TableRow key={`${e.date}-${e.description}`}>
                     <TableCell className="text-muted-foreground">{e.date}</TableCell>
                     <TableCell>{e.description}</TableCell>
+                    <TableCell className="text-muted-foreground">{e.category}</TableCell>
                     <TableCell className="text-right">{formatBRL(e.value_abs)}</TableCell>
                   </TableRow>
                 ))}
@@ -160,6 +175,42 @@ export default async function DashboardPage({
           )}
         </div>
       </div>
+
+      <details className="mt-10 rounded-lg border border-border p-4 text-sm">
+        <summary className="cursor-pointer font-medium text-foreground">
+          Ver todas as transações do período
+        </summary>
+        {dashboard.all_transactions.length > 0 ? (
+          <div className="mt-4 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead>Categoria do banco</TableHead>
+                  <TableHead>Estabelecimento</TableHead>
+                  <TableHead>Categoria</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dashboard.all_transactions.map((t, i) => (
+                  <TableRow key={`${t.date}-${t.description}-${i}`}>
+                    <TableCell className="text-muted-foreground">{t.date}</TableCell>
+                    <TableCell>{t.description}</TableCell>
+                    <TableCell className="text-right">{formatBRL(t.value)}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.bank_category || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.merchant || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.category}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground">Sem transações no período selecionado.</p>
+        )}
+      </details>
     </main>
   );
 }

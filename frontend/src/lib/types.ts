@@ -89,6 +89,20 @@ export interface TopMerchant {
   n_transacoes: number;
 }
 
+export interface DashboardTransaction {
+  date: string;
+  description: string;
+  value: number;
+  bank_category: string;
+  merchant: string;
+  category: string;
+}
+
+export interface DailyBalancePoint {
+  date: string;
+  balance: number;
+}
+
 export interface DashboardData {
   has_data: true;
   months: string[];
@@ -104,6 +118,8 @@ export interface DashboardData {
   monthly_evolution: MonthlyEvolution[];
   top_expenses: TopExpense[];
   top_merchants: TopMerchant[];
+  all_transactions: DashboardTransaction[];
+  daily_balance: DailyBalancePoint[];
 }
 
 export interface DashboardEmpty {
@@ -136,6 +152,7 @@ export interface PatrimonioData {
   patrimonio_total: number;
   assets: AssetPosition[];
   net_worth_history: NetWorthPoint[];
+  all_snapshots: AssetPosition[];
 }
 
 export interface PatrimonioEmpty {

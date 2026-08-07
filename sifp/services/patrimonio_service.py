@@ -35,6 +35,23 @@ class PatrimonioService:
             net_worth["data_referencia"] = pd.to_datetime(net_worth["data_referencia"]).dt.strftime("%Y-%m-%d")
         net_worth_records = net_worth.to_dict("records") if not net_worth.empty else []
 
+        all_snapshots_records = []
+        if not all_snapshots.empty:
+            all_snapshots_display = all_snapshots[
+                ["position_key", "nome", "tipo", "instituicao", "data_referencia", "saldo_liquido",
+                 "rentabilidade_12m_pct", "benchmark", "benchmark_12m_pct"]
+            ].copy()
+            all_snapshots_display["data_referencia"] = pd.to_datetime(
+                all_snapshots_display["data_referencia"]
+            ).dt.strftime("%Y-%m-%d")
+            # snapshots mais antigos podem não ter rentabilidade/benchmark
+            # preenchidos -- NaN não é JSON válido (Starlette serializa com
+            # allow_nan=False), então vira None explicitamente.
+            all_snapshots_display = all_snapshots_display.astype(object).where(
+                pd.notna(all_snapshots_display), None
+            )
+            all_snapshots_records = all_snapshots_display.to_dict("records")
+
         return {
             "has_data": True,
             "patrimonio_total": patrimonio_total,
@@ -43,6 +60,7 @@ class PatrimonioService:
                  "rentabilidade_12m_pct", "benchmark", "benchmark_12m_pct"]
             ].to_dict("records"),
             "net_worth_history": net_worth_records,
+            "all_snapshots": all_snapshots_records,
         }
 
     def import_pdf(self, file_obj) -> int:

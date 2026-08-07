@@ -61,6 +61,31 @@ class DashboardService:
         for row in top_gastos_records:
             row["date"] = pd.Timestamp(row["date"]).strftime("%Y-%m-%d")
 
+        all_transactions_records = (
+            df_period[["date", "description", "value", "bank_category", "merchant", "category"]]
+            .sort_values("date", ascending=False)
+            .to_dict("records")
+        )
+        for row in all_transactions_records:
+            row["date"] = pd.Timestamp(row["date"]).strftime("%Y-%m-%d")
+
+        # Saldo diário (Módulo 3) só existe pra extratos XLS/XLSX do BTG, que
+        # trazem a coluna "Saldo Diário" -- é um dado mais fino que o saldo
+        # mensal agregado (monthly_evolution), então fica em separado.
+        all_balances = self.balance_repo.get_all()
+        daily_balance_records = []
+        if not all_balances.empty:
+            bal_period = all_balances.copy()
+            bal_period["month"] = bal_period["date"].dt.to_period("M").astype(str)
+            if month is not None:
+                bal_period = bal_period[bal_period["month"] == month]
+            if not bal_period.empty:
+                bal_period = bal_period.sort_values("date")
+                daily_balance_records = [
+                    {"date": row["date"].strftime("%Y-%m-%d"), "balance": float(row["balance"])}
+                    for _, row in bal_period.iterrows()
+                ]
+
         return {
             "has_data": True,
             "months": months_sorted,
@@ -76,6 +101,8 @@ class DashboardService:
             "monthly_evolution": monthly_records,
             "top_expenses": top_gastos_records,
             "top_merchants": by_merchant.to_dict("records"),
+            "all_transactions": all_transactions_records,
+            "daily_balance": daily_balance_records,
         }
 
     def list_category_transactions(self, month: str | None, categoria: str) -> list[dict]:
