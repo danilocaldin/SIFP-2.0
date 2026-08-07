@@ -47,9 +47,33 @@ function LoginPageContent() {
     if (!hashParams.get("access_token") || !hashParams.get("refresh_token")) return "login";
     return "carregando"; // token presente — o efeito abaixo processa e decide o próximo modo
   });
-  const [erroHash, setErroHash] = useState<string | null>(() =>
-    readHashParams()?.get("error_code") ? LINK_INVALIDO_MSG : null
-  );
+  const [erroHash, setErroHash] = useState<string | null>(() => {
+    if (readHashParams()?.get("error_code")) return LINK_INVALIDO_MSG;
+    // /auth/confirm manda pra cá com ?erro=link_invalido quando o
+    // verifyOtp() falha no servidor (token de convite/recuperação
+    // inválido ou expirado) -- sem isso a pessoa só via um formulário de
+    // login limpo, sem explicação nenhuma do que deu errado.
+    if (searchParams.get("erro") === "link_invalido") return LINK_INVALIDO_MSG;
+    return null;
+  });
+
+  useEffect(() => {
+    // "modo" só chega aqui como "login" quando não há nem token no
+    // fragmento nem ?modo=definir-senha na URL -- ou seja, não há
+    // convite/recuperação em andamento. SÓ NESSE caso faz sentido
+    // verificar se o visitante já está logado e mandar pra home; o
+    // redirecionamento antigo ficava no proxy.ts (servidor) e por isso
+    // interceptava tanto a volta do /auth/confirm (?modo=definir-senha,
+    // sessão já criada no servidor) quanto o fragmento de um link de
+    // recuperação clicado com outra sessão já ativa -- ver proxy.ts.
+    if (modo !== "login") return;
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        router.replace("/");
+      }
+    });
+  }, [modo, router]);
 
   useEffect(() => {
     const hashParams = readHashParams();

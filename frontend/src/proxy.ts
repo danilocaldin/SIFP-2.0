@@ -42,15 +42,24 @@ export async function proxy(request: NextRequest) {
 
   const { response, user } = await updateSession(request);
 
-  const isLoginRoute = path === "/login";
-
-  if (!user && !isLoginRoute) {
+  if (!user && path !== "/login") {
     return NextResponse.redirect(new URL("/login", request.url));
   }
-  if (user && isLoginRoute) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
 
+  // Deliberadamente NÃO existe mais "if (user && path === '/login') redirect
+  // pra /'" aqui -- havia um bounce assim, e ele quebrava o fluxo de
+  // convite/recuperação de senha de duas formas: (1) /auth/confirm autentica
+  // a sessão no SERVIDOR e redireciona pra /login?modo=definir-senha -- essa
+  // NOVA requisição já chega com sessão ativa, e o bounce mandava o usuário
+  // direto pra / sem nunca ver o formulário de definir senha (ele então
+  // nunca define senha nenhuma, e no próximo acesso não consegue logar); (2)
+  // um link de recuperação clicado com sessão já ativa em outra aba/aparelho
+  // carrega o token no FRAGMENTO da URL (invisível pro servidor) -- o bounce
+  // servidor disparava antes do fragmento ser lido no cliente, e o navegador
+  // carrega esse fragmento pra "/" no redirect, onde nada o processa (token
+  // perdido em silêncio). Quem decide "já estou logado, não preciso ver
+  // login" agora é a própria página de login, no cliente -- só ali dá pra
+  // saber com certeza que não há convite/recuperação em andamento.
   return response;
 }
 
