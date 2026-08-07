@@ -43,7 +43,7 @@ class OrcamentoService:
         limits_df = self.budget_repo.get_all()
         limits = [
             {
-                "category": row["category"],
+                "categoria": row["category"],
                 "limite_mensal": float(row["limite_mensal"]),
                 "gasto_atual": float(gasto_atual_map.get(row["category"], 0.0)),
             }

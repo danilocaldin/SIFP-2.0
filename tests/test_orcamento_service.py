@@ -43,7 +43,7 @@ def test_build_orcamento_shows_current_spend_against_limit(service):
     result = svc.build_orcamento()
     assert len(result["limites"]) == 1
     limite = result["limites"][0]
-    assert limite["category"] == "Mercado"
+    assert limite["categoria"] == "Mercado"
     assert limite["limite_mensal"] == pytest.approx(800.0)
     assert limite["gasto_atual"] == pytest.approx(600.0)  # mes mais recente (junho)
 

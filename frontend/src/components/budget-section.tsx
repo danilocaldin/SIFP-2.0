@@ -111,14 +111,14 @@ export function BudgetSection({ data }: { data: OrcamentoData }) {
           data.limites.map((l) => {
             const pct = l.limite_mensal > 0 ? Math.min((l.gasto_atual / l.limite_mensal) * 100, 100) : 0;
             return (
-              <div key={l.category} className="space-y-1">
+              <div key={l.categoria} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="text-sm">
-                    <span className="font-medium">{l.category}</span> — {formatBRL(l.gasto_atual)} /{" "}
+                    <span className="font-medium">{l.categoria}</span> — {formatBRL(l.gasto_atual)} /{" "}
                     {formatBRL(l.limite_mensal)}
                   </p>
                   <button
-                    onClick={() => handleRemove(l.category)}
+                    onClick={() => handleRemove(l.categoria)}
                     className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
                   >
                     Remover

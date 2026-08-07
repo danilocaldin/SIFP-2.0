@@ -175,7 +175,7 @@ def test_criar_e_remover_limite_de_orcamento():
     verdade definido pelo usuário; nunca deve ficar perdido."""
     categorias = client.get("/api/orcamento").json()["categorias"]
     categoria = categorias[0]
-    limites_antes = {l["category"]: l["limite_mensal"] for l in client.get("/api/orcamento").json()["limites"]}
+    limites_antes = {l["categoria"]: l["limite_mensal"] for l in client.get("/api/orcamento").json()["limites"]}
     valor_original = limites_antes.get(categoria)
 
     try:
@@ -183,7 +183,7 @@ def test_criar_e_remover_limite_de_orcamento():
         assert resp.status_code == 200
 
         limites = client.get("/api/orcamento").json()["limites"]
-        assert any(l["category"] == categoria and l["limite_mensal"] == pytest.approx(123.45) for l in limites)
+        assert any(l["categoria"] == categoria and l["limite_mensal"] == pytest.approx(123.45) for l in limites)
     finally:
         if valor_original is None:
             client.delete(f"/api/orcamento/limites/{categoria}")

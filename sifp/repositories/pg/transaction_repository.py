@@ -78,9 +78,6 @@ class TransactionRepository:
             params=(CATEGORIA_NAO_CATEGORIZADO,),
         )
 
-    def update_category(self, conn: psycopg.Connection, tx_hash: str, new_category: str) -> None:
-        self.bulk_update_categories(conn, [(tx_hash, new_category)])
-
     def bulk_update_categories(self, conn: psycopg.Connection, updates: list[tuple[str, str]]) -> None:
         """Mesma regra da versão SQLite: se a categoria final ainda é
         'Não categorizado', NÃO marca como confirmada (ver docstring

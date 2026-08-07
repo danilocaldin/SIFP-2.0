@@ -15,7 +15,7 @@ import { formatBRL } from "@/lib/format";
 import type { ProjectionChartPoint } from "@/lib/types";
 
 type ChartRow = {
-  data: string;
+  data_referencia: string;
   historico?: number;
   projecao?: number;
   melhor?: number;
@@ -66,7 +66,7 @@ export function ProjectionChart({ data }: { data: ProjectionChartPoint[] }) {
   // um jeito nativo de desenhar uma área "entre duas linhas".
   const byDate = new Map<string, ChartRow>();
   for (const point of data) {
-    const row = byDate.get(point.data) ?? { data: point.data };
+    const row = byDate.get(point.data_referencia) ?? { data_referencia: point.data_referencia };
     if (point.tipo === "historico") {
       row.historico = point.patrimonio;
     } else {
@@ -78,7 +78,7 @@ export function ProjectionChart({ data }: { data: ProjectionChartPoint[] }) {
         row.faixaAltura = point.patrimonio_melhor - point.patrimonio_pior;
       }
     }
-    byDate.set(point.data, row);
+    byDate.set(point.data_referencia, row);
   }
   const chartData = [...byDate.values()];
 
@@ -87,7 +87,7 @@ export function ProjectionChart({ data }: { data: ProjectionChartPoint[] }) {
       <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
         <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
         <XAxis
-          dataKey="data"
+          dataKey="data_referencia"
           tick={{ fill: "var(--chart-axis)", fontSize: 12 }}
           axisLine={{ stroke: "var(--chart-grid)" }}
           tickLine={false}

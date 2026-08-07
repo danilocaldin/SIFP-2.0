@@ -147,7 +147,7 @@ export type Patrimonio = PatrimonioData | PatrimonioEmpty;
 // Espelha GET /api/projecoes (sifp/services/projecoes_service.py).
 
 export interface ProjectionChartPoint {
-  data: string;
+  data_referencia: string;
   patrimonio: number;
   patrimonio_melhor?: number;
   patrimonio_pior?: number;
@@ -195,7 +195,7 @@ export type Projecoes = ProjecoesData | ProjecoesEmpty;
 // GET /api/metas (CRUD direto sobre GoalRepository).
 
 export interface BudgetLimit {
-  category: string;
+  categoria: string;
   limite_mensal: number;
   gasto_atual: number;
 }

@@ -58,13 +58,6 @@ class Transaction:
 
 
 @dataclass(frozen=True)
-class DailyBalance:
-    date: str
-    balance: float
-    source_file: str = ""
-
-
-@dataclass(frozen=True)
 class AssetPosition:
     """Posição de um ativo (Módulo 6) numa data de referência — ex: o
     saldo de um fundo de investimento ao final do mês, extraído do

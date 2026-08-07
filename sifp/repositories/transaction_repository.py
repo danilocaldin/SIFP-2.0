@@ -109,10 +109,6 @@ class TransactionRepository:
         conn.close()
         return df
 
-    def update_category(self, tx_hash: str, new_category: str) -> None:
-        """Atualiza a categoria de uma transação e marca como confirmada por humano."""
-        self.bulk_update_categories([(tx_hash, new_category)])
-
     def bulk_update_categories(self, updates: list[tuple[str, str]]) -> None:
         """
         updates: lista de (tx_hash, categoria_confirmada). Marca

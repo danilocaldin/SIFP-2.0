@@ -84,7 +84,7 @@ class ProjecoesService:
         hist = hist.copy()
         hist["data_referencia"] = pd.to_datetime(hist["data_referencia"])
         chart = [
-            {"data": row["data_referencia"].strftime("%Y-%m-%d"), "patrimonio": float(row["patrimonio_total"]), "tipo": "historico"}
+            {"data_referencia": row["data_referencia"].strftime("%Y-%m-%d"), "patrimonio": float(row["patrimonio_total"]), "tipo": "historico"}
             for _, row in hist.iterrows()
         ]
 
@@ -92,7 +92,7 @@ class ProjecoesService:
         # duplica o último ponto histórico como primeiro ponto de projeção,
         # pra conectar as linhas visualmente (mesmo valor nas 3 séries).
         chart.append({
-            "data": last_date.strftime("%Y-%m-%d"),
+            "data_referencia": last_date.strftime("%Y-%m-%d"),
             "patrimonio": patrimonio_atual,
             "patrimonio_melhor": patrimonio_atual,
             "patrimonio_pior": patrimonio_atual,
@@ -103,7 +103,7 @@ class ProjecoesService:
         ):
             d = last_date + pd.DateOffset(months=int(r_media["mes_offset"]))
             chart.append({
-                "data": d.strftime("%Y-%m-%d"),
+                "data_referencia": d.strftime("%Y-%m-%d"),
                 "patrimonio": float(r_media["patrimonio_projetado"]),
                 "patrimonio_melhor": float(r_melhor["patrimonio_projetado"]),
                 "patrimonio_pior": float(r_pior["patrimonio_projetado"]),

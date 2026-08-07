@@ -25,7 +25,6 @@ from sifp.domain.categories import CATEGORIAS_PADRAO, CATEGORIA_NAO_CATEGORIZADO
 from sifp.importers.btg_importer import BTGImporter
 from sifp.importers.btg_investment_importer import BTGInvestmentImporter
 from sifp.domain.models import DiagnosticSeverity
-from sifp.intelligence import diagnostics as diag
 from sifp.intelligence.categorization import CategorizationService, is_pix_or_transfer
 from sifp.repositories.asset_repository import AssetRepository
 from sifp.repositories.balance_repository import BalanceRepository
