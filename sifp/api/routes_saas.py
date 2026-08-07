@@ -27,7 +27,7 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 
-from sifp.api.auth import get_current_user_name, get_db
+from sifp.api.auth import get_current_user_id, get_current_user_name, get_db
 from sifp.api.shared import as_file_like, categorization_service, transactions_payload
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,7 @@ from sifp.repositories.pg.asset_repository import AssetRepository
 from sifp.repositories.pg.balance_repository import BalanceRepository
 from sifp.repositories.pg.bound import ConnBound
 from sifp.repositories.pg.budget_repository import BudgetRepository
+from sifp.repositories.pg.connection import scoped_transaction
 from sifp.repositories.pg.despesa_fixa_repository import DespesaFixaRepository
 from sifp.repositories.pg.goal_repository import GoalRepository
 from sifp.repositories.pg.import_alias_repository import ImportAliasRepository
@@ -443,12 +444,25 @@ def excluir_ativo(position_key: str, conn: psycopg.Connection = Depends(get_db))
 
 
 @router.post("/narrativa")
-def narrativa(conn: psycopg.Connection = Depends(get_db)):
-    r = _repos(conn)
-    summary_service = _summary_service(r)
-    narrativa_service = NarrativaService(summary_service, r["transaction_repo"])
+def narrativa(user_id: str = Depends(get_current_user_id)):
+    # Conexão Postgres aberta só pra ler o contexto (rápido) -- a chamada
+    # à Anthropic logo abaixo pode levar segundos, e sem escopar a conexão
+    # só até aqui ela ficava presa o tempo todo, esgotando o pool sob uso
+    # concorrente (ver sifp/repositories/pg/connection.py).
     try:
-        texto = narrativa_service.explicar_mes()
+        with scoped_transaction(user_id) as conn:
+            r = _repos(conn)
+            summary_service = _summary_service(r)
+            narrativa_service = NarrativaService(summary_service, r["transaction_repo"])
+            ctx = narrativa_service.preparar_contexto()
+    except NarrativaIndisponivel as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        logger.exception("Falha ao gerar narrativa do mês")
+        raise HTTPException(status_code=502, detail="Falha ao gerar a explicação. Tente novamente em instantes.")
+
+    try:
+        texto = narrativa_service.explicar_com_contexto(ctx)
     except NarrativaIndisponivel as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception:
@@ -467,13 +481,28 @@ class ChatIn(BaseModel):
 
 
 @router.post("/chat")
-def chat(body: ChatIn, conn: psycopg.Connection = Depends(get_db)):
+def chat(body: ChatIn, user_id: str = Depends(get_current_user_id)):
     if not body.mensagens:
         raise HTTPException(status_code=400, detail="Envie ao menos uma mensagem.")
-    r = _repos(conn)
-    chat_service = ChatService(r["transaction_repo"], r["asset_repo"])
+    mensagens = [m.model_dump() for m in body.mensagens]
+
+    # Mesmo motivo do /narrativa: conexão Postgres liberada ANTES do loop
+    # de tool-use com a Anthropic (que pode chamar a ferramenta de
+    # patrimônio várias vezes e levar dezenas de segundos) -- ver
+    # sifp/repositories/pg/connection.py.
     try:
-        resposta = chat_service.responder([m.model_dump() for m in body.mensagens])
+        with scoped_transaction(user_id) as conn:
+            r = _repos(conn)
+            chat_service = ChatService(r["transaction_repo"], r["asset_repo"])
+            dados = chat_service.preparar_dados()
+    except ChatIndisponivel as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        logger.exception("Falha ao gerar resposta do chat")
+        raise HTTPException(status_code=502, detail="Falha ao gerar a resposta. Tente novamente em instantes.")
+
+    try:
+        resposta = chat_service.responder_com_dados(mensagens, dados)
     except ChatIndisponivel as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception:

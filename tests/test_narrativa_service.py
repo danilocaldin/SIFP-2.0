@@ -128,6 +128,27 @@ def test_explicar_mes_retorna_texto_do_cliente_mockado(service, monkeypatch):
     assert "Jun/2026" in capture["messages"][0]["content"]
 
 
+def test_explicar_com_contexto_nao_toca_o_banco(service, monkeypatch):
+    """Achado real de auditoria: sem separar 'ler o contexto' de 'chamar
+    a Anthropic', uma conexão Postgres ficava presa durante toda a
+    chamada ao LLM -- esgota o pool sob uso concorrente. Uma vez que
+    preparar_contexto() já buscou tudo, explicar_com_contexto() não pode
+    mais tocar transaction_repo/summary_service."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-fake-for-test")
+    monkeypatch.setitem(__import__("sys").modules, "anthropic", _fake_anthropic_module())
+
+    ctx = service.preparar_contexto()
+
+    def _explode(*args, **kwargs):
+        raise AssertionError("explicar_com_contexto não pode ler o banco de novo")
+
+    monkeypatch.setattr(service.transaction_repo, "get_all", _explode)
+    monkeypatch.setattr(service.summary_service, "build_resumo", _explode)
+
+    texto = service.explicar_com_contexto(ctx)
+    assert texto == "Explicação de teste."
+
+
 def test_explicar_mes_propaga_erro_generico_do_cliente(service, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-fake-for-test")
 

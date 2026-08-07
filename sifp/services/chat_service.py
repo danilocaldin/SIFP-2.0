@@ -70,6 +70,21 @@ class ChatService:
         all_tx["month"] = all_tx["date"].dt.to_period("M").astype(str)
         return all_tx
 
+    def preparar_dados(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """Só a parte que precisa do banco (transações + patrimônio) — a
+        tool `patrimonio_atual` lia o patrimônio DE NOVO, ao vivo, durante
+        o loop de tool-use, então essa busca antecipada também elimina
+        aquele acesso tardio. Separado de `responder_com_dados` pra quem
+        chama poder liberar a conexão Postgres ANTES do loop de tool-use
+        da Anthropic (que pode levar dezenas de segundos e, sem essa
+        separação, prendia uma conexão o tempo todo — esgota o pool sob
+        uso concorrente)."""
+        all_tx = self._dados_base()
+        if all_tx is None:
+            raise ChatIndisponivel("Ainda não há dados suficientes para responder perguntas.")
+        assets_df = self.asset_repo.get_latest_positions()
+        return all_tx, assets_df
+
     def _montar_system_prompt(self, all_tx: pd.DataFrame) -> str:
         meses = sorted(all_tx["month"].unique())
         intervalo = f"{formatar_mes(meses[0])} até {formatar_mes(meses[-1])}" if meses else "nenhum"
@@ -79,7 +94,7 @@ class ChatService:
             f"Categorias válidas: {', '.join(CATEGORIAS_PADRAO)}."
         )
 
-    def _montar_tools(self, all_tx_full: pd.DataFrame):
+    def _montar_tools(self, all_tx_full: pd.DataFrame, assets_df: pd.DataFrame):
         from anthropic import beta_tool
 
         all_tx = ind.exclude_self_transfers(all_tx_full)
@@ -203,7 +218,7 @@ class ChatService:
         @beta_tool
         def patrimonio_atual() -> str:
             """Patrimônio total atual e a posição de cada ativo de investimento."""
-            assets = self.asset_repo.get_latest_positions()
+            assets = assets_df
             if assets.empty:
                 return _json({"has_data": False})
             return _json({
@@ -224,11 +239,13 @@ class ChatService:
 
         return [listar_categorias, buscar_transacoes, resumo_periodo, patrimonio_atual]
 
-    def responder(self, mensagens: list[dict]) -> str:
-        all_tx = self._dados_base()
-        if all_tx is None:
-            raise ChatIndisponivel("Ainda não há dados suficientes para responder perguntas.")
-
+    def responder_com_dados(
+        self, mensagens: list[dict], dados: tuple[pd.DataFrame, pd.DataFrame]
+    ) -> str:
+        """Só o loop de tool-use com a Anthropic — não toca o banco (as
+        tools operam sobre `dados`, já buscado por preparar_dados). Ver
+        preparar_dados."""
+        all_tx, assets_df = dados
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             raise ChatIndisponivel("ANTHROPIC_API_KEY não configurada.")
@@ -240,7 +257,7 @@ class ChatService:
             model=MODEL,
             max_tokens=1024,
             system=self._montar_system_prompt(all_tx),
-            tools=self._montar_tools(all_tx),
+            tools=self._montar_tools(all_tx, assets_df),
             messages=mensagens,
         )
 
@@ -252,3 +269,8 @@ class ChatService:
             raise ChatIndisponivel("O modelo não retornou nenhuma resposta.")
 
         return "".join(block.text for block in last.content if block.type == "text").strip()
+
+    def responder(self, mensagens: list[dict]) -> str:
+        """Atalho pra quem não precisa separar as duas fases (ex: app.py
+        Streamlit, que já usa SQLite local sem custo de conexão de rede)."""
+        return self.responder_com_dados(mensagens, self.preparar_dados())

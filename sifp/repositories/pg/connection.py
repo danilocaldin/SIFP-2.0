@@ -31,19 +31,45 @@ from contextlib import contextmanager
 from typing import Iterator
 
 import psycopg
+from psycopg_pool import ConnectionPool
 
 DATABASE_URL = os.environ.get("SUPABASE_DB_URL", "")
+
+# Antes disto, cada request abria uma conexão TCP+TLS+auth NOVA contra o
+# Supavisor -- handshake inteiro a cada troca de mês no dashboard, e sem
+# nenhum teto: sob uso concorrente (ex: vários usuários no /chat ao mesmo
+# tempo, que segura a conexão aberta durante a chamada à Anthropic -- ver
+# routes_saas.py) o número de conexões físicas crescia sem limite até
+# estourar o do projeto Supabase, derrubando TODAS as rotas com 500, não
+# só as de IA. O pool é criado só na primeira vez que uma conexão é
+# pedida (nunca no import do módulo) -- os testes importam este módulo
+# sem SUPABASE_DB_URL configurada, e abrir o pool eager quebraria a
+# suíte inteira tentando conectar em uma URL vazia.
+_pool: ConnectionPool | None = None
+
+
+def _get_pool() -> ConnectionPool:
+    global _pool
+    if _pool is None:
+        _pool = ConnectionPool(
+            conninfo=DATABASE_URL,
+            min_size=1,
+            max_size=10,
+            max_idle=300,  # segundos -- Supavisor já fecha conexões ociosas por conta própria
+            open=True,
+        )
+    return _pool
 
 
 @contextmanager
 def scoped_transaction(user_id: str) -> Iterator[psycopg.Connection]:
-    """Uma conexão + transação únicas para um request inteiro, já
-    autenticada como `user_id`. Todo repository deve receber essa `conn`
-    (nunca abrir a própria) e nunca chamar commit()/close() nela — quem
-    entra no `with` é dono do ciclo de vida: commita no fim se não houve
-    exceção, faz rollback se houve, sempre fecha a conexão."""
-    conn = psycopg.connect(DATABASE_URL)
-    try:
+    """Uma conexão (emprestada do pool) + transação únicas para um
+    request inteiro, já autenticada como `user_id`. Todo repository deve
+    receber essa `conn` (nunca abrir a própria) e nunca chamar
+    commit()/close() nela — quem entra no `with` é dono do ciclo de vida:
+    commita no fim se não houve exceção, faz rollback se houve, sempre
+    devolve a conexão pro pool (nunca fecha de verdade)."""
+    with _get_pool().connection() as conn:
         with conn.transaction():
             with conn.cursor() as cur:
                 cur.execute("SET LOCAL role authenticated")
@@ -52,5 +78,3 @@ def scoped_transaction(user_id: str) -> Iterator[psycopg.Connection]:
                     (json.dumps({"sub": user_id, "role": "authenticated"}),),
                 )
             yield conn
-    finally:
-        conn.close()

@@ -104,11 +104,19 @@ class NarrativaService:
 
         return "\n".join(linhas)
 
-    def explicar_mes(self) -> str:
+    def preparar_contexto(self) -> dict:
+        """Só a parte que precisa do banco. Separada de `explicar_com_contexto`
+        pra quem chama poder liberar a conexão (commitar/devolver ao pool)
+        ANTES de chamar a Anthropic — sem essa separação, uma conexão
+        Postgres ficava presa o tempo inteiro da chamada ao LLM (segundos
+        a dezenas de segundos), esgotando o pool sob uso concorrente."""
         ctx = self._montar_contexto()
         if ctx is None:
             raise NarrativaIndisponivel("Ainda não há dados suficientes para gerar uma explicação.")
+        return ctx
 
+    def explicar_com_contexto(self, ctx: dict) -> str:
+        """Só a chamada à Anthropic — não toca o banco. Ver preparar_contexto."""
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             raise NarrativaIndisponivel("ANTHROPIC_API_KEY não configurada.")
@@ -123,3 +131,8 @@ class NarrativaService:
             messages=[{"role": "user", "content": self._montar_prompt(ctx)}],
         )
         return "".join(block.text for block in response.content if block.type == "text").strip()
+
+    def explicar_mes(self) -> str:
+        """Atalho pra quem não precisa separar as duas fases (ex: app.py
+        Streamlit, que já usa SQLite local sem custo de conexão de rede)."""
+        return self.explicar_com_contexto(self.preparar_contexto())

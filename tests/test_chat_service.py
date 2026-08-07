@@ -88,12 +88,14 @@ def service(tmp_db_path):
     return ChatService(transaction_repo, asset_repo)
 
 
-def _tool(service, all_tx, nome):
+def _tool(service, all_tx, nome, assets_df=None):
     """Devolve a tool já embrulhada para decodificar o JSON que ela
     retorna — o Tool Runner exige que toda tool devolva string (ou lista
     de content blocks), nunca um dict/list Python cru, então as tools
     reais fazem json.dumps() internamente."""
-    tools = service._montar_tools(all_tx)
+    if assets_df is None:
+        assets_df = service.asset_repo.get_latest_positions()
+    tools = service._montar_tools(all_tx, assets_df)
     tool = next(t for t in tools if t.name == nome)
     return lambda *args, **kwargs: json.loads(tool(*args, **kwargs))
 
@@ -207,6 +209,29 @@ def test_tool_patrimonio_atual(service):
     assert resultado["has_data"] is True
     assert resultado["patrimonio_total"] == pytest.approx(3000.0)
     assert resultado["ativos"][0]["nome"] == "Fundo Teste"
+
+
+def test_responder_com_dados_nao_toca_o_banco(service, monkeypatch):
+    """Achado real de auditoria: sem separar 'ler dados' de 'chamar a
+    Anthropic', uma conexão Postgres ficava presa o tempo inteiro do
+    loop de tool-use (segundos a dezenas de segundos), esgotando o pool
+    sob uso concorrente. preparar_dados() busca tudo antecipadamente
+    (inclusive o patrimônio, que a tool patrimonio_atual lia AO VIVO
+    antes) -- responder_com_dados() não pode mais tocar os repositories."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-fake-for-test")
+    fake_module = types.SimpleNamespace(Anthropic=_FakeAnthropicClient, beta_tool=lambda fn: fn)
+    monkeypatch.setitem(__import__("sys").modules, "anthropic", fake_module)
+
+    dados = service.preparar_dados()
+
+    def _explode(*args, **kwargs):
+        raise AssertionError("responder_com_dados não pode ler o banco de novo")
+
+    monkeypatch.setattr(service.transaction_repo, "get_all", _explode)
+    monkeypatch.setattr(service.asset_repo, "get_latest_positions", _explode)
+
+    resposta = service.responder_com_dados([{"role": "user", "content": "oi"}], dados)
+    assert resposta == "Resposta de teste."
 
 
 def test_tool_listar_categorias(service):
