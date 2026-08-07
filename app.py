@@ -207,16 +207,19 @@ with tab_resumo:
             if restantes > 0:
                 st.caption(f"+ {restantes} outro(s) ponto(s) de atenção na aba 🩺 Diagnósticos.")
 
-        if resumo["saldo_medio_3m"] > 0 and resumo["projecao_12m"] is not None:
+        if resumo["projecao_12m"] is not None and resumo["saldo_medio_3m"] >= 0:
             st.caption(
                 f"📈 No ritmo atual, seu patrimônio deve chegar perto de "
                 f"**{format_brl_md(resumo['projecao_12m'])}** em 12 meses. Veja a aba 🔮 Projeções para mais detalhes."
             )
-        else:
+        elif resumo["projecao_12m"] is not None:
             st.caption(
-                "📉 Nos últimos 3 meses seu saldo médio foi negativo — no ritmo atual, seu "
-                "patrimônio não cresce. Veja a aba 🔮 Projeções."
+                f"📉 Nos últimos 3 meses seu saldo médio foi negativo — no ritmo atual, seu "
+                f"patrimônio deve cair para **{format_brl_md(resumo['projecao_12m'])}** em 12 meses. "
+                f"Veja a aba 🔮 Projeções."
             )
+        else:
+            st.caption("Ainda não há dados suficientes pra projetar os próximos 12 meses.")
 
         st.divider()
         if st.button("🤖 Explicar este mês em linguagem natural"):

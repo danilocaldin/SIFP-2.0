@@ -51,6 +51,21 @@ def test_parses_single_fund_position():
     assert p.saldo_liquido == pytest.approx(547.0)
 
 
+def test_posicao_com_valor_inteiro_sem_decimais_nao_e_descartada():
+    """Uma coluna com valor redondo (ex: SaldoLiquidoAnterior "500" sem
+    ",00") não pode fazer a linha de Posição inteira ser descartada por
+    a contagem de 8 números não bater -- achado real de uma varredura:
+    _BR_NUM_RE exigia vírgula decimal em TODOS os números."""
+    texto = SAMPLE_TEXT.replace(
+        "30/06/26 500,00 100,00000000",
+        "30/06/26 500 100,00000000",
+    )
+    positions = parse_positions_from_text(texto, source_file="teste.pdf")
+    assert len(positions) == 1
+    assert positions[0].saldo_liquido == pytest.approx(547.0)
+    assert positions[0].quantidade == pytest.approx(100.0)
+
+
 def test_ignores_detalhamento_row_uses_posicao_row():
     """A linha de Detalhamento (7 números, cotação de compra 5,00) não
     pode ser confundida com a linha de Posição (8 números, cotação atual 5,50)."""

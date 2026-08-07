@@ -194,15 +194,19 @@ function LimiteAlertaForm({ limiteAtual }: { limiteAtual: number | null }) {
   const router = useRouter();
   const [pct, setPct] = useState(String(limiteAtual ?? 30));
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const valor = Number(pct);
     if (!valor || valor <= 0) return;
     setSaving(true);
+    setError(null);
     try {
       await definirLimiteAlertaDespesasFixas(valor);
       router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido.");
     } finally {
       setSaving(false);
     }
@@ -221,6 +225,7 @@ function LimiteAlertaForm({ limiteAtual }: { limiteAtual: number | null }) {
           {saving ? "Salvando…" : "Salvar limite"}
         </Button>
       </form>
+      {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
     </div>
   );
 }
@@ -228,6 +233,7 @@ function LimiteAlertaForm({ limiteAtual }: { limiteAtual: number | null }) {
 function DespesaRow({ despesa }: { despesa: DespesaFixa }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const progresso =
     despesa.tipo === "parcelada" && despesa.parcelas_totais
@@ -237,9 +243,12 @@ function DespesaRow({ despesa }: { despesa: DespesaFixa }) {
   async function handleAvancarParcela() {
     if (!despesa.parcela_atual) return;
     setBusy(true);
+    setError(null);
     try {
       await atualizarParcelaDespesaFixa(despesa.id, despesa.parcela_atual + 1);
       router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido.");
     } finally {
       setBusy(false);
     }
@@ -247,9 +256,12 @@ function DespesaRow({ despesa }: { despesa: DespesaFixa }) {
 
   async function handleEncerrar() {
     setBusy(true);
+    setError(null);
     try {
       await encerrarDespesaFixa(despesa.id);
       router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido.");
     } finally {
       setBusy(false);
     }
@@ -257,9 +269,12 @@ function DespesaRow({ despesa }: { despesa: DespesaFixa }) {
 
   async function handleExcluir() {
     setBusy(true);
+    setError(null);
     try {
       await excluirDespesaFixa(despesa.id);
       router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido.");
     } finally {
       setBusy(false);
     }
@@ -294,6 +309,7 @@ function DespesaRow({ despesa }: { despesa: DespesaFixa }) {
           Excluir
         </Button>
       </div>
+      {error && <p className="text-sm text-red-500">{error}</p>}
     </div>
   );
 }

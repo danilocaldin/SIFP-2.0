@@ -146,17 +146,23 @@ export default async function Home() {
           </div>
 
           <p className="mt-4 text-sm text-muted-foreground">
-            {resumo.saldo_medio_3m > 0 && resumo.projecao_12m !== null ? (
-              <>
-                📈 No ritmo atual, seu patrimônio deve chegar perto de{" "}
-                <span className="font-medium text-foreground">{formatBRL(resumo.projecao_12m)}</span>{" "}
-                em 12 meses.
-              </>
+            {resumo.projecao_12m !== null ? (
+              resumo.saldo_medio_3m >= 0 ? (
+                <>
+                  📈 No ritmo atual, seu patrimônio deve chegar perto de{" "}
+                  <span className="font-medium text-foreground">{formatBRL(resumo.projecao_12m)}</span>{" "}
+                  em 12 meses.
+                </>
+              ) : (
+                <>
+                  📉 Nos últimos 3 meses seu saldo médio foi negativo — no ritmo atual, seu patrimônio
+                  deve cair para{" "}
+                  <span className="font-medium text-foreground">{formatBRL(resumo.projecao_12m)}</span>{" "}
+                  em 12 meses.
+                </>
+              )
             ) : (
-              <>
-                📉 Nos últimos 3 meses seu saldo médio foi negativo — no ritmo atual, seu patrimônio
-                não cresce.
-              </>
+              <>Ainda não há dados suficientes pra projetar os próximos 12 meses.</>
             )}
           </p>
         </div>

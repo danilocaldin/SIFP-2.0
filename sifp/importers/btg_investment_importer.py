@@ -28,7 +28,11 @@ import pdfplumber
 from sifp.domain.models import AssetPosition
 
 _DATE_RE = re.compile(r"^\d{2}/\d{2}/\d{2}$")
-_BR_NUM_RE = re.compile(r"^-?\d+(\.\d{3})*,\d{2,}$|^-$")
+# O ",\d{2,}" (decimais) é OPCIONAL -- uma coluna com valor redondo sem
+# centavos (ex: "Quantidade" de cotas, às vezes um número inteiro) não
+# tinha vírgula nenhuma e a linha inteira era descartada em silêncio por
+# não bater na contagem de 8 números da linha de Posição.
+_BR_NUM_RE = re.compile(r"^-?\d+(\.\d{3})*(,\d{2,})?$|^-$")
 _FUND_CNPJ_RE = re.compile(r"([A-Za-z0-9À-ÿ .]+?)\s*-\s*Classe\s+CNPJ:\s*([\d./\-]+)")
 _PERIOD_RE = re.compile(r"Per.odo de (\d{2}/\d{2}/\d{2}).*?(\d{2}/\d{2}/\d{2})")
 

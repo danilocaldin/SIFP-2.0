@@ -68,6 +68,20 @@ def test_category_breakdown_empty_when_no_expenses():
     assert result.empty
 
 
+def test_category_breakdown_exclui_nao_categorizado():
+    """"Não categorizado" não pode virar "a categoria de maior gasto" --
+    é ausência de categoria, não uma categoria de verdade."""
+    df = pd.DataFrame({
+        "date": ["2026-06-01", "2026-06-02"],
+        "value": [-900.0, -100.0],
+        "category": ["Não categorizado", "Lazer"],
+    })
+    result = ind.category_breakdown(df)
+    assert "Não categorizado" not in result["category"].values
+    assert list(result["category"]) == ["Lazer"]
+    assert result.iloc[0]["pct"] == pytest.approx(100.0)
+
+
 def test_merchant_concentration_groups_by_canonical_name(sample_df):
     real = ind.exclude_self_transfers(sample_df)
     result = ind.merchant_concentration(real)

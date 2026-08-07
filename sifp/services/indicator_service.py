@@ -14,7 +14,7 @@ renderização da tela.
 
 import pandas as pd
 
-from sifp.domain.categories import SELF_TRANSFER_CATEGORY
+from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO, SELF_TRANSFER_CATEGORY
 
 
 def exclude_current_month(df: pd.DataFrame, month_col: str = "month") -> pd.DataFrame:
@@ -75,8 +75,13 @@ def month_over_month_delta(current: dict, previous: dict | None) -> dict:
 
 
 def category_breakdown(df: pd.DataFrame) -> pd.DataFrame:
-    """Gastos por categoria (só despesas), do maior pro menor, com % do total."""
-    gastos = df[df["value"] < 0].copy()
+    """Gastos por categoria (só despesas), do maior pro menor, com % do
+    total. "Não categorizado" fica de fora -- não é uma categoria de
+    verdade, é ausência de categoria; deixá-la entrar podia virar "a
+    categoria de maior gasto" e disparar um diagnóstico de concentração
+    sem nenhuma ação prática (a resposta certa é categorizar, não
+    "diversificar Não categorizado")."""
+    gastos = df[(df["value"] < 0) & (df["category"] != CATEGORIA_NAO_CATEGORIZADO)].copy()
     if gastos.empty:
         return pd.DataFrame(columns=["category", "value_abs", "pct"])
     gastos["value_abs"] = gastos["value"].abs()

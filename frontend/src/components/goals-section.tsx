@@ -79,6 +79,7 @@ function GoalRow({ goal }: { goal: Goal }) {
   const router = useRouter();
   const [valor, setValor] = useState(String(goal.valor_acumulado));
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const progresso =
     goal.valor_necessario > 0
@@ -87,9 +88,12 @@ function GoalRow({ goal }: { goal: Goal }) {
 
   async function handleSave() {
     setBusy(true);
+    setError(null);
     try {
       await atualizarProgressoMeta(goal.id, Number(valor) || 0);
       router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido.");
     } finally {
       setBusy(false);
     }
@@ -97,9 +101,12 @@ function GoalRow({ goal }: { goal: Goal }) {
 
   async function handleDelete() {
     setBusy(true);
+    setError(null);
     try {
       await excluirMeta(goal.id);
       router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido.");
     } finally {
       setBusy(false);
     }
@@ -128,6 +135,7 @@ function GoalRow({ goal }: { goal: Goal }) {
           Excluir
         </Button>
       </div>
+      {error && <p className="text-sm text-red-500">{error}</p>}
     </div>
   );
 }

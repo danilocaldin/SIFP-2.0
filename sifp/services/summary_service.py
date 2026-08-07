@@ -123,14 +123,15 @@ class SummaryService:
         diagnostics = self.diagnostics_for_month(all_tx, all_tx_real, latest_month, latest_label)
 
         saldo_medio_3m = proj.average_monthly_saldo(monthly, janela=3)
-        projecao_12m = None
-        if saldo_medio_3m > 0:
-            taxa_12m = proj.weighted_avg_rentabilidade(latest_assets, campo="rentabilidade_12m_pct")
-            if taxa_12m is not None:
-                df_proj = proj.project_patrimonio_com_rendimento(patrimonio_total, saldo_medio_3m, taxa_12m, meses=12)
-            else:
-                df_proj = proj.project_patrimonio(patrimonio_total, saldo_medio_3m, meses=12)
-            projecao_12m = float(df_proj.iloc[-1]["patrimonio_projetado"])
+        # Calcula mesmo com saldo médio negativo -- é justamente quem está
+        # gastando mais do que ganha que mais precisa ver a trajetória
+        # (patrimônio caindo), não só quem está com saldo positivo.
+        taxa_12m = proj.weighted_avg_rentabilidade(latest_assets, campo="rentabilidade_12m_pct")
+        if taxa_12m is not None:
+            df_proj = proj.project_patrimonio_com_rendimento(patrimonio_total, saldo_medio_3m, taxa_12m, meses=12)
+        else:
+            df_proj = proj.project_patrimonio(patrimonio_total, saldo_medio_3m, meses=12)
+        projecao_12m = float(df_proj.iloc[-1]["patrimonio_projetado"])
 
         return {
             "has_data": True,

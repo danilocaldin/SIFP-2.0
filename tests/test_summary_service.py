@@ -22,6 +22,23 @@ def _mes(periodo: str) -> str:
     return f"{nomes[mes]}/{ano}"
 
 
+def _servico_saldo_negativo(tmp_db_path) -> SummaryService:
+    init_db(tmp_db_path)
+    transaction_repo = TransactionRepository(tmp_db_path)
+    tx = pd.DataFrame([
+        {"date": "2026-05-05", "description": "Salario", "value": 2000.0, "category": "Salário/Receita"},
+        {"date": "2026-05-10", "description": "Mercado", "value": -3000.0, "category": "Mercado"},
+        {"date": "2026-06-05", "description": "Salario", "value": 2000.0, "category": "Salário/Receita"},
+        {"date": "2026-06-10", "description": "Mercado", "value": -3000.0, "category": "Mercado"},
+    ])
+    transaction_repo.insert_new(tx)
+    return SummaryService(
+        transaction_repo, BalanceRepository(tmp_db_path), AssetRepository(tmp_db_path),
+        BudgetRepository(tmp_db_path), GoalRepository(tmp_db_path),
+        DespesaFixaRepository(tmp_db_path), PreferenciaRepository(tmp_db_path),
+    )
+
+
 @pytest.fixture
 def service(tmp_db_path):
     init_db(tmp_db_path)
@@ -117,3 +134,15 @@ def test_build_resumo_excludes_self_transfer_from_saldo(tmp_db_path):
     )
     resumo = svc.build_resumo(_mes)
     assert resumo["saldo"] == pytest.approx(5000.0)  # nao 4000 - self-transfer nao conta como despesa
+
+
+def test_build_resumo_projeta_mesmo_com_saldo_medio_negativo(tmp_db_path):
+    """Quem gasta mais do que ganha é quem mais precisa ver a
+    trajetória (patrimônio caindo) -- a projeção não pode sumir só
+    porque o saldo médio é negativo."""
+    svc = _servico_saldo_negativo(tmp_db_path)
+    resumo = svc.build_resumo(_mes)
+    assert resumo["saldo_medio_3m"] < 0
+    assert resumo["projecao_12m"] is not None
+    # patrimonio_total=0 + 12 meses de saldo_medio_3m negativo -> negativo
+    assert resumo["projecao_12m"] < 0

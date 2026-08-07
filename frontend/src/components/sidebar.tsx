@@ -69,7 +69,21 @@ export function Sidebar() {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    // Promise.resolve().then() em vez de setMounted(true) direto: só pra
+    // marcar "hidratado no cliente" (evita mismatch de ícone de tema
+    // entre servidor/cliente) -- não tem nenhuma fonte síncrona de onde
+    // ler esse estado antes do efeito, então precisa mesmo de um efeito;
+    // o microtask satisfaz a regra que evita setState síncrono direto no
+    // corpo do efeito sem atrasar visivelmente nada.
+    Promise.resolve().then(() => setMounted(true));
+  }, []);
+
+  // Visitante não autenticado (tela de login do SaaS) não deve ver o
+  // menu inteiro do produto -- todo link levaria de volta pro próprio
+  // login mesmo assim, mas expor a navegação completa sem sessão é
+  // ruído/vazamento de estrutura desnecessário.
+  if (SAAS_MODE && pathname === "/login") return null;
 
   async function handleLogout() {
     const supabase = createClient();
