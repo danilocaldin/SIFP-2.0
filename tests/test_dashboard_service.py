@@ -88,18 +88,51 @@ def test_build_dashboard_top_expenses_dates_are_strings(service):
         assert isinstance(row["date"], str)
 
 
-def test_build_dashboard_all_transactions_includes_full_period_sorted_desc(service):
+def test_build_dashboard_nao_expoe_mais_all_transactions(service):
+    # Achado real de auditoria: esse campo já passou de 1MB numa conta
+    # com anos de uso e era carregado em toda troca de mês mesmo que o
+    # expander nunca abrisse -- agora só existe via list_transactions().
     result = service.build_dashboard("2026-06", _mes)
-    dates = [row["date"] for row in result["all_transactions"]]
+    assert "all_transactions" not in result
+
+
+def test_list_transactions_periodo_sorted_desc(service):
+    result = service.list_transactions("2026-06")
+    dates = [row["date"] for row in result["transactions"]]
     assert dates == sorted(dates, reverse=True)
-    descriptions = {row["description"] for row in result["all_transactions"]}
+    descriptions = {row["description"] for row in result["transactions"]}
     assert descriptions == {"Salario", "Mercado", "Uber", "Transferencia p/ investimento"}
+    assert result["total"] == 4
+    assert result["has_more"] is False
 
 
-def test_build_dashboard_all_transactions_dates_are_strings(service):
-    result = service.build_dashboard(None, _mes)
-    for row in result["all_transactions"]:
+def test_list_transactions_dates_are_strings(service):
+    result = service.list_transactions(None)
+    for row in result["transactions"]:
         assert isinstance(row["date"], str)
+
+
+def test_list_transactions_pagina_com_limit_e_offset(service):
+    pagina1 = service.list_transactions(None, limit=2, offset=0)
+    assert len(pagina1["transactions"]) == 2
+    assert pagina1["total"] == 6  # 6 transações no fixture, sem filtro de mês
+    assert pagina1["has_more"] is True
+
+    pagina2 = service.list_transactions(None, limit=2, offset=2)
+    assert len(pagina2["transactions"]) == 2
+    # páginas não se sobrepõem
+    assert {r["date"] + r["description"] for r in pagina1["transactions"]}.isdisjoint(
+        {r["date"] + r["description"] for r in pagina2["transactions"]}
+    )
+
+
+def test_list_transactions_sem_dados():
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "empty.db")
+        init_db(path)
+        svc = DashboardService(TransactionRepository(path), BalanceRepository(path))
+        assert svc.list_transactions(None) == {"transactions": [], "total": 0, "has_more": False}
 
 
 def test_build_dashboard_daily_balance_empty_without_balance_data(service):

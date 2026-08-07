@@ -118,7 +118,6 @@ export interface DashboardData {
   monthly_evolution: MonthlyEvolution[];
   top_expenses: TopExpense[];
   top_merchants: TopMerchant[];
-  all_transactions: DashboardTransaction[];
   daily_balance: DailyBalancePoint[];
 }
 
@@ -127,6 +126,14 @@ export interface DashboardEmpty {
 }
 
 export type Dashboard = DashboardData | DashboardEmpty;
+
+// Espelha GET /api/dashboard/transacoes (paginado).
+
+export interface DashboardTransactionsPage {
+  transactions: DashboardTransaction[];
+  total: number;
+  has_more: boolean;
+}
 
 // Espelha GET /api/patrimonio (sifp/services/patrimonio_service.py).
 
@@ -152,7 +159,6 @@ export interface PatrimonioData {
   patrimonio_total: number;
   assets: AssetPosition[];
   net_worth_history: NetWorthPoint[];
-  all_snapshots: AssetPosition[];
 }
 
 export interface PatrimonioEmpty {
@@ -160,6 +166,14 @@ export interface PatrimonioEmpty {
 }
 
 export type Patrimonio = PatrimonioData | PatrimonioEmpty;
+
+// Espelha GET /api/patrimonio/snapshots (paginado).
+
+export interface PatrimonioSnapshotsPage {
+  snapshots: AssetPosition[];
+  total: number;
+  has_more: boolean;
+}
 
 // Espelha GET /api/projecoes (sifp/services/projecoes_service.py).
 

@@ -54,9 +54,64 @@ def test_build_patrimonio_with_assets(asset_repo):
     for row in result["net_worth_history"]:
         assert row["data_referencia"] in ("2026-05-31", "2026-06-30")  # "YYYY-MM-DD", nao timestamp ISO completo
 
-    assert len(result["all_snapshots"]) == 2  # os 2 snapshots individuais, nao so o mais recente
-    for row in result["all_snapshots"]:
+    # Achado real de auditoria: esse campo já passou de 250KB numa conta
+    # com anos de importações e era carregado em toda visita à tela --
+    # agora só existe via list_snapshots().
+    assert "all_snapshots" not in result
+
+
+def test_list_snapshots_retorna_todos_os_snapshots_individuais(asset_repo):
+    asset_repo.insert_many([
+        AssetPosition(
+            nome="Fundo Teste", identificador="00.000.000/0001-00", tipo="Fundo de Investimento",
+            instituicao="BTG Pactual", data_referencia="2026-06-30",
+            saldo_bruto=3100.0, saldo_liquido=3000.0,
+            rentabilidade_12m_pct=14.0, benchmark="CDI", benchmark_12m_pct=13.0,
+        ),
+        AssetPosition(
+            nome="Fundo Teste", identificador="00.000.000/0001-00", tipo="Fundo de Investimento",
+            instituicao="BTG Pactual", data_referencia="2026-05-31",
+            saldo_bruto=2600.0, saldo_liquido=2500.0,
+        ),
+    ])
+    service = PatrimonioService(asset_repo, FakeImporter([]))
+    result = service.list_snapshots()
+
+    assert result["total"] == 2
+    assert result["has_more"] is False
+    assert len(result["snapshots"]) == 2
+    for row in result["snapshots"]:
         assert row["data_referencia"] in ("2026-05-31", "2026-06-30")
+    # o snapshot mais antigo (05/31) não tem rentabilidade/benchmark --
+    # NaN precisa ter virado None, não quebrar a serialização.
+    sem_rentabilidade = next(r for r in result["snapshots"] if r["data_referencia"] == "2026-05-31")
+    assert sem_rentabilidade["rentabilidade_12m_pct"] is None
+    assert sem_rentabilidade["benchmark"] is None
+
+
+def test_list_snapshots_pagina_com_limit_e_offset(asset_repo):
+    asset_repo.insert_many([
+        AssetPosition(
+            nome="Fundo Teste", identificador="00.000.000/0001-00", tipo="Fundo de Investimento",
+            instituicao="BTG Pactual", data_referencia=data, saldo_bruto=100.0, saldo_liquido=100.0,
+        )
+        for data in ["2026-04-30", "2026-05-31", "2026-06-30"]
+    ])
+    service = PatrimonioService(asset_repo, FakeImporter([]))
+
+    pagina1 = service.list_snapshots(limit=2, offset=0)
+    assert len(pagina1["snapshots"]) == 2
+    assert pagina1["total"] == 3
+    assert pagina1["has_more"] is True
+
+    pagina2 = service.list_snapshots(limit=2, offset=2)
+    assert len(pagina2["snapshots"]) == 1
+    assert pagina2["has_more"] is False
+
+
+def test_list_snapshots_sem_dados(asset_repo):
+    service = PatrimonioService(asset_repo, FakeImporter([]))
+    assert service.list_snapshots() == {"snapshots": [], "total": 0, "has_more": False}
 
 
 def test_import_pdf_persists_positions(asset_repo):

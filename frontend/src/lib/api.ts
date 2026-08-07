@@ -2,7 +2,9 @@ import type {
   CategoryTransaction,
   ChatMensagem,
   ChatResponse,
+  DashboardTransactionsPage,
   NarrativaResponse,
+  PatrimonioSnapshotsPage,
   TipoDespesaFixa,
   UploadPersistSummary,
   UploadPreview,
@@ -241,6 +243,32 @@ export async function getDashboardCategoria(
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao buscar as transações da categoria."));
   const data = await res.json();
   return data.transacoes;
+}
+
+export async function getDashboardTransacoes(
+  month: string | null,
+  limit: number,
+  offset: number
+): Promise<DashboardTransactionsPage> {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (month) params.set("month", month);
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/dashboard/transacoes?${params}`, {
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao buscar as transações."));
+  return res.json();
+}
+
+export async function getPatrimonioSnapshots(
+  limit: number,
+  offset: number
+): Promise<PatrimonioSnapshotsPage> {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/patrimonio/snapshots?${params}`, {
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao buscar o histórico de ativos."));
+  return res.json();
 }
 
 export async function excluirTransacao(txHash: string): Promise<void> {

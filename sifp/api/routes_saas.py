@@ -121,11 +121,27 @@ def dashboard_categoria(categoria: str, month: str | None = None, conn: psycopg.
     return {"transacoes": dashboard_service.list_category_transactions(month, categoria)}
 
 
+@router.get("/dashboard/transacoes")
+def dashboard_transacoes(
+    month: str | None = None, limit: int = 200, offset: int = 0, conn: psycopg.Connection = Depends(get_db)
+):
+    r = _repos(conn)
+    dashboard_service = DashboardService(r["transaction_repo"], r["balance_repo"])
+    return dashboard_service.list_transactions(month, limit=limit, offset=offset)
+
+
 @router.get("/patrimonio")
 def patrimonio(conn: psycopg.Connection = Depends(get_db)):
     r = _repos(conn)
     patrimonio_service = PatrimonioService(r["asset_repo"], _investment_importer)
     return patrimonio_service.build_patrimonio()
+
+
+@router.get("/patrimonio/snapshots")
+def patrimonio_snapshots(limit: int = 200, offset: int = 0, conn: psycopg.Connection = Depends(get_db)):
+    r = _repos(conn)
+    patrimonio_service = PatrimonioService(r["asset_repo"], _investment_importer)
+    return patrimonio_service.list_snapshots(limit=limit, offset=offset)
 
 
 @router.post("/patrimonio/import")

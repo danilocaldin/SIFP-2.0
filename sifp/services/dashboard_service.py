@@ -61,14 +61,6 @@ class DashboardService:
         for row in top_gastos_records:
             row["date"] = pd.Timestamp(row["date"]).strftime("%Y-%m-%d")
 
-        all_transactions_records = (
-            df_period[["date", "description", "value", "bank_category", "merchant", "category"]]
-            .sort_values("date", ascending=False)
-            .to_dict("records")
-        )
-        for row in all_transactions_records:
-            row["date"] = pd.Timestamp(row["date"]).strftime("%Y-%m-%d")
-
         # Saldo diário (Módulo 3) só existe pra extratos XLS/XLSX do BTG, que
         # trazem a coluna "Saldo Diário" -- é um dado mais fino que o saldo
         # mensal agregado (monthly_evolution), então fica em separado.
@@ -101,8 +93,34 @@ class DashboardService:
             "monthly_evolution": monthly_records,
             "top_expenses": top_gastos_records,
             "top_merchants": by_merchant.to_dict("records"),
-            "all_transactions": all_transactions_records,
             "daily_balance": daily_balance_records,
+        }
+
+    def list_transactions(self, month: str | None, limit: int = 200, offset: int = 0) -> dict:
+        """Página de transações do período, mais recentes primeiro — usado
+        pelo expander "Ver todas as transações" da tela Dashboard. Existe
+        como rota própria (em vez de ir dentro de build_dashboard) porque
+        o histórico inteiro sem limite já passou de 1 MB numa conta com
+        alguns anos de uso e é carregado em TODA troca de mês mesmo que o
+        expander nunca seja aberto."""
+        all_tx = self.transaction_repo.get_all()
+        if all_tx.empty:
+            return {"transactions": [], "total": 0, "has_more": False}
+
+        all_tx["date"] = pd.to_datetime(all_tx["date"])
+        all_tx["month"] = all_tx["date"].dt.to_period("M").astype(str)
+        df_period = all_tx if month is None else all_tx[all_tx["month"] == month]
+        df_period = df_period.sort_values("date", ascending=False)
+
+        total = len(df_period)
+        page = df_period.iloc[offset:offset + limit][
+            ["date", "description", "value", "bank_category", "merchant", "category"]
+        ].copy()
+        page["date"] = page["date"].dt.strftime("%Y-%m-%d")
+        return {
+            "transactions": page.to_dict("records"),
+            "total": total,
+            "has_more": offset + limit < total,
         }
 
     def list_category_transactions(self, month: str | None, categoria: str) -> list[dict]:

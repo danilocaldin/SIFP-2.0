@@ -14,6 +14,23 @@ import pandas as pd
 from sifp.services import indicator_service as ind
 
 
+_SNAPSHOT_COLUMNS = [
+    "position_key", "nome", "tipo", "instituicao", "data_referencia", "saldo_liquido",
+    "rentabilidade_12m_pct", "benchmark", "benchmark_12m_pct",
+]
+
+
+def _sanitize_snapshots(df: pd.DataFrame) -> pd.DataFrame:
+    """Seleciona as colunas expostas na API, formata a data e troca NaN
+    por None -- snapshots mais antigos podem não ter rentabilidade/
+    benchmark preenchidos, e NaN não é JSON válido (Starlette serializa
+    com allow_nan=False, o que quebrava a rota com 500 assim que um
+    extrato sem essas colunas aparecia)."""
+    out = df[_SNAPSHOT_COLUMNS].copy()
+    out["data_referencia"] = pd.to_datetime(out["data_referencia"]).dt.strftime("%Y-%m-%d")
+    return out.astype(object).where(pd.notna(out), None)
+
+
 class PatrimonioService:
     def __init__(self, asset_repo, investment_importer):
         self.asset_repo = asset_repo
@@ -24,8 +41,6 @@ class PatrimonioService:
         if latest.empty:
             return {"has_data": False}
 
-        latest = latest.copy()
-        latest["data_referencia"] = latest["data_referencia"].dt.strftime("%Y-%m-%d")
         patrimonio_total = float(latest["saldo_liquido"].sum())
 
         all_snapshots = self.asset_repo.get_all()
@@ -35,32 +50,30 @@ class PatrimonioService:
             net_worth["data_referencia"] = pd.to_datetime(net_worth["data_referencia"]).dt.strftime("%Y-%m-%d")
         net_worth_records = net_worth.to_dict("records") if not net_worth.empty else []
 
-        all_snapshots_records = []
-        if not all_snapshots.empty:
-            all_snapshots_display = all_snapshots[
-                ["position_key", "nome", "tipo", "instituicao", "data_referencia", "saldo_liquido",
-                 "rentabilidade_12m_pct", "benchmark", "benchmark_12m_pct"]
-            ].copy()
-            all_snapshots_display["data_referencia"] = pd.to_datetime(
-                all_snapshots_display["data_referencia"]
-            ).dt.strftime("%Y-%m-%d")
-            # snapshots mais antigos podem não ter rentabilidade/benchmark
-            # preenchidos -- NaN não é JSON válido (Starlette serializa com
-            # allow_nan=False), então vira None explicitamente.
-            all_snapshots_display = all_snapshots_display.astype(object).where(
-                pd.notna(all_snapshots_display), None
-            )
-            all_snapshots_records = all_snapshots_display.to_dict("records")
-
         return {
             "has_data": True,
             "patrimonio_total": patrimonio_total,
-            "assets": latest[
-                ["position_key", "nome", "tipo", "instituicao", "data_referencia", "saldo_liquido",
-                 "rentabilidade_12m_pct", "benchmark", "benchmark_12m_pct"]
-            ].to_dict("records"),
+            "assets": _sanitize_snapshots(latest).to_dict("records"),
             "net_worth_history": net_worth_records,
-            "all_snapshots": all_snapshots_records,
+        }
+
+    def list_snapshots(self, limit: int = 200, offset: int = 0) -> dict:
+        """Página do histórico completo de snapshots de ativos (todas as
+        importações, não só a posição mais recente) — usado pelo expander
+        "Ver histórico completo" da tela Patrimônio. Rota própria pelo
+        mesmo motivo de DashboardService.list_transactions: o histórico
+        inteiro sem limite era carregado em toda visita à tela mesmo que
+        o expander nunca abrisse."""
+        all_snapshots = self.asset_repo.get_all()
+        if all_snapshots.empty:
+            return {"snapshots": [], "total": 0, "has_more": False}
+
+        total = len(all_snapshots)
+        page = all_snapshots.iloc[offset:offset + limit]
+        return {
+            "snapshots": _sanitize_snapshots(page).to_dict("records"),
+            "total": total,
+            "has_more": offset + limit < total,
         }
 
     def import_pdf(self, file_obj) -> int:

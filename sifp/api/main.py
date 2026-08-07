@@ -205,9 +205,19 @@ def dashboard_categoria(categoria: str, month: str | None = None):
     return {"transacoes": dashboard_service.list_category_transactions(month, categoria)}
 
 
+@app.get("/api/dashboard/transacoes")
+def dashboard_transacoes(month: str | None = None, limit: int = 200, offset: int = 0):
+    return dashboard_service.list_transactions(month, limit=limit, offset=offset)
+
+
 @app.get("/api/patrimonio")
 def patrimonio():
     return patrimonio_service.build_patrimonio()
+
+
+@app.get("/api/patrimonio/snapshots")
+def patrimonio_snapshots(limit: int = 200, offset: int = 0):
+    return patrimonio_service.list_snapshots(limit=limit, offset=offset)
 
 
 @app.post("/api/patrimonio/import")
