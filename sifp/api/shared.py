@@ -7,15 +7,21 @@ partes não acabarem com DUAS instâncias separadas do mesmo singleton.
 
 O caso concreto que isso evita: CategorizationService.train() atualiza
 self.model em memória E grava em disco (categorizer_model.joblib). Se cada
-módulo carregasse a própria instância, um retreino disparado por um
-usuário do SaaS não apareceria pro Streamlit (ou vice-versa) até o
-processo reiniciar — inconsistência silenciosa. Com uma instância só,
-qualquer retreino (de qualquer origem) atualiza o mesmo objeto em memória
-pros dois caminhos.
+módulo carregasse a própria instância, um retreino disparado pelo app
+pessoal não apareceria em routes_saas.py (ou vice-versa) até o processo
+reiniciar — inconsistência silenciosa.
 
-O modelo de categorização em si é deliberadamente global (não por
-usuário/tenant) — é sugestão de categoria, não dado financeiro sensível
-(ver memória project_sifp_multiuser_scaling).
+O modelo é global (não por usuário/tenant) por design, mas isso só é
+seguro no app pessoal (single-tenant, um usuário só). No SaaS,
+routes_saas.py::_refresh_model() está deliberadamente DESLIGADO (não
+chama .train()) — treinar esse modelo único com dados de um cliente
+sobrescreveria o modelo global usado nas sugestões de todos os outros, e
+o vetorizador TF-IDF guarda n-gramas literais de descrições reais (nome
+de contraparte de Pix, por exemplo), que é dado pessoal de terceiro. Um
+modelo por tenant é o caminho de médio prazo; até lá, as camadas 0-3 de
+categorização (memória por descrição, self-transfer, palavra-chave,
+categoria do banco) são por usuário via RLS e cobrem a maior parte dos
+casos sem precisar do ML.
 """
 
 import io

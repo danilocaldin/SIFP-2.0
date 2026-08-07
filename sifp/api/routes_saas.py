@@ -341,8 +341,20 @@ def _import_service(r: dict) -> ImportService:
 
 
 def _refresh_model(r: dict) -> str:
-    training_df = r["transaction_repo"].get_training_data()
-    return categorization_service.train(training_df)
+    # O modelo de ML (sifp/api/shared.py::categorization_service) é uma
+    # ÚNICA instância de processo, compartilhada por TODOS os clientes do
+    # SaaS -- treinar aqui com as transações de UM cliente sobrescreve o
+    # modelo global usado nas sugestões de todo mundo, e o vetorizador
+    # TF-IDF guarda n-gramas literais de descrições reais (ex: nome de
+    # quem recebeu um Pix), que é dado pessoal de terceiro sendo
+    # processado sem base legal nenhuma. Desligado até existir um modelo
+    # por tenant -- as camadas 0-3 de categorização (memória por
+    # descrição, self-transfer, palavra-chave, categoria do banco) já são
+    # por usuário (RLS) e cobrem a maior parte dos casos sem o ML.
+    return (
+        "Retreino automático desligado no modo multiusuário — a categorização por "
+        "regras e pela sua própria memória de revisões continua funcionando normalmente."
+    )
 
 
 @router.post("/upload/preview")
