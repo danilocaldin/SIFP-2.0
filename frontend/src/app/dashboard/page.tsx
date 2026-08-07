@@ -35,7 +35,7 @@ export default async function DashboardPage({
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-12 sm:py-16">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-muted-foreground">Dashboard</p>
           <h1 className="mt-1 text-xl font-semibold">Visão geral das finanças</h1>
@@ -59,7 +59,7 @@ export default async function DashboardPage({
           </>
         ) : (
           <>
-            ficou <span className="font-semibold text-red-500">{formatBRL(Math.abs(dashboard.saldo))} no vermelho</span>.
+            ficou <span className="font-semibold text-red-600 dark:text-red-400">{formatBRL(Math.abs(dashboard.saldo))} no vermelho</span>.
           </>
         )}
       </p>
@@ -182,7 +182,7 @@ function StatCard({
         <p className="text-sm text-muted-foreground">{label}</p>
         <p className="text-2xl font-semibold tracking-tight">{value}</p>
         {delta !== null && (
-          <p className={`text-xs font-medium ${positive ? "text-emerald-600" : "text-red-500"}`}>
+          <p className={`text-xs font-medium ${positive ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
             {formatPctSigned(delta)} vs mês anterior
           </p>
         )}

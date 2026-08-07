@@ -27,7 +27,7 @@ export function MonthSelect({
         router.push(value === "todos" ? "/dashboard" : `/dashboard?month=${value}`);
       }}
     >
-      <SelectTrigger className="w-[180px]">
+      <SelectTrigger className="w-full sm:w-[180px]">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

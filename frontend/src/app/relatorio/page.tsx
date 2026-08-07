@@ -20,7 +20,7 @@ export default async function RelatorioPage({
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-12 sm:py-16">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-muted-foreground">Relatório</p>
           <h1 className="mt-1 text-xl font-semibold">Relatório financeiro</h1>

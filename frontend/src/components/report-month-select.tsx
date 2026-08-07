@@ -28,7 +28,7 @@ export function ReportMonthSelect({
         router.push(`/relatorio?month=${value}`);
       }}
     >
-      <SelectTrigger className="w-[180px]">
+      <SelectTrigger className="w-full sm:w-[180px]">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

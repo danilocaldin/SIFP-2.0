@@ -89,7 +89,7 @@ export default function ChatPage() {
       {erro && (
         <Card className="mt-4">
           <CardContent>
-            <p className="text-sm text-red-500">⚠️ {erro}</p>
+            <p className="text-sm text-red-600 dark:text-red-400">⚠️ {erro}</p>
           </CardContent>
         </Card>
       )}

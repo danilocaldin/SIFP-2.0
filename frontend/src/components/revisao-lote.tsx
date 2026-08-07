@@ -71,8 +71,8 @@ export function RevisaoLote({
           </div>
         ))}
       </div>
-      {message && <p className="text-sm text-emerald-600">✅ {message}</p>}
-      {error && <p className="text-sm text-red-500">⚠️ {error}</p>}
+      {message && <p className="text-sm text-emerald-700 dark:text-emerald-400">✅ {message}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">⚠️ {error}</p>}
     </div>
   );
 }

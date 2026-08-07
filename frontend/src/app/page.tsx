@@ -34,7 +34,7 @@ export default async function Home() {
         {resumo.delta_saldo_pct !== null && (
           <span
             className={`text-sm font-medium ${
-              resumo.delta_saldo_pct >= 0 ? "text-emerald-600" : "text-red-500"
+              resumo.delta_saldo_pct >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
             }`}
           >
             {formatPctSigned(resumo.delta_saldo_pct)} de saldo vs mês anterior
@@ -72,7 +72,7 @@ export default async function Home() {
           ) : (
             <>
               Em {resumo.mes_label}, você fechou{" "}
-              <span className="font-medium text-red-500">
+              <span className="font-medium text-red-600 dark:text-red-400">
                 {formatBRL(Math.abs(resumo.saldo))} no vermelho
               </span>
               .
@@ -190,7 +190,7 @@ function StatCard({
         {delta !== undefined && delta !== null && (
           <p
             className={`text-xs font-medium ${
-              delta >= 0 ? "text-emerald-600" : "text-red-500"
+              delta >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
             }`}
           >
             {formatPctSigned(delta)} vs mês anterior

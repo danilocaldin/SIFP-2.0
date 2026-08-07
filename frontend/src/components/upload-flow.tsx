@@ -94,7 +94,7 @@ export function UploadFlow() {
 
       {status.kind === "loading" && <p className="text-sm text-muted-foreground">Lendo arquivo…</p>}
 
-      {status.kind === "error" && <p className="text-sm text-red-500">⚠️ {status.message}</p>}
+      {status.kind === "error" && <p className="text-sm text-red-600 dark:text-red-400">⚠️ {status.message}</p>}
 
       {(status.kind === "previewed" || status.kind === "persisting") && (
         <div className="space-y-3">
@@ -163,7 +163,7 @@ export function UploadFlow() {
 
       {status.kind === "done" && (
         <div className="space-y-3">
-          <p className="text-sm text-emerald-600">
+          <p className="text-sm text-emerald-700 dark:text-emerald-400">
             ✅ {status.summary.inseridas} transação(ões) nova(s) importada(s).{" "}
             {status.summary.ignoradas_duplicadas} já existia(m) no banco e foram ignorada(s) (sem
             duplicidade).
