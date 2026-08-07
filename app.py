@@ -11,6 +11,7 @@ Rodar com:
     streamlit run app.py
 """
 
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -20,6 +21,8 @@ load_dotenv()
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 from sifp.domain.categories import CATEGORIAS_PADRAO, CATEGORIA_NAO_CATEGORIZADO, SELF_TRANSFER_CATEGORY
 from sifp.importers.btg_importer import BTGImporter
@@ -230,6 +233,7 @@ with tab_resumo:
                     st.session_state.narrativa_texto = None
                     st.session_state.narrativa_erro = str(e)
                 except Exception:
+                    logger.exception("Falha ao gerar narrativa do mês")
                     st.session_state.narrativa_texto = None
                     st.session_state.narrativa_erro = "Falha ao gerar a explicação. Tente novamente em instantes."
 
@@ -1261,6 +1265,7 @@ with tab_chat:
                 except ChatIndisponivel as e:
                     resposta = f"⚠️ {e}"
                 except Exception:
+                    logger.exception("Falha ao gerar resposta do chat")
                     resposta = "⚠️ Falha ao gerar a resposta. Tente novamente em instantes."
             st.markdown(resposta)
         st.session_state.chat_mensagens.append({"role": "assistant", "content": resposta})

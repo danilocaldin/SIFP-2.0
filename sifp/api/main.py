@@ -12,11 +12,14 @@ Rodar com:
     uvicorn sifp.api.main:app --reload --port 8000
 """
 
+import logging
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -162,6 +165,7 @@ def narrativa():
     except NarrativaIndisponivel as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception:
+        logger.exception("Falha ao gerar narrativa do mês")
         raise HTTPException(status_code=502, detail="Falha ao gerar a explicação. Tente novamente em instantes.")
     return {"texto": texto}
 
@@ -186,6 +190,7 @@ def chat(body: ChatIn):
     except ChatIndisponivel as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception:
+        logger.exception("Falha ao gerar resposta do chat")
         raise HTTPException(status_code=502, detail="Falha ao gerar a resposta. Tente novamente em instantes.")
     return {"resposta": resposta}
 

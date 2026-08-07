@@ -36,12 +36,15 @@ injetado (em vez de módulo global) para ficar testável sem tocar disco.
 Se nada bater, 'Não categorizado' com confiança 0.
 """
 
+import logging
 import re
 from pathlib import Path
 
 import joblib
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
+
+logger = logging.getLogger(__name__)
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
@@ -245,7 +248,7 @@ class CategorizationService:
                     classes[best_idx], float(proba[best_idx]), CategorySource.ML_MODEL
                 )
             except Exception:
-                pass
+                logger.exception("Falha ao prever categoria via modelo de ML para: %r", description)
 
         return CategorySuggestion(CATEGORIA_NAO_CATEGORIZADO, 0.0, CategorySource.NONE)
 

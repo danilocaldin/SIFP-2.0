@@ -20,6 +20,7 @@ não dado financeiro sensível.
 
 from __future__ import annotations
 
+import logging
 import os
 
 import psycopg
@@ -28,6 +29,8 @@ from pydantic import BaseModel
 
 from sifp.api.auth import get_current_user_name, get_db
 from sifp.api.shared import as_file_like, categorization_service, transactions_payload
+
+logger = logging.getLogger(__name__)
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
 from sifp.importers.btg_importer import BTGImporter
 from sifp.importers.btg_investment_importer import BTGInvestmentImporter
@@ -437,6 +440,7 @@ def narrativa(conn: psycopg.Connection = Depends(get_db)):
     except NarrativaIndisponivel as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception:
+        logger.exception("Falha ao gerar narrativa do mês")
         raise HTTPException(status_code=502, detail="Falha ao gerar a explicação. Tente novamente em instantes.")
     return {"texto": texto}
 
@@ -461,5 +465,6 @@ def chat(body: ChatIn, conn: psycopg.Connection = Depends(get_db)):
     except ChatIndisponivel as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception:
+        logger.exception("Falha ao gerar resposta do chat")
         raise HTTPException(status_code=502, detail="Falha ao gerar a resposta. Tente novamente em instantes.")
     return {"resposta": resposta}
