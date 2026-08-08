@@ -334,7 +334,8 @@ def criar_meta(body: GoalIn):
 
 @app.patch("/api/metas/{goal_id}")
 def atualizar_progresso_meta(goal_id: int, body: GoalProgressIn):
-    goal_repo.update_progress(goal_id, body.valor_acumulado)
+    if not goal_repo.update_progress(goal_id, body.valor_acumulado):
+        raise HTTPException(status_code=404, detail="Meta não encontrada.")
     return {"ok": True}
 
 
@@ -385,13 +386,15 @@ def criar_despesa_fixa(body: DespesaFixaIn):
 
 @app.patch("/api/despesas-fixas/{despesa_id}/parcela")
 def atualizar_parcela_despesa_fixa(despesa_id: int, body: DespesaFixaParcelaIn):
-    despesa_fixa_repo.update_parcela_atual(despesa_id, body.parcela_atual)
+    if not despesa_fixa_repo.update_parcela_atual(despesa_id, body.parcela_atual):
+        raise HTTPException(status_code=404, detail="Despesa fixa não encontrada.")
     return {"ok": True}
 
 
 @app.post("/api/despesas-fixas/{despesa_id}/encerrar")
 def encerrar_despesa_fixa(despesa_id: int):
-    despesa_fixa_repo.set_ativa(despesa_id, False)
+    if not despesa_fixa_repo.set_ativa(despesa_id, False):
+        raise HTTPException(status_code=404, detail="Despesa fixa não encontrada.")
     return {"ok": True}
 
 

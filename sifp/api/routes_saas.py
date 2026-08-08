@@ -231,7 +231,8 @@ def criar_meta(body: GoalIn, conn: psycopg.Connection = Depends(get_db)):
 
 @router.patch("/metas/{goal_id}")
 def atualizar_progresso_meta(goal_id: int, body: GoalProgressIn, conn: psycopg.Connection = Depends(get_db)):
-    _repos(conn)["goal_repo"].update_progress(goal_id, body.valor_acumulado)
+    if not _repos(conn)["goal_repo"].update_progress(goal_id, body.valor_acumulado):
+        raise HTTPException(status_code=404, detail="Meta não encontrada.")
     return {"ok": True}
 
 
@@ -285,13 +286,15 @@ def criar_despesa_fixa(body: DespesaFixaIn, conn: psycopg.Connection = Depends(g
 def atualizar_parcela_despesa_fixa(
     despesa_id: int, body: DespesaFixaParcelaIn, conn: psycopg.Connection = Depends(get_db)
 ):
-    _repos(conn)["despesa_fixa_repo"].update_parcela_atual(despesa_id, body.parcela_atual)
+    if not _repos(conn)["despesa_fixa_repo"].update_parcela_atual(despesa_id, body.parcela_atual):
+        raise HTTPException(status_code=404, detail="Despesa fixa não encontrada.")
     return {"ok": True}
 
 
 @router.post("/despesas-fixas/{despesa_id}/encerrar")
 def encerrar_despesa_fixa(despesa_id: int, conn: psycopg.Connection = Depends(get_db)):
-    _repos(conn)["despesa_fixa_repo"].set_ativa(despesa_id, False)
+    if not _repos(conn)["despesa_fixa_repo"].set_ativa(despesa_id, False):
+        raise HTTPException(status_code=404, detail="Despesa fixa não encontrada.")
     return {"ok": True}
 
 

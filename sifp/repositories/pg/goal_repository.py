@@ -28,9 +28,10 @@ class GoalRepository:
         )
         return cur.fetchone()[0]
 
-    def update_progress(self, conn: psycopg.Connection, goal_id: int, valor_acumulado: float) -> None:
+    def update_progress(self, conn: psycopg.Connection, goal_id: int, valor_acumulado: float) -> bool:
         cur = conn.cursor()
         cur.execute("UPDATE goals SET valor_acumulado = %s WHERE id = %s", (valor_acumulado, goal_id))
+        return cur.rowcount > 0
 
     def delete(self, conn: psycopg.Connection, goal_id: int) -> bool:
         cur = conn.cursor()

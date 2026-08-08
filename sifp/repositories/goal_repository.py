@@ -30,12 +30,14 @@ class GoalRepository:
         conn.close()
         return goal_id
 
-    def update_progress(self, goal_id: int, valor_acumulado: float) -> None:
+    def update_progress(self, goal_id: int, valor_acumulado: float) -> bool:
         conn = self._connect()
         cur = conn.cursor()
         cur.execute("UPDATE goals SET valor_acumulado = ? WHERE id = ?", (valor_acumulado, goal_id))
         conn.commit()
+        atualizou = cur.rowcount > 0
         conn.close()
+        return atualizou
 
     def delete(self, goal_id: int) -> bool:
         conn = self._connect()

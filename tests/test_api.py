@@ -289,6 +289,24 @@ def test_excluir_despesa_fixa_inexistente_retorna_404():
     assert resp.status_code == 404
 
 
+def test_atualizar_progresso_meta_inexistente_retorna_404():
+    """Achado real de auditoria: update_progress() não checava rowcount --
+    igual ao bug já corrigido em delete(), um PATCH num id inexistente
+    (ex: já apagado em outra aba) respondia "ok" sem gravar nada."""
+    resp = client.patch("/api/metas/999999999", json={"valor_acumulado": 100.0})
+    assert resp.status_code == 404
+
+
+def test_atualizar_parcela_despesa_fixa_inexistente_retorna_404():
+    resp = client.patch("/api/despesas-fixas/999999999/parcela", json={"parcela_atual": 3})
+    assert resp.status_code == 404
+
+
+def test_encerrar_despesa_fixa_inexistente_retorna_404():
+    resp = client.post("/api/despesas-fixas/999999999/encerrar")
+    assert resp.status_code == 404
+
+
 def test_atualizar_progresso_meta_com_valor_negativo_e_rejeitado():
     resp = client.patch("/api/metas/1", json={"valor_acumulado": -100.0})
     assert resp.status_code == 422

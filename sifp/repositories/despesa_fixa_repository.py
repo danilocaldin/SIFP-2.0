@@ -44,19 +44,23 @@ class DespesaFixaRepository:
         conn.close()
         return despesa_id
 
-    def update_parcela_atual(self, despesa_id: int, parcela_atual: int) -> None:
+    def update_parcela_atual(self, despesa_id: int, parcela_atual: int) -> bool:
         conn = self._connect()
         cur = conn.cursor()
         cur.execute("UPDATE despesas_fixas SET parcela_atual = ? WHERE id = ?", (parcela_atual, despesa_id))
         conn.commit()
+        atualizou = cur.rowcount > 0
         conn.close()
+        return atualizou
 
-    def set_ativa(self, despesa_id: int, ativa: bool) -> None:
+    def set_ativa(self, despesa_id: int, ativa: bool) -> bool:
         conn = self._connect()
         cur = conn.cursor()
         cur.execute("UPDATE despesas_fixas SET ativa = ? WHERE id = ?", (1 if ativa else 0, despesa_id))
         conn.commit()
+        atualizou = cur.rowcount > 0
         conn.close()
+        return atualizou
 
     def delete(self, despesa_id: int) -> bool:
         conn = self._connect()

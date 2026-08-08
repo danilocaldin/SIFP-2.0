@@ -38,13 +38,15 @@ class DespesaFixaRepository:
         )
         return cur.fetchone()[0]
 
-    def update_parcela_atual(self, conn: psycopg.Connection, despesa_id: int, parcela_atual: int) -> None:
+    def update_parcela_atual(self, conn: psycopg.Connection, despesa_id: int, parcela_atual: int) -> bool:
         cur = conn.cursor()
         cur.execute("UPDATE despesas_fixas SET parcela_atual = %s WHERE id = %s", (parcela_atual, despesa_id))
+        return cur.rowcount > 0
 
-    def set_ativa(self, conn: psycopg.Connection, despesa_id: int, ativa: bool) -> None:
+    def set_ativa(self, conn: psycopg.Connection, despesa_id: int, ativa: bool) -> bool:
         cur = conn.cursor()
         cur.execute("UPDATE despesas_fixas SET ativa = %s WHERE id = %s", (ativa, despesa_id))
+        return cur.rowcount > 0
 
     def delete(self, conn: psycopg.Connection, despesa_id: int) -> bool:
         cur = conn.cursor()
