@@ -498,6 +498,20 @@ def test_chat_rejects_empty_mensagens():
     assert resp.status_code == 400
 
 
+def test_chat_rejects_muitas_mensagens():
+    """Achado real de auditoria: /chat reenvia a conversa inteira a cada
+    chamada sem nenhum cap de tamanho -- um payload arbitrariamente
+    grande é reprocessado e faturado direto na chave da Anthropic."""
+    mensagens = [{"role": "user", "content": "oi"}] * 61
+    resp = client.post("/api/chat", json={"mensagens": mensagens})
+    assert resp.status_code == 422
+
+
+def test_chat_rejects_mensagem_muito_longa():
+    resp = client.post("/api/chat", json={"mensagens": [{"role": "user", "content": "a" * 4001}]})
+    assert resp.status_code == 422
+
+
 def test_chat_returns_503_when_indisponivel(monkeypatch):
     def _raise(mensagens):
         raise ChatIndisponivel("sem dados")

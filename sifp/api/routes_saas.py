@@ -28,7 +28,14 @@ from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
 from pydantic import BaseModel, field_validator
 
 from sifp.api.auth import get_current_user_id, get_current_user_name, get_db
-from sifp.api.shared import as_file_like, categorization_service, transactions_payload, validar_categoria
+from sifp.api.shared import (
+    as_file_like,
+    categorization_service,
+    transactions_payload,
+    validar_categoria,
+    validar_mensagens_chat,
+    validar_tamanho_upload,
+)
 
 logger = logging.getLogger(__name__)
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
@@ -146,6 +153,7 @@ def patrimonio_snapshots(limit: int = 200, offset: int = 0, conn: psycopg.Connec
 
 @router.post("/patrimonio/import")
 def patrimonio_import(file: UploadFile, conn: psycopg.Connection = Depends(get_db)):
+    validar_tamanho_upload(file)
     if not _investment_importer.supports(file.filename or ""):
         raise HTTPException(status_code=400, detail="Envie um arquivo PDF do extrato de investimento.")
     r = _repos(conn)
@@ -380,6 +388,7 @@ def _refresh_model(r: dict) -> str:
 
 @router.post("/upload/preview")
 def upload_preview(file: UploadFile, conn: psycopg.Connection = Depends(get_db)):
+    validar_tamanho_upload(file)
     r = _repos(conn)
     try:
         df, balances = _import_service(r).parse(as_file_like(file))
@@ -394,6 +403,7 @@ def upload_preview(file: UploadFile, conn: psycopg.Connection = Depends(get_db))
 
 @router.post("/upload/persist")
 def upload_persist(file: UploadFile, conn: psycopg.Connection = Depends(get_db)):
+    validar_tamanho_upload(file)
     r = _repos(conn)
     try:
         summary = _import_service(r).import_and_persist(as_file_like(file))
@@ -502,6 +512,8 @@ class ChatMensagem(BaseModel):
 
 class ChatIn(BaseModel):
     mensagens: list[ChatMensagem]
+
+    _validar_mensagens = field_validator("mensagens")(validar_mensagens_chat)
 
 
 @router.post("/chat")

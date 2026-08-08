@@ -27,7 +27,14 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 
 from sifp.api.routes_saas import router as saas_router
-from sifp.api.shared import as_file_like, categorization_service, transactions_payload, validar_categoria
+from sifp.api.shared import (
+    as_file_like,
+    categorization_service,
+    transactions_payload,
+    validar_categoria,
+    validar_mensagens_chat,
+    validar_tamanho_upload,
+)
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
 from sifp.importers.btg_importer import BTGImporter
 from sifp.importers.btg_investment_importer import BTGInvestmentImporter
@@ -185,6 +192,8 @@ class ChatMensagem(BaseModel):
 class ChatIn(BaseModel):
     mensagens: list[ChatMensagem]
 
+    _validar_mensagens = field_validator("mensagens")(validar_mensagens_chat)
+
 
 @app.post("/api/chat")
 def chat(body: ChatIn):
@@ -229,6 +238,7 @@ def patrimonio_snapshots(limit: int = 200, offset: int = 0):
 
 @app.post("/api/patrimonio/import")
 def patrimonio_import(file: UploadFile):
+    validar_tamanho_upload(file)
     if not investment_importer.supports(file.filename or ""):
         raise HTTPException(status_code=400, detail="Envie um arquivo PDF do extrato de investimento.")
     try:
@@ -394,6 +404,7 @@ def relatorio_pdf(month: str | None = None):
 
 @app.post("/api/upload/preview")
 def upload_preview(file: UploadFile):
+    validar_tamanho_upload(file)
     try:
         df, balances = import_service.parse(as_file_like(file))
     except ValueError as e:
@@ -407,6 +418,7 @@ def upload_preview(file: UploadFile):
 
 @app.post("/api/upload/persist")
 def upload_persist(file: UploadFile):
+    validar_tamanho_upload(file)
     try:
         summary = import_service.import_and_persist(as_file_like(file))
     except ValueError as e:

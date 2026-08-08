@@ -26,12 +26,52 @@ casos sem precisar do ML.
 
 import io
 
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 
 from sifp.domain.categories import CATEGORIAS_PADRAO
 from sifp.intelligence.categorization import CategorizationService
 
 categorization_service = CategorizationService.load()
+
+# Achado real de auditoria: nenhuma rota de upload checava tamanho —
+# só a extensão do nome do arquivo. Um XLSX/PDF gigante (ou uma
+# zip-bomb) era lido inteiro pra memória e podia derrubar o processo
+# pra todos os clientes. 25MB é bem acima do maior extrato/PDF real de
+# investimento visto em uso (esses ficam na casa de poucos MB).
+MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024
+
+
+def validar_tamanho_upload(file: UploadFile) -> None:
+    """Rejeita ANTES de ler o arquivo pra memória (as_file_like) ou
+    passá-lo pro importer/pandas. `file.size` já reflete o tamanho real
+    nesse ponto — o Starlette termina de bufferizar o multipart inteiro
+    antes de chamar a rota, então isso não evita o upload em si, mas
+    evita o segundo (e mais caro) carregamento inteiro em memória."""
+    if file.size is not None and file.size > MAX_UPLOAD_SIZE_BYTES:
+        limite_mb = MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)
+        raise HTTPException(
+            status_code=413, detail=f"Arquivo muito grande. O limite é {limite_mb}MB."
+        )
+
+
+# Achado real de auditoria: /chat reenvia a conversa inteira a cada
+# chamada (design stateless, sem sessão/histórico no servidor) sem
+# nenhum cap de quantidade de mensagens nem de tamanho de conteúdo --
+# um payload arbitrariamente grande é reprocessado e reenviado pra
+# Anthropic a cada chamada, faturado direto na chave do Danilo.
+MAX_CHAT_MENSAGENS = 60
+MAX_CHAT_CONTEUDO_CHARS = 4000
+
+
+def validar_mensagens_chat(cls, mensagens: list) -> list:
+    """Validator reutilizável (Pydantic v2) pro campo `mensagens` de
+    ChatIn, em main.py e routes_saas.py."""
+    if len(mensagens) > MAX_CHAT_MENSAGENS:
+        raise ValueError(f"Muitas mensagens na conversa (máximo {MAX_CHAT_MENSAGENS}).")
+    for m in mensagens:
+        if len(m.content) > MAX_CHAT_CONTEUDO_CHARS:
+            raise ValueError(f"Mensagem muito longa (máximo {MAX_CHAT_CONTEUDO_CHARS} caracteres).")
+    return mensagens
 
 
 def validar_categoria(cls, v: str) -> str:
