@@ -24,7 +24,10 @@ export function MonthSelect({
     <Select
       value={selected ?? "todos"}
       onValueChange={(value) => {
-        router.push(value === "todos" ? "/dashboard" : `/dashboard?month=${value}`);
+        if (!value) return;
+        router.push(
+          value === "todos" ? "/dashboard" : `/dashboard?${new URLSearchParams({ month: value })}`
+        );
       }}
     >
       <SelectTrigger className="w-full sm:w-[180px]">

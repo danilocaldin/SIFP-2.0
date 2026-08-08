@@ -25,7 +25,7 @@ export function ReportMonthSelect({
       value={selected}
       onValueChange={(value) => {
         if (!value) return;
-        router.push(`/relatorio?month=${value}`);
+        router.push(`/relatorio?${new URLSearchParams({ month: value })}`);
       }}
     >
       <SelectTrigger className="w-full sm:w-[180px]">

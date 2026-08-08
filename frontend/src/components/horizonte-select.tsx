@@ -17,7 +17,10 @@ export function HorizonteSelect({ horizonte }: { horizonte: number }) {
   return (
     <Select
       value={String(horizonte)}
-      onValueChange={(value) => router.push(`/projecoes?horizonte=${value}`)}
+      onValueChange={(value) => {
+        if (!value) return;
+        router.push(`/projecoes?${new URLSearchParams({ horizonte: value })}`);
+      }}
     >
       <SelectTrigger className="w-[140px]">
         <SelectValue />

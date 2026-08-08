@@ -7,6 +7,7 @@ import { baixarRelatorioPdf } from "@/lib/api";
 export function ReportActions({ reportText, month }: { reportText: string; month: string }) {
   const [copied, setCopied] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
   async function handleCopy() {
     await navigator.clipboard.writeText(reportText);
@@ -26,6 +27,7 @@ export function ReportActions({ reportText, month }: { reportText: string; month
 
   async function handleDownloadPdf() {
     setGerandoPdf(true);
+    setErro(null);
     try {
       const blob = await baixarRelatorioPdf(month);
       const url = URL.createObjectURL(blob);
@@ -35,23 +37,26 @@ export function ReportActions({ reportText, month }: { reportText: string; month
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert("Não foi possível gerar o PDF. Tente novamente em instantes.");
+      setErro("Não foi possível gerar o PDF. Tente novamente em instantes.");
     } finally {
       setGerandoPdf(false);
     }
   }
 
   return (
-    <div className="flex gap-2">
-      <Button variant="outline" size="sm" onClick={handleCopy}>
-        {copied ? "Copiado!" : "Copiar"}
-      </Button>
-      <Button variant="outline" size="sm" onClick={handleDownload}>
-        Baixar (.txt)
-      </Button>
-      <Button size="sm" onClick={handleDownloadPdf} disabled={gerandoPdf}>
-        {gerandoPdf ? "Gerando…" : "Baixar PDF"}
-      </Button>
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={handleCopy}>
+          {copied ? "Copiado!" : "Copiar"}
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleDownload}>
+          Baixar (.txt)
+        </Button>
+        <Button size="sm" onClick={handleDownloadPdf} disabled={gerandoPdf}>
+          {gerandoPdf ? "Gerando…" : "Baixar PDF"}
+        </Button>
+      </div>
+      {erro && <p className="text-sm text-destructive">⚠️ {erro}</p>}
     </div>
   );
 }

@@ -36,7 +36,7 @@ export default async function ProjecoesPage({
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 sm:py-16">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-muted-foreground">Projeções</p>
           <h1 className="mt-1 text-xl font-semibold">
