@@ -218,6 +218,29 @@ def test_criar_limite_com_valor_invalido_e_rejeitado():
     assert resp.status_code == 400
 
 
+def test_criar_limite_com_categoria_inexistente_e_rejeitado():
+    """Achado real de auditoria: uma categoria digitada errada (via
+    chamada direta à API, não pela UI) virava rótulo permanente de treino
+    do modelo de ML e voltava como sugestão pra sempre."""
+    resp = client.post("/api/orcamento/limites", json={"category": "Categoria Que Nao Existe", "valor": 100.0})
+    assert resp.status_code == 422
+
+
+def test_revisao_lote_com_categoria_inexistente_e_rejeitado():
+    resp = client.post(
+        "/api/revisao/lote", json={"description": "qualquer coisa", "category": "Categoria Que Nao Existe"}
+    )
+    assert resp.status_code == 422
+
+
+def test_revisao_confirmar_com_categoria_inexistente_e_rejeitado():
+    resp = client.post(
+        "/api/revisao/confirmar",
+        json={"updates": [{"tx_hash": "abc123", "category": "Categoria Que Nao Existe"}]},
+    )
+    assert resp.status_code == 422
+
+
 def test_ciclo_completo_de_meta():
     resp = client.post(
         "/api/metas",

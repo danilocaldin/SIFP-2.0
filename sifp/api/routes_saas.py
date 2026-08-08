@@ -25,10 +25,10 @@ import os
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from sifp.api.auth import get_current_user_id, get_current_user_name, get_db
-from sifp.api.shared import as_file_like, categorization_service, transactions_payload
+from sifp.api.shared import as_file_like, categorization_service, transactions_payload, validar_categoria
 
 logger = logging.getLogger(__name__)
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
@@ -170,6 +170,8 @@ class LimiteIn(BaseModel):
     category: str
     valor: float
 
+    _validar_categoria = field_validator("category")(validar_categoria)
+
 
 @router.get("/orcamento")
 def orcamento(conn: psycopg.Connection = Depends(get_db)):
@@ -236,6 +238,8 @@ class DespesaFixaIn(BaseModel):
     data_inicio: str  # "YYYY-MM-DD"
     parcela_atual: int | None = None
     parcelas_totais: int | None = None
+
+    _validar_categoria = field_validator("categoria")(validar_categoria)
 
 
 class DespesaFixaParcelaIn(BaseModel):
@@ -408,6 +412,8 @@ class RevisaoLoteIn(BaseModel):
     description: str
     category: str
 
+    _validar_categoria = field_validator("category")(validar_categoria)
+
 
 @router.post("/revisao/lote")
 def revisao_lote(body: RevisaoLoteIn, conn: psycopg.Connection = Depends(get_db)):
@@ -422,6 +428,8 @@ def revisao_lote(body: RevisaoLoteIn, conn: psycopg.Connection = Depends(get_db)
 class RevisaoUpdate(BaseModel):
     tx_hash: str
     category: str
+
+    _validar_categoria = field_validator("category")(validar_categoria)
 
 
 class RevisaoConfirmarIn(BaseModel):

@@ -28,9 +28,25 @@ import io
 
 from fastapi import UploadFile
 
+from sifp.domain.categories import CATEGORIAS_PADRAO
 from sifp.intelligence.categorization import CategorizationService
 
 categorization_service = CategorizationService.load()
+
+
+def validar_categoria(cls, v: str) -> str:
+    """Validator reutilizável (Pydantic v2, `field_validator("...")(validar_categoria)`)
+    pros DTOs que recebem uma categoria como texto livre (LimiteIn,
+    DespesaFixaIn, RevisaoLoteIn, RevisaoUpdate, em main.py e
+    routes_saas.py). Achado real de auditoria: sem essa checagem, uma
+    categoria digitada errada (via chamada direta à API, não pela UI)
+    virava rótulo permanente de treino do modelo de ML e voltava como
+    sugestão pra sempre."""
+    if v not in CATEGORIAS_PADRAO:
+        raise ValueError(
+            f"Categoria inválida. Use uma das categorias existentes: {', '.join(CATEGORIAS_PADRAO)}."
+        )
+    return v
 
 
 def as_file_like(file: UploadFile) -> io.BytesIO:

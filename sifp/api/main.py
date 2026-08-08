@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from sifp.api.routes_saas import router as saas_router
-from sifp.api.shared import as_file_like, categorization_service, transactions_payload
+from sifp.api.shared import as_file_like, categorization_service, transactions_payload, validar_categoria
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
 from sifp.importers.btg_importer import BTGImporter
 from sifp.importers.btg_investment_importer import BTGInvestmentImporter
@@ -249,6 +249,8 @@ class LimiteIn(BaseModel):
     category: str
     valor: float
 
+    _validar_categoria = field_validator("category")(validar_categoria)
+
 
 @app.get("/api/orcamento")
 def orcamento():
@@ -312,6 +314,8 @@ class DespesaFixaIn(BaseModel):
     data_inicio: str  # "YYYY-MM-DD"
     parcela_atual: int | None = None
     parcelas_totais: int | None = None
+
+    _validar_categoria = field_validator("categoria")(validar_categoria)
 
 
 class DespesaFixaParcelaIn(BaseModel):
@@ -419,6 +423,8 @@ class RevisaoLoteIn(BaseModel):
     description: str
     category: str
 
+    _validar_categoria = field_validator("category")(validar_categoria)
+
 
 @app.post("/api/revisao/lote")
 def revisao_lote(body: RevisaoLoteIn):
@@ -432,6 +438,8 @@ def revisao_lote(body: RevisaoLoteIn):
 class RevisaoUpdate(BaseModel):
     tx_hash: str
     category: str
+
+    _validar_categoria = field_validator("category")(validar_categoria)
 
 
 class RevisaoConfirmarIn(BaseModel):
