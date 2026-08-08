@@ -28,6 +28,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field, field_validator
 
 from sifp.api.auth import get_current_user_id, get_current_user_name, get_db
+from sifp.api.rate_limit import rate_limiter
 from sifp.api.shared import (
     as_file_like,
     categorization_service,
@@ -152,7 +153,7 @@ def patrimonio_snapshots(limit: int = 200, offset: int = 0, conn: psycopg.Connec
     return patrimonio_service.list_snapshots(limit=limit, offset=offset)
 
 
-@router.post("/patrimonio/import")
+@router.post("/patrimonio/import", dependencies=[Depends(rate_limiter("patrimonio_import", 10, 60))])
 def patrimonio_import(file: UploadFile, conn: psycopg.Connection = Depends(get_db)):
     validar_tamanho_upload(file)
     if not _investment_importer.supports(file.filename or ""):
@@ -348,7 +349,7 @@ def relatorio(month: str | None = None, conn: psycopg.Connection = Depends(get_d
     return relatorio_service.build_relatorio(month, formatar_mes)
 
 
-@router.get("/relatorio/pdf")
+@router.get("/relatorio/pdf", dependencies=[Depends(rate_limiter("relatorio_pdf", 10, 60))])
 def relatorio_pdf(
     month: str | None = None,
     conn: psycopg.Connection = Depends(get_db),
@@ -395,7 +396,7 @@ def _refresh_model(r: dict) -> str:
     )
 
 
-@router.post("/upload/preview")
+@router.post("/upload/preview", dependencies=[Depends(rate_limiter("upload", 10, 60))])
 def upload_preview(file: UploadFile, conn: psycopg.Connection = Depends(get_db)):
     validar_tamanho_upload(file)
     r = _repos(conn)
@@ -410,7 +411,7 @@ def upload_preview(file: UploadFile, conn: psycopg.Connection = Depends(get_db))
     }
 
 
-@router.post("/upload/persist")
+@router.post("/upload/persist", dependencies=[Depends(rate_limiter("upload", 10, 60))])
 def upload_persist(file: UploadFile, conn: psycopg.Connection = Depends(get_db)):
     validar_tamanho_upload(file)
     r = _repos(conn)
@@ -488,7 +489,7 @@ def excluir_ativo(position_key: str, conn: psycopg.Connection = Depends(get_db))
     return {"ok": True}
 
 
-@router.post("/narrativa")
+@router.post("/narrativa", dependencies=[Depends(rate_limiter("narrativa", 10, 60))])
 def narrativa(user_id: str = Depends(get_current_user_id)):
     # Conexão Postgres aberta só pra ler o contexto (rápido) -- a chamada
     # à Anthropic logo abaixo pode levar segundos, e sem escopar a conexão
@@ -527,7 +528,7 @@ class ChatIn(BaseModel):
     _validar_mensagens = field_validator("mensagens")(validar_mensagens_chat)
 
 
-@router.post("/chat")
+@router.post("/chat", dependencies=[Depends(rate_limiter("chat", 20, 60))])
 def chat(body: ChatIn, user_id: str = Depends(get_current_user_id)):
     if not body.mensagens:
         raise HTTPException(status_code=400, detail="Envie ao menos uma mensagem.")

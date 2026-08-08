@@ -49,6 +49,10 @@ class RelatorioService:
         by_merchant = ind.merchant_concentration(period_df_real)
         monthly = ind.monthly_evolution(all_tx_real)
         latest_assets = self.asset_repo.get_latest_positions()
+        # Nota de transparência já mostrada no Dashboard, faltava aqui
+        # (melhoria viável da 3ª varredura) -- por isso usa period_df
+        # (COM self-transfer), não period_df_real.
+        self_transfer_total = ind.self_transfer_total(period_df)
 
         diagnostics = self.summary_service.diagnostics_for_month(all_tx, all_tx_real, month, period_label)
 
@@ -65,6 +69,7 @@ class RelatorioService:
             "latest_assets": latest_assets,
             "diagnostics": diagnostics,
             "debt_transactions": debt_transactions,
+            "self_transfer_total": self_transfer_total,
         }
 
     def build_relatorio(self, month: str | None, month_label_fmt) -> dict:
@@ -84,6 +89,7 @@ class RelatorioService:
             diagnostics=dados["diagnostics"],
             asset_positions=dados["latest_assets"],
             debt_transactions=dados["debt_transactions"],
+            self_transfer_total=dados["self_transfer_total"],
         )
 
         return {
@@ -121,4 +127,5 @@ class RelatorioService:
             nome_titular=nome_titular,
             debt_transactions=dados["debt_transactions"],
             patrimonio_total=patrimonio_total,
+            self_transfer_total=dados["self_transfer_total"],
         )

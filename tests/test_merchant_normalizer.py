@@ -69,3 +69,23 @@ def test_normalize_batch_matches_normalize(normalizer):
     descriptions = pd.Series(["UBER TRIP", "IFOOD*1", "Lançamento XYZ"])
     result = normalizer.normalize_batch(descriptions)
     assert list(result) == ["Uber", "iFood", "Lançamento Xyz"]
+
+
+def test_normalize_alias_mais_especifico_vence_mesmo_fora_de_ordem(normalizer, monkeypatch):
+    """Melhoria viável da 3ª varredura: antes, o PRIMEIRO alias que
+    casasse na ordem de inserção do dicionário vencia -- funcionava hoje
+    só porque "AMAZON PRIME" está escrito antes de "AMAZON" no
+    dicionário real, mas não era garantido pela lógica. Reordena o
+    dicionário de propósito (o curto primeiro) e confirma que o mais
+    específico ainda vence, igual a apply_keyword_rules já garante pra
+    categorização."""
+    import sifp.intelligence.merchant_normalizer as mod
+
+    aliases_fora_de_ordem = {
+        "AMAZON": "Amazon",
+        "AMAZON PRIME": "Amazon Prime",
+    }
+    monkeypatch.setattr(mod, "MERCHANT_ALIASES", aliases_fora_de_ordem)
+
+    assert normalizer.normalize("AMAZON PRIME VIDEO") == "Amazon Prime"
+    assert normalizer.normalize("AMAZON.COM.BR") == "Amazon"

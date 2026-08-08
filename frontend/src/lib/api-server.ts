@@ -21,6 +21,22 @@ import { createClient as createServerSupabaseClient } from "@/lib/supabase/serve
 // servidor-para-servidor — nunca passa pelo navegador, não precisa de CORS.
 const API_URL = process.env.SIFP_API_URL ?? "http://localhost:8000";
 
+// Achado real de auditoria (melhoria viável, 3ª varredura): todo erro
+// aqui descartava o corpo da resposta ("Falha ao buscar .../x: 500", sem
+// o `detail` real do FastAPI) -- a única pista de diagnóstico era esse
+// texto genérico chegando em error.tsx. api.ts já tinha essa função pra
+// chamadas do navegador; os dois arquivos continuam deliberadamente
+// separados (ver comentário acima), então a função é replicada aqui, não
+// importada de lá.
+async function parseErrorDetail(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json();
+    return body.detail ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 async function authHeadersServer(): Promise<Record<string, string>> {
   if (!SAAS_MODE) {
     // App pessoal: chamadas server-to-server (Server Components) usam a
@@ -44,7 +60,7 @@ export async function getResumo(): Promise<Resumo> {
     headers: await authHeadersServer(),
   });
   if (!res.ok) {
-    throw new Error(`Falha ao buscar ${API_PREFIX}/resumo: ${res.status}`);
+    throw new Error(await parseErrorDetail(res, `Falha ao buscar ${API_PREFIX}/resumo: ${res.status}`));
   }
   return res.json();
 }
@@ -54,7 +70,7 @@ export async function getDashboard(month?: string): Promise<Dashboard> {
   if (month) url.searchParams.set("month", month);
   const res = await fetch(url, { cache: "no-store", headers: await authHeadersServer() });
   if (!res.ok) {
-    throw new Error(`Falha ao buscar ${API_PREFIX}/dashboard: ${res.status}`);
+    throw new Error(await parseErrorDetail(res, `Falha ao buscar ${API_PREFIX}/dashboard: ${res.status}`));
   }
   return res.json();
 }
@@ -65,7 +81,7 @@ export async function getPatrimonio(): Promise<Patrimonio> {
     headers: await authHeadersServer(),
   });
   if (!res.ok) {
-    throw new Error(`Falha ao buscar ${API_PREFIX}/patrimonio: ${res.status}`);
+    throw new Error(await parseErrorDetail(res, `Falha ao buscar ${API_PREFIX}/patrimonio: ${res.status}`));
   }
   return res.json();
 }
@@ -75,7 +91,7 @@ export async function getProjecoes(horizonte: number = 12): Promise<Projecoes> {
   url.searchParams.set("horizonte", String(horizonte));
   const res = await fetch(url, { cache: "no-store", headers: await authHeadersServer() });
   if (!res.ok) {
-    throw new Error(`Falha ao buscar ${API_PREFIX}/projecoes: ${res.status}`);
+    throw new Error(await parseErrorDetail(res, `Falha ao buscar ${API_PREFIX}/projecoes: ${res.status}`));
   }
   return res.json();
 }
@@ -86,7 +102,7 @@ export async function getOrcamento(): Promise<OrcamentoData> {
     headers: await authHeadersServer(),
   });
   if (!res.ok) {
-    throw new Error(`Falha ao buscar ${API_PREFIX}/orcamento: ${res.status}`);
+    throw new Error(await parseErrorDetail(res, `Falha ao buscar ${API_PREFIX}/orcamento: ${res.status}`));
   }
   return res.json();
 }
@@ -97,7 +113,7 @@ export async function getMetas(): Promise<Goal[]> {
     headers: await authHeadersServer(),
   });
   if (!res.ok) {
-    throw new Error(`Falha ao buscar ${API_PREFIX}/metas: ${res.status}`);
+    throw new Error(await parseErrorDetail(res, `Falha ao buscar ${API_PREFIX}/metas: ${res.status}`));
   }
   return res.json();
 }
@@ -108,7 +124,7 @@ export async function getDespesasFixas(): Promise<DespesasFixasData> {
     headers: await authHeadersServer(),
   });
   if (!res.ok) {
-    throw new Error(`Falha ao buscar ${API_PREFIX}/despesas-fixas: ${res.status}`);
+    throw new Error(await parseErrorDetail(res, `Falha ao buscar ${API_PREFIX}/despesas-fixas: ${res.status}`));
   }
   return res.json();
 }
@@ -119,7 +135,7 @@ export async function getRevisao(): Promise<Revisao> {
     headers: await authHeadersServer(),
   });
   if (!res.ok) {
-    throw new Error(`Falha ao buscar ${API_PREFIX}/revisao: ${res.status}`);
+    throw new Error(await parseErrorDetail(res, `Falha ao buscar ${API_PREFIX}/revisao: ${res.status}`));
   }
   return res.json();
 }
@@ -129,7 +145,7 @@ export async function getRelatorio(month?: string): Promise<Relatorio> {
   if (month) url.searchParams.set("month", month);
   const res = await fetch(url, { cache: "no-store", headers: await authHeadersServer() });
   if (!res.ok) {
-    throw new Error(`Falha ao buscar ${API_PREFIX}/relatorio: ${res.status}`);
+    throw new Error(await parseErrorDetail(res, `Falha ao buscar ${API_PREFIX}/relatorio: ${res.status}`));
   }
   return res.json();
 }

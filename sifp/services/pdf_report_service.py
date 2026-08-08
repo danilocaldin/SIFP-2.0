@@ -403,6 +403,7 @@ def generate_pdf_report(
     debt_transactions: pd.DataFrame,
     patrimonio_total: float,
     nome_titular: str | None = None,
+    self_transfer_total: float = 0.0,
 ) -> bytes:
     buffer = BytesIO()
     content_width = A4[0] - 2 * _PAGE_MARGIN
@@ -543,6 +544,17 @@ def generate_pdf_report(
     # Resumo do mês
     story.append(Paragraph("Resumo do mês", _STYLES["h1"]))
     story.append(_resumo_table(summary, content_width))
+    # Nota de transparência (não é receita nem despesa) -- já mostrada no
+    # Dashboard, faltava aqui (melhoria viável da 3ª varredura).
+    if self_transfer_total > 0:
+        story.append(Spacer(1, 4))
+        story.append(
+            Paragraph(
+                f"{format_brl(self_transfer_total)} movimentados entre contas próprias neste "
+                "período — não contam como receita nem despesa acima.",
+                _STYLES["empty"],
+            )
+        )
 
     # Gastos por categoria
     story.append(Paragraph("Gastos por categoria", _STYLES["h1"]))

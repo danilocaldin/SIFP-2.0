@@ -110,12 +110,26 @@ class MerchantNormalizer:
 
         if lookup_key in MERCHANT_ALIASES:
             return MERCHANT_ALIASES[lookup_key]
+
+        # Coleta TODOS os aliases que casam e fica com o mais ESPECÍFICO
+        # (mais longo) -- mesmo padrão de apply_keyword_rules
+        # (categorization.py), reforçado depois de uma melhoria viável da
+        # 3ª varredura: até aqui, o primeiro alias que casasse na ordem de
+        # inserção do dicionário vencia (funcionava hoje só porque
+        # "AMAZON PRIME" está escrito antes de "AMAZON" em
+        # MERCHANT_ALIASES) -- um alias curto adicionado no lugar errado
+        # no futuro quebraria isso silenciosamente, sem nenhum teste
+        # acusando na hora da edição.
+        matches: list[tuple[int, str]] = []
         for alias_key, canonical in MERCHANT_ALIASES.items():
             # Limite de palavra (\b), não substring solta -- mesmo motivo
-            # de apply_keyword_rules (categorization.py): sem isso, "UBER"
-            # casava dentro de "UBERABA"/"UBERLANDIA".
+            # de apply_keyword_rules: sem isso, "UBER" casava dentro de
+            # "UBERABA"/"UBERLANDIA".
             if re.search(rf"\b{re.escape(alias_key)}\b", lookup_key):
-                return canonical
+                matches.append((len(alias_key), canonical))
+        if matches:
+            matches.sort(key=lambda m: m[0], reverse=True)
+            return matches[0][1]
 
         return text.title()
 

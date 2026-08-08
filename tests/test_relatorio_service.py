@@ -97,3 +97,33 @@ def test_build_relatorio_report_text_contains_expected_sections(service):
     assert "Financiamento carro" in text
     # sem escape de markdown vazando pro texto plano
     assert "R\\$" not in text
+
+
+def test_build_relatorio_mostra_self_transfer_total(tmp_db_path):
+    """Melhoria viável da 3ª varredura: self_transfer_total (nota de
+    transparência já mostrada no Dashboard) não chegava ao relatório --
+    _compor_periodo() usava só period_df_real (sem self-transfer),
+    nunca calculava o total sobre period_df (com self-transfer)."""
+    from sifp.domain.categories import SELF_TRANSFER_CATEGORY
+
+    init_db(tmp_db_path)
+    transaction_repo = TransactionRepository(tmp_db_path)
+    asset_repo = AssetRepository(tmp_db_path)
+    tx = pd.DataFrame([
+        {"date": "2026-06-05", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
+        {
+            "date": "2026-06-10", "description": "Fulano De Tal", "value": -1000.0,
+            "category": SELF_TRANSFER_CATEGORY, "self_transfer": True,
+        },
+    ])
+    transaction_repo.insert_new(tx)
+
+    summary_service = SummaryService(
+        transaction_repo, BalanceRepository(tmp_db_path), asset_repo, BudgetRepository(tmp_db_path),
+        GoalRepository(tmp_db_path), DespesaFixaRepository(tmp_db_path), PreferenciaRepository(tmp_db_path),
+    )
+    service = RelatorioService(transaction_repo, asset_repo, summary_service)
+
+    result = service.build_relatorio("2026-06", _mes)
+    assert "1.000,00" in result["report_text"]
+    assert "movimentados entre suas próprias contas" in result["report_text"]

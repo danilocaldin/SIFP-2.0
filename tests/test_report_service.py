@@ -158,6 +158,24 @@ def test_report_formata_mes_na_tabela_de_evolucao(summary, by_cat, by_merchant, 
     assert "2026-06" not in trecho
 
 
+def test_report_mostra_self_transfer_total_quando_maior_que_zero(summary, by_cat, by_merchant, monthly, diagnostics, asset_positions, debt_transactions):
+    """Melhoria viável da 3ª varredura: self_transfer_total (nota de
+    transparência já mostrada no Dashboard) não aparecia no relatório."""
+    report = generate_text_report(
+        "Jun/2026", summary, by_cat, by_merchant, monthly, diagnostics, asset_positions, debt_transactions,
+        self_transfer_total=1000.0,
+    )
+    assert "1.000,00" in report
+    assert "movimentados entre suas próprias contas" in report
+
+
+def test_report_omite_self_transfer_total_quando_zero(summary, by_cat, by_merchant, monthly, diagnostics, asset_positions, debt_transactions):
+    report = generate_text_report(
+        "Jun/2026", summary, by_cat, by_merchant, monthly, diagnostics, asset_positions, debt_transactions,
+    )
+    assert "movimentados entre suas próprias contas" not in report
+
+
 def test_report_handles_empty_sections_gracefully(summary, monthly):
     empty_df = pd.DataFrame(columns=["category", "value_abs", "pct"])
     empty_merchant = pd.DataFrame(columns=["merchant", "value_abs", "n_transacoes"])

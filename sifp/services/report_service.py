@@ -32,6 +32,7 @@ def generate_text_report(
     diagnostics: list[Diagnostic],
     asset_positions: pd.DataFrame,
     debt_transactions: pd.DataFrame,
+    self_transfer_total: float = 0.0,
 ) -> str:
     """
     Monta o relatório em texto para um período.
@@ -43,6 +44,10 @@ def generate_text_report(
     diagnostics: diagnostics.run_diagnostics()
     asset_positions: AssetRepository.get_latest_positions()
     debt_transactions: transações do período com category == "Dívida"
+    self_transfer_total: indicator_service.self_transfer_total() do período --
+        nota de transparência (não é receita nem despesa, mas o usuário deve
+        ver o valor); já mostrada no Dashboard, faltava aqui (melhoria viável
+        da 3ª varredura).
     """
     lines: list[str] = []
     lines.append(f"RELATÓRIO FINANCEIRO — {period_label}")
@@ -53,6 +58,11 @@ def generate_text_report(
     lines.append(f"Despesas............... R$ {_num(summary['despesas']):>14}")
     lines.append(f"Saldo.................. R$ {_num(summary['saldo']):>14}")
     lines.append(f"Taxa de poupança....... {summary['taxa_poupanca']:>17.1f}%")
+    if self_transfer_total > 0:
+        lines.append(
+            f"(R$ {_num(self_transfer_total)} movimentados entre suas próprias contas neste "
+            "período — não contam como receita nem despesa acima)"
+        )
 
     lines += _section("Gastos por categoria")
     if by_cat.empty:

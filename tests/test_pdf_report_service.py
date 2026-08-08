@@ -13,7 +13,7 @@ import pytest
 from sifp.services.pdf_report_service import generate_pdf_report
 
 
-def _pdf_texto(monthly: pd.DataFrame, debt_transactions: pd.DataFrame) -> str:
+def _pdf_texto(monthly: pd.DataFrame, debt_transactions: pd.DataFrame, self_transfer_total: float = 0.0) -> str:
     summary = {"receitas": 5000.0, "despesas": 3000.0, "saldo": 2000.0, "taxa_poupanca": 40.0}
     by_cat = pd.DataFrame({"category": ["Mercado"], "value_abs": [300.0], "pct": [100.0]})
     by_merchant = pd.DataFrame({"merchant": ["Amigao"], "value_abs": [300.0], "n_transacoes": [1]})
@@ -22,6 +22,7 @@ def _pdf_texto(monthly: pd.DataFrame, debt_transactions: pd.DataFrame) -> str:
     pdf_bytes = generate_pdf_report(
         "Jun/2026", summary, by_cat, by_merchant, monthly, [],
         asset_positions, debt_transactions, patrimonio_total=1000.0,
+        self_transfer_total=self_transfer_total,
     )
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         return "\n".join(p.extract_text() or "" for p in pdf.pages)
@@ -62,3 +63,22 @@ def test_evolucao_chart_sem_aviso_quando_nao_corta():
 
     texto = _pdf_texto(monthly, debt_transactions)
     assert "Exibindo os últimos" not in texto
+
+
+def test_pdf_mostra_self_transfer_total_quando_maior_que_zero():
+    """Melhoria viável da 3ª varredura: self_transfer_total (nota de
+    transparência já mostrada no Dashboard) não aparecia no PDF."""
+    monthly = pd.DataFrame({"month": ["2026-06"], "Receitas": [5000.0], "Despesas": [3000.0], "Saldo": [2000.0]})
+    debt_transactions = pd.DataFrame(columns=["date", "description", "value"])
+
+    texto = _pdf_texto(monthly, debt_transactions, self_transfer_total=1000.0)
+    assert "movimentados entre contas próprias" in texto
+    assert "1.000,00" in texto
+
+
+def test_pdf_omite_self_transfer_total_quando_zero():
+    monthly = pd.DataFrame({"month": ["2026-06"], "Receitas": [5000.0], "Despesas": [3000.0], "Saldo": [2000.0]})
+    debt_transactions = pd.DataFrame(columns=["date", "description", "value"])
+
+    texto = _pdf_texto(monthly, debt_transactions)
+    assert "movimentados entre contas próprias" not in texto
