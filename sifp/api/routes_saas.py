@@ -368,6 +368,7 @@ def _import_service(r: dict) -> ImportService:
         categorization=categorization_service,
         transaction_repo=r["transaction_repo"],
         balance_repo=r["balance_repo"],
+        preferencia_repo=r["preferencia_repo"],
     )
 
 

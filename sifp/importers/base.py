@@ -25,12 +25,23 @@ class StatementImporter(ABC):
         """True se este importador sabe ler o arquivo, a partir do nome/extensão."""
 
     @abstractmethod
-    def read(self, uploaded_file) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def read(
+        self, uploaded_file, account_holder_hint: str | None = None
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Lê o arquivo e retorna (transacoes, saldos_diarios) normalizados:
           - transacoes: date, description, value, bank_category, self_transfer
           - saldos_diarios: date, balance (pode vir vazio se o formato não
             trouxer essa informação)
+
+        account_holder_hint: nome do titular já conhecido de uma importação
+        anterior (ver ImportService/PreferenciaRepository), usado por
+        formatos que não trazem essa informação no próprio arquivo (ex: CSV
+        "achatado") para detectar transferências do titular pra si mesmo.
+        Formatos que já extraem o nome do titular do próprio arquivo (ex:
+        Excel do internet banking) podem ignorar o hint e, em vez disso,
+        expor o nome encontrado em `transacoes.attrs["account_holder_name"]`
+        pra o caller aprender e reaproveitar em importações futuras.
 
         Levanta ValueError com mensagem amigável se o arquivo não puder
         ser interpretado.

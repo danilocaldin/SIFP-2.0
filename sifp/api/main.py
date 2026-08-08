@@ -75,6 +75,7 @@ import_service = ImportService(
     categorization=categorization_service,
     transaction_repo=transaction_repo,
     balance_repo=balance_repo,
+    preferencia_repo=preferencia_repo,
 )
 summary_service = SummaryService(
     transaction_repo, balance_repo, asset_repo, budget_repo, goal_repo, despesa_fixa_repo, preferencia_repo

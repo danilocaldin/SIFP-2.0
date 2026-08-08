@@ -69,12 +69,14 @@ class BTGImporter(StatementImporter):
     def supports(self, filename: str) -> bool:
         return _get_extension_from_name(filename) in SUPPORTED_EXTENSIONS
 
-    def read(self, uploaded_file) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def read(
+        self, uploaded_file, account_holder_hint: str | None = None
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         ext = _get_extension_from_name(getattr(uploaded_file, "name", ""))
         if ext in ("xls", "xlsx"):
             return _read_btg_excel(uploaded_file, ext)
         if ext == "csv":
-            return _read_btg_csv(uploaded_file)
+            return _read_btg_csv(uploaded_file, account_holder_hint=account_holder_hint)
         raise ValueError(
             f"Formato de arquivo não suportado ('.{ext}'). Envie um CSV, XLS ou XLSX."
         )
@@ -109,7 +111,9 @@ def _find_account_holder_name(df_raw: pd.DataFrame, label_col_idx: int) -> str |
 # ---------------------------------------------------------------------
 # CSV
 # ---------------------------------------------------------------------
-def _read_btg_csv(uploaded_file) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _read_btg_csv(
+    uploaded_file, account_holder_hint: str | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     raw_bytes = uploaded_file.read()
 
     text = None
@@ -181,7 +185,20 @@ def _read_btg_csv(uploaded_file) -> tuple[pd.DataFrame, pd.DataFrame]:
     # importadores gravassem formatos diferentes, misturar CSV com Excel
     # faria as datas do formato minoritário virarem NaT silenciosamente.
     df["date"] = df["date"].dt.strftime("%Y-%m-%d %H:%M")
-    df["self_transfer"] = False
+
+    # O CSV "achatado" não traz um bloco de metadados com o nome do
+    # titular (diferente do Excel do internet banking, ver
+    # _find_account_holder_name) -- sem isso, transferência do titular
+    # pra si mesmo nunca era detectada aqui. account_holder_hint vem de
+    # uma importação em Excel anterior, aprendida e guardada pelo
+    # ImportService (PreferenciaRepository) especificamente pra cobrir
+    # esse caso.
+    if account_holder_hint:
+        holder_norm = strip_accents(account_holder_hint).strip().lower()
+        desc_norm = df["description"].apply(lambda d: strip_accents(str(d)).strip().lower())
+        df["self_transfer"] = desc_norm == holder_norm
+    else:
+        df["self_transfer"] = False
     df = df[["date", "description", "value", "bank_category", "self_transfer"]].reset_index(drop=True)
     empty_balances = pd.DataFrame(columns=["date", "balance"])
     return df, empty_balances
@@ -320,7 +337,12 @@ def _read_btg_excel(uploaded_file, ext: str = "xls") -> tuple[pd.DataFrame, pd.D
             "após remover cabeçalhos repetidos e linhas de saldo diário."
         )
 
-    return out[["date", "description", "value", "bank_category", "self_transfer"]], balances
+    result = out[["date", "description", "value", "bank_category", "self_transfer"]]
+    # Expõe o nome do titular achado no bloco de metadados pro
+    # ImportService aprender e reaproveitar em importações futuras de CSV
+    # (que não tem esse metadado no próprio arquivo -- ver _read_btg_csv).
+    result.attrs["account_holder_name"] = account_holder_name
+    return result, balances
 
 
 def _find_excel_header(df_raw: pd.DataFrame):

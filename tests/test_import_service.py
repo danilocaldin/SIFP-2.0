@@ -11,9 +11,10 @@ from sifp.importers.btg_importer import BTGImporter
 from sifp.intelligence.categorization import CategorizationService
 from sifp.repositories.balance_repository import BalanceRepository
 from sifp.repositories.connection import init_db
+from sifp.repositories.preferencia_repository import PreferenciaRepository
 from sifp.repositories.transaction_repository import TransactionRepository
 from sifp.services.import_service import ImportService
-from tests.conftest import FakeUploadedFile
+from tests.conftest import CLIENT_NAME, FakeUploadedFile
 
 
 @pytest.fixture
@@ -24,6 +25,7 @@ def import_service(tmp_db_path):
         categorization=CategorizationService(model=None),
         transaction_repo=TransactionRepository(tmp_db_path),
         balance_repo=BalanceRepository(tmp_db_path),
+        preferencia_repo=PreferenciaRepository(tmp_db_path),
     )
 
 
@@ -144,3 +146,34 @@ def test_revisao_pendente_vazia_quando_tudo_ja_existia(import_service, sample_bt
     summary2 = import_service.import_and_persist(upload2)
 
     assert summary2["revisao_pendente"] == []
+
+
+def test_importa_xlsx_aprende_titular_e_csv_seguinte_ja_detecta_self_transfer(
+    import_service, sample_btg_xlsx_bytes
+):
+    """Achado #150 da segunda varredura: CSV "achatado" não traz o nome do
+    titular no próprio arquivo (diferente do Excel), então uma
+    transferência do titular pra si mesmo nunca era detectada nesse
+    formato. Depois de uma importação em Excel (que extrai o nome do
+    cabeçalho), o ImportService guarda esse nome via PreferenciaRepository
+    e passa a usá-lo como hint em importações de CSV seguintes."""
+    upload_xlsx = FakeUploadedFile(sample_btg_xlsx_bytes, "extrato.xlsx")
+    import_service.import_and_persist(upload_xlsx)
+    assert import_service.preferencia_repo.get("nome_titular") == CLIENT_NAME
+
+    csv_content = (
+        "Data;Descrição;Valor\n"
+        f"10/06/2026;{CLIENT_NAME};-500,00\n"
+        "11/06/2026;UBER TRIP;-15,00\n"
+    ).encode("utf-8-sig")
+    upload_csv = FakeUploadedFile(csv_content, "extrato2.csv")
+    summary = import_service.import_and_persist(upload_csv)
+
+    all_tx = import_service.transaction_repo.get_all()
+    nova_transferencia = all_tx[all_tx["description"] == CLIENT_NAME]
+    assert len(nova_transferencia) == 1
+    assert nova_transferencia.iloc[0]["self_transfer"] == 1
+    assert nova_transferencia.iloc[0]["category"] == SELF_TRANSFER_CATEGORY
+    # não vira "revisão pendente" -- mesmo motivo do Excel, já resolvida com certeza
+    revisao_descricoes = {r["description"] for r in summary["revisao_pendente"]}
+    assert CLIENT_NAME not in revisao_descricoes

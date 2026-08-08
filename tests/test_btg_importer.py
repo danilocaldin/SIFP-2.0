@@ -31,7 +31,7 @@ def test_csv_happy_path(importer, sample_btg_csv_bytes):
     assert len(df) == 4
     assert balances.empty
     assert list(df.columns) == ["date", "description", "value", "bank_category", "self_transfer"]
-    assert not df["self_transfer"].any()  # CSV genérico nunca detecta self-transfer
+    assert not df["self_transfer"].any()  # sem account_holder_hint, não detecta
 
     # valores em formato BR convertidos corretamente
     row = df[df["description"] == "SUPERMERCADO PAO DE ACUCAR"].iloc[0]
@@ -45,6 +45,28 @@ def test_csv_happy_path(importer, sample_btg_csv_bytes):
     # bater (misturar formatos diferentes na coluna date da tabela
     # transactions faz o pandas devolver NaT pro formato minoritário).
     assert all(len(d) == 16 and d[10] == " " for d in df["date"])
+
+
+def test_csv_com_hint_detecta_self_transfer(importer):
+    """Achado real de auditoria: o CSV "achatado" não tem bloco de
+    metadados com o nome do titular (diferente do Excel), então nunca
+    detectava transferência pra si mesmo. account_holder_hint (vindo de
+    uma importação em Excel anterior, ver ImportService) resolve isso --
+    inclusive ignorando acento/caixa, igual ao caminho do Excel."""
+    content = (
+        "Data;Descrição;Valor\n"
+        "01/06/2026;PIX RECEBIDO JOAO SILVA;2500,00\n"
+        "02/06/2026;joão da silva santos;-1000,00\n"
+        "03/06/2026;UBER TRIP SAO PAULO;-28,50\n"
+    ).encode("utf-8-sig")
+    upload = FakeUploadedFile(content, "extrato.csv")
+
+    df, _ = importer.read(upload, account_holder_hint="João da Silva Santos")
+
+    self_transfers = df[df["self_transfer"]]
+    assert len(self_transfers) == 1
+    assert self_transfers.iloc[0]["description"] == "joão da silva santos"
+    assert not df[df["description"] != "joão da silva santos"]["self_transfer"].any()
 
 
 def test_csv_unsupported_columns_raises(importer):

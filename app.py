@@ -84,6 +84,7 @@ import_service = ImportService(
     categorization=st.session_state.categorization,
     transaction_repo=transaction_repo,
     balance_repo=balance_repo,
+    preferencia_repo=preferencia_repo,
 )
 
 

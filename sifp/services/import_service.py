@@ -18,6 +18,12 @@ from sifp.intelligence.merchant_normalizer import MerchantNormalizer
 from sifp.repositories.balance_repository import BalanceRepository
 from sifp.repositories.transaction_repository import TransactionRepository, make_tx_hash, normalize_tx_date
 
+# Chave em PreferenciaRepository onde o nome do titular (extraído de uma
+# importação em Excel anterior, ver _find_account_holder_name em
+# btg_importer.py) fica guardado pra ser reaproveitado em importações de
+# CSV, formato que não traz essa informação no próprio arquivo.
+PREFERENCIA_NOME_TITULAR = "nome_titular"
+
 
 class ImportService:
     def __init__(
@@ -27,12 +33,14 @@ class ImportService:
         transaction_repo: TransactionRepository,
         balance_repo: BalanceRepository,
         merchant_normalizer: MerchantNormalizer | None = None,
+        preferencia_repo=None,
     ):
         self.importers = importers
         self.categorization = categorization
         self.transaction_repo = transaction_repo
         self.balance_repo = balance_repo
         self.merchant_normalizer = merchant_normalizer or MerchantNormalizer()
+        self.preferencia_repo = preferencia_repo
 
     def _find_importer(self, filename: str) -> StatementImporter:
         for importer in self.importers:
@@ -47,7 +55,17 @@ class ImportService:
         """Só lê e normaliza o arquivo (Módulo 1 + 2), sem categorizar nem
         gravar — usado para a pré-visualização antes do usuário confirmar."""
         importer = self._find_importer(getattr(uploaded_file, "name", ""))
-        return importer.read(uploaded_file)
+        hint = self.preferencia_repo.get(PREFERENCIA_NOME_TITULAR) if self.preferencia_repo else None
+        df, balances = importer.read(uploaded_file, account_holder_hint=hint)
+
+        # Excel expõe o nome do titular que achou (ver attrs em
+        # _read_btg_excel); se for diferente do que já sabíamos, aprende
+        # pra próxima importação de CSV já vir com self_transfer certo.
+        descoberto = df.attrs.get("account_holder_name")
+        if descoberto and self.preferencia_repo and descoberto != hint:
+            self.preferencia_repo.set(PREFERENCIA_NOME_TITULAR, descoberto)
+
+        return df, balances
 
     def categorize(self, df: pd.DataFrame) -> pd.DataFrame:
         """Adiciona merchant (Módulo 4) e category/confidence/category_source (Módulo 3)."""
