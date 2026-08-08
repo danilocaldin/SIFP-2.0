@@ -761,7 +761,15 @@ def check_assinatura_reajustada(all_tx: pd.DataFrame, latest_month: str | None) 
         if desvio_hist_pct > ASSINATURA_VARIACAO_HISTORICA_MAX_PCT:
             continue
 
-        atual_valor = float(atuais[atuais["merchant"] == merchant]["value_abs"].iloc[-1])
+        # Achado real de auditoria: .iloc[-1] pressupunha ordem cronológica
+        # ascendente, mas TransactionRepository.get_all() devolve as linhas
+        # em ordem DESCENDENTE (mais recente primeiro) -- pegava a cobrança
+        # mais ANTIGA do mês, não a mais recente, quando havia mais de uma
+        # cobrança do mesmo estabelecimento no mês. Ordenar explicitamente
+        # por data torna isso correto independente da ordem de entrada.
+        atual_valor = float(
+            atuais[atuais["merchant"] == merchant].sort_values("date")["value_abs"].iloc[-1]
+        )
         aumento_rs = atual_valor - media_hist
         aumento_pct = aumento_rs / media_hist * 100
         if aumento_pct < ASSINATURA_REAJUSTE_MIN_PCT or aumento_rs < ASSINATURA_REAJUSTE_MIN_RS:

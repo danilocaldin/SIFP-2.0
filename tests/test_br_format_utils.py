@@ -31,6 +31,14 @@ from sifp.importers.br_format_utils import parse_brl_number
         # detecção de "D" exigia vírgula presente na string).
         ("500 D", -500.0),
         ("1.500 D", -1500.0),
+        # Achado real de auditoria (3ª varredura): "D" colado ao valor sem
+        # espaço não tinha fronteira de palavra (\b) entre o último dígito
+        # e o "D", então a regex \bD\b não casava e o débito virava
+        # positivo silenciosamente.
+        ("45,00D", -45.0),
+        ("500D", -500.0),
+        ("1.234,56D", -1234.56),
+        ("45,00C", 45.0),
         # Bug 3: negativo entre parênteses (convenção contábil) virava
         # 0.0 silenciosamente (float() não aceita parênteses).
         ("(150,00)", -150.0),

@@ -311,6 +311,24 @@ def test_criar_meta_com_dados_invalidos_e_rejeitada():
     assert resp.status_code == 400
 
 
+def test_criar_meta_com_prazo_invalido_e_rejeitada():
+    """Achado real de auditoria: sem essa validação, um prazo vazio ou mal
+    formatado ficava salvo sem erro e só quebrava depois em /projecoes
+    (pd.to_datetime("") vira NaT, NaT.strftime() levanta ValueError) --
+    derrubando a rota pra conta inteira, sem forma de corrigir via API
+    já que não existe PATCH pra editar prazo de uma meta existente."""
+    resp_vazio = client.post(
+        "/api/metas", json={"nome": "[pytest] prazo vazio", "valor_necessario": 100.0, "prazo": ""}
+    )
+    assert resp_vazio.status_code == 422
+
+    resp_invalido = client.post(
+        "/api/metas",
+        json={"nome": "[pytest] prazo invalido", "valor_necessario": 100.0, "prazo": "31/13/2026"},
+    )
+    assert resp_invalido.status_code == 422
+
+
 def test_upload_preview_returns_parsed_transactions_without_persisting():
     csv_content = (
         "Data;Descrição;Valor\n"

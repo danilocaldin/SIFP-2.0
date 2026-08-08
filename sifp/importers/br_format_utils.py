@@ -64,7 +64,13 @@ def parse_brl_number(value) -> float:
         negative = True
         s = s[1:-1]
 
-    if re.search(r"\bD\b", s.upper()):
+    # Achado real de auditoria: \bD\b exige uma fronteira de palavra dos
+    # dois lados, mas "D"/dígito são ambos \w -- em "45,00D" (sufixo
+    # colado, sem espaço) não há fronteira nenhuma entre o "0" e o "D", e
+    # o débito virava positivo silenciosamente. O sufixo de débito/crédito
+    # sempre vem no FINAL do valor (com ou sem espaço antes) -- checar
+    # isso diretamente cobre os dois formatos sem exigir separador.
+    if re.search(r"\d\s*D$", s.upper()):
         negative = True
     if "-" in s:
         negative = True

@@ -792,6 +792,26 @@ def test_assinatura_dispara_para_reajuste_real():
     assert result[0].impacto_financeiro == pytest.approx(19.90)
 
 
+def test_assinatura_usa_a_cobranca_mais_recente_quando_ha_duas_no_mes():
+    """Achado real de auditoria (3ª varredura): TransactionRepository.get_all()
+    devolve as linhas em ordem DESCENDENTE de data (mais recente primeiro,
+    ORDER BY date DESC) -- o código usava .iloc[-1] pra pegar "a cobrança
+    atual", que na ordem real pega a mais ANTIGA do mês, não a mais
+    recente. Reproduz o cenário real: 5 meses estáveis em R$40, e no mês
+    atual duas cobranças -- R$40 no dia 3 (não é reajuste) e R$55 no dia 25
+    (reajuste real de 37,5%), com o DataFrame já na ordem DESC de get_all()."""
+    rows = [_tx_merchant_row(mes, "Academia", -40.0) for mes in
+            ("2026-01", "2026-02", "2026-03", "2026-04", "2026-05")]
+    rows.append({**_tx_merchant_row("2026-06", "Academia", -55.0), "date": "2026-06-25 10:00"})
+    rows.append({**_tx_merchant_row("2026-06", "Academia", -40.0), "date": "2026-06-03 10:00"})
+    df = pd.DataFrame(rows).sort_values("date", ascending=False).reset_index(drop=True)
+
+    result = diag.check_assinatura_reajustada(df, latest_month="2026-06")
+    assert len(result) == 1
+    assert result[0].codigo == "assinatura_reajustada_Academia"
+    assert result[0].impacto_financeiro == pytest.approx(15.0)
+
+
 def test_assinatura_ignora_transacao_sem_mes_atual():
     df = _historico_assinatura(mes_atual_valor=59.90)
     assert diag.check_assinatura_reajustada(df, latest_month=None) == []

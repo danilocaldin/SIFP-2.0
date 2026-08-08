@@ -98,3 +98,63 @@ def test_extract_sender_strips_display_name():
 def test_extract_sender_empty_when_no_from_header():
     msg = _build_message({"To": "x+y@gmail.com"})
     assert _extract_sender(msg) == ""
+
+
+def test_run_isola_erro_por_mensagem_e_continua_o_lote(monkeypatch):
+    """Achado real de auditoria (3ª varredura): antes só a importação em
+    si (_import_for_user) tinha try/except -- um erro em qualquer passo
+    anterior do processamento de UMA mensagem (extrair token, consultar
+    remetente confiável etc.) propagava pra fora do loop e travava as
+    mensagens RESTANTES de TODOS os usuários naquela execução (é uma
+    caixa compartilhada, roteada só por token). run() agora isola o erro
+    por mensagem e continua o lote."""
+    import sifp.workers.email_import_worker as worker
+
+    monkeypatch.setattr(worker, "DATABASE_URL", "postgres://fake")
+    monkeypatch.setenv("IMAP_USER", "fake@example.com")
+    monkeypatch.setenv("IMAP_APP_PASSWORD", "fake-password")
+
+    processadas = []
+
+    def fake_process_message(imap, lookup_conn, msg_id):
+        processadas.append(msg_id)
+        if msg_id == b"1":
+            raise RuntimeError("erro simulado processando a mensagem 1")
+
+    monkeypatch.setattr(worker, "_process_message", fake_process_message)
+
+    class FakeConn:
+        def __init__(self):
+            self.rollback_chamado = False
+
+        def rollback(self):
+            self.rollback_chamado = True
+
+        def close(self):
+            pass
+
+    fake_conn = FakeConn()
+    monkeypatch.setattr(worker.psycopg, "connect", lambda url: fake_conn)
+
+    class FakeImap:
+        def login(self, user, password):
+            pass
+
+        def select(self, mailbox):
+            pass
+
+        def search(self, charset, criteria):
+            return "OK", [b"1 2"]
+
+        def logout(self):
+            pass
+
+    monkeypatch.setattr(worker.imaplib, "IMAP4_SSL", lambda host, port: FakeImap())
+
+    worker.run()
+
+    # As DUAS mensagens foram processadas (a 2 não foi travada pelo erro na 1).
+    assert processadas == [b"1", b"2"]
+    # A conexão compartilhada foi limpa após o erro, senão a mensagem 2
+    # herdaria uma transação abortada do Postgres.
+    assert fake_conn.rollback_chamado is True

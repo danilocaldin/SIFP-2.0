@@ -25,6 +25,7 @@ casos sem precisar do ML.
 """
 
 import io
+from datetime import datetime
 
 from fastapi import HTTPException, UploadFile
 
@@ -90,6 +91,24 @@ def validar_categoria(cls, v: str) -> str:
         raise ValueError(
             f"Categoria inválida. Use uma das categorias existentes: {', '.join(CATEGORIAS_PADRAO)}."
         )
+    return v
+
+
+def validar_data_iso(cls, v: str) -> str:
+    """Validator reutilizável (Pydantic v2) pro campo `prazo` de GoalIn (em
+    main.py e routes_saas.py). Achado real de auditoria: sem essa checagem,
+    um prazo vazio ou mal formatado (ex: "" ou "31/13/2026", digitado via
+    chamada direta à API) ficava salvo sem erro nenhum — e só quebrava
+    depois, em /projecoes, onde pd.to_datetime(prazo) levanta DateParseError
+    (texto não-data) ou vira NaT (string vazia), e NaT.strftime(...) levanta
+    ValueError. Como não existe rota pra editar prazo/nome de uma meta já
+    criada, isso derrubava /projecoes (e o gráfico de patrimônio) pra conta
+    inteira até alguém identificar e apagar a meta problemática. Validar na
+    criação rejeita com 400 amigável em vez de quebrar semanas depois."""
+    try:
+        datetime.strptime(v, "%Y-%m-%d")
+    except (ValueError, TypeError) as e:
+        raise ValueError('Prazo inválido. Use o formato "AAAA-MM-DD".') from e
     return v
 
 

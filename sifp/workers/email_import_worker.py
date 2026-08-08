@@ -171,6 +171,80 @@ def _import_for_user(user_id: str, filename: str, raw: bytes) -> str:
     return "arquivo não reconhecido (ignorado)"
 
 
+def _process_message(imap: imaplib.IMAP4_SSL, lookup_conn: psycopg.Connection, msg_id: bytes) -> None:
+    """Processa UMA mensagem (busca, extrai token/remetente/anexos,
+    importa). Levanta a exceção original pra quem chama decidir o que
+    fazer -- run() isola o erro por mensagem, pra uma falha numa não
+    travar as outras do lote."""
+    label = msg_id.decode()
+    status, msg_data = imap.fetch(msg_id, "(RFC822)")
+    if status != "OK" or not msg_data or not isinstance(msg_data[0], tuple):
+        return
+    msg = email.message_from_bytes(msg_data[0][1])
+
+    token, token_confiavel = _extract_token(msg)
+    if not token:
+        logger.warning("[%s] sem token identificável — ignorado.", label)
+        imap.store(msg_id, "+FLAGS", "\\Seen")
+        return
+
+    user_id = _lookup_user_id(lookup_conn, token)
+    if not user_id:
+        logger.warning("[%s] token '%s' não corresponde a nenhum usuário — ignorado.", label, token)
+        imap.store(msg_id, "+FLAGS", "\\Seen")
+        return
+
+    remetente = _extract_sender(msg)
+    confiavel = _remetente_confiavel(lookup_conn, token)
+    if confiavel is None:
+        if not token_confiavel:
+            # Alias ainda sem remetente estabelecido, e o token só
+            # apareceu em To/Cc (conteúdo do remetente, não da
+            # entrega real) -- não deixa essa mensagem "sequestrar"
+            # o primeiro uso do alias. Precisa de um e-mail com
+            # Delivered-To/X-Original-To confirmando a entrega real
+            # pra estabelecer o primeiro remetente confiável.
+            logger.warning(
+                "[%s] usuário %s: token '%s' achado só em To/Cc e o alias ainda não tem "
+                "remetente confiável — ignorado por segurança.",
+                label, user_id, token,
+            )
+            imap.store(msg_id, "+FLAGS", "\\Seen")
+            return
+        # Primeiro e-mail que chega nesse alias -- "confiar no
+        # primeiro uso": registra esse remetente como o único
+        # aceito daqui pra frente pra esse token.
+        if remetente:
+            _registrar_remetente_confiavel(lookup_conn, token, remetente)
+            logger.info(
+                "[%s] usuário %s: remetente '%s' registrado como confiável pra esse alias.",
+                label, user_id, remetente,
+            )
+    elif remetente != confiavel:
+        logger.warning(
+            "[%s] usuário %s: remetente '%s' não é o remetente confiável ('%s') "
+            "desse alias — ignorado por segurança.",
+            label, user_id, remetente, confiavel,
+        )
+        imap.store(msg_id, "+FLAGS", "\\Seen")
+        return
+
+    attachments = _extract_attachments(msg)
+    if not attachments:
+        logger.warning("[%s] token '%s' reconhecido, mas sem anexo — ignorado.", label, token)
+        imap.store(msg_id, "+FLAGS", "\\Seen")
+        return
+
+    for filename, raw in attachments:
+        try:
+            resultado = _import_for_user(user_id, filename, raw)
+            logger.info("[%s] usuário %s: %s -> %s", label, user_id, filename, resultado)
+        except Exception:
+            logger.exception("[%s] usuário %s: erro ao importar '%s'", label, user_id, filename)
+
+    imap.store(msg_id, "+FLAGS", "\\Seen")
+
+
 def run() -> None:
     if not DATABASE_URL:
         logger.error("SUPABASE_DB_URL não configurada — abortando.")
@@ -198,73 +272,25 @@ def run() -> None:
     lookup_conn = psycopg.connect(DATABASE_URL)
     try:
         for msg_id in ids:
-            status, msg_data = imap.fetch(msg_id, "(RFC822)")
-            if status != "OK" or not msg_data or not isinstance(msg_data[0], tuple):
-                continue
-            msg = email.message_from_bytes(msg_data[0][1])
-            label = msg_id.decode()
-
-            token, token_confiavel = _extract_token(msg)
-            if not token:
-                logger.warning("[%s] sem token identificável — ignorado.", label)
-                imap.store(msg_id, "+FLAGS", "\\Seen")
-                continue
-
-            user_id = _lookup_user_id(lookup_conn, token)
-            if not user_id:
-                logger.warning("[%s] token '%s' não corresponde a nenhum usuário — ignorado.", label, token)
-                imap.store(msg_id, "+FLAGS", "\\Seen")
-                continue
-
-            remetente = _extract_sender(msg)
-            confiavel = _remetente_confiavel(lookup_conn, token)
-            if confiavel is None:
-                if not token_confiavel:
-                    # Alias ainda sem remetente estabelecido, e o token só
-                    # apareceu em To/Cc (conteúdo do remetente, não da
-                    # entrega real) -- não deixa essa mensagem "sequestrar"
-                    # o primeiro uso do alias. Precisa de um e-mail com
-                    # Delivered-To/X-Original-To confirmando a entrega real
-                    # pra estabelecer o primeiro remetente confiável.
-                    logger.warning(
-                        "[%s] usuário %s: token '%s' achado só em To/Cc e o alias ainda não tem "
-                        "remetente confiável — ignorado por segurança.",
-                        label, user_id, token,
-                    )
-                    imap.store(msg_id, "+FLAGS", "\\Seen")
-                    continue
-                # Primeiro e-mail que chega nesse alias -- "confiar no
-                # primeiro uso": registra esse remetente como o único
-                # aceito daqui pra frente pra esse token.
-                if remetente:
-                    _registrar_remetente_confiavel(lookup_conn, token, remetente)
-                    logger.info(
-                        "[%s] usuário %s: remetente '%s' registrado como confiável pra esse alias.",
-                        label, user_id, remetente,
-                    )
-            elif remetente != confiavel:
-                logger.warning(
-                    "[%s] usuário %s: remetente '%s' não é o remetente confiável ('%s') "
-                    "desse alias — ignorado por segurança.",
-                    label, user_id, remetente, confiavel,
+            try:
+                _process_message(imap, lookup_conn, msg_id)
+            except Exception:
+                # Achado real de auditoria: antes só a importação em si
+                # (_import_for_user) tinha try/except -- um erro em
+                # qualquer passo anterior (extrair token, consultar o
+                # remetente confiável etc.) propagava pra fora do loop e
+                # travava o processamento das mensagens RESTANTES de
+                # TODOS os usuários nessa execução (é uma caixa
+                # compartilhada, roteada por token). Isola por mensagem: o
+                # resto do lote continua mesmo se uma mensagem falhar. O
+                # rollback evita que lookup_conn fique numa transação
+                # abortada pras iterações seguintes (erro real de
+                # Postgres deixa a conexão inutilizável até um ROLLBACK).
+                logger.exception(
+                    "[%s] erro inesperado processando esta mensagem — pulando pra próxima.",
+                    msg_id.decode(),
                 )
-                imap.store(msg_id, "+FLAGS", "\\Seen")
-                continue
-
-            attachments = _extract_attachments(msg)
-            if not attachments:
-                logger.warning("[%s] token '%s' reconhecido, mas sem anexo — ignorado.", label, token)
-                imap.store(msg_id, "+FLAGS", "\\Seen")
-                continue
-
-            for filename, raw in attachments:
-                try:
-                    resultado = _import_for_user(user_id, filename, raw)
-                    logger.info("[%s] usuário %s: %s -> %s", label, user_id, filename, resultado)
-                except Exception:
-                    logger.exception("[%s] usuário %s: erro ao importar '%s'", label, user_id, filename)
-
-            imap.store(msg_id, "+FLAGS", "\\Seen")
+                lookup_conn.rollback()
     finally:
         lookup_conn.close()
         imap.logout()

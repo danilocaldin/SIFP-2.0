@@ -33,6 +33,7 @@ from sifp.api.shared import (
     categorization_service,
     transactions_payload,
     validar_categoria,
+    validar_data_iso,
     validar_mensagens_chat,
     validar_tamanho_upload,
 )
@@ -310,6 +311,8 @@ class GoalIn(BaseModel):
     nome: str
     valor_necessario: float
     prazo: str  # "YYYY-MM-DD"
+
+    _validar_prazo = field_validator("prazo")(validar_data_iso)
 
 
 class GoalProgressIn(BaseModel):
