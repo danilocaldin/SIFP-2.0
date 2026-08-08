@@ -8,6 +8,16 @@ import type { RevisaoTransaction } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
+// Achado real de auditoria: /api/revisao devolve TODAS as transações já
+// importadas (sem paginação nem filtro de período no backend) -- já
+// testado com ~750 linhas reais, e só cresce. Renderizar um <tr> com
+// <select>+<Progress>+botão pra cada uma de uma vez é o risco real de
+// travamento, não o payload em si (que já vem pronto do servidor). Em
+// vez de mudar o contrato da API (quebraria "Salvar linhas visíveis",
+// que precisa enxergar TODAS as linhas que passam no filtro, não só uma
+// página), limita quantas linhas ficam de fato no DOM por vez.
+const RENDER_PAGE_SIZE = 100;
+
 export function RevisaoTable({
   transactions,
   categorias,
@@ -25,6 +35,7 @@ export function RevisaoTable({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingHash, setDeletingHash] = useState<string | null>(null);
+  const [renderLimit, setRenderLimit] = useState(RENDER_PAGE_SIZE);
 
   const visible = useMemo(() => {
     return transactions.filter((tx) => {
@@ -33,6 +44,12 @@ export function RevisaoTable({
       return true;
     });
   }, [transactions, onlyPending, lowConfidence, categoriaNaoCategorizada]);
+
+  // "Salvar" continua processando TODAS as linhas de `visible` (o filtro
+  // já escolhido pelo usuário), não só as renderizadas -- só o <tbody>
+  // é limitado, pra não mudar o que o botão promete fazer.
+  const renderizadas = visible.slice(0, renderLimit);
+  const restantes = visible.length - renderizadas.length;
 
   function handleCategoryChange(txHash: string, category: string) {
     setOverrides((prev) => ({ ...prev, [txHash]: category }));
@@ -92,7 +109,10 @@ export function RevisaoTable({
           <input
             type="checkbox"
             checked={onlyPending}
-            onChange={(e) => setOnlyPending(e.target.checked)}
+            onChange={(e) => {
+              setOnlyPending(e.target.checked);
+              setRenderLimit(RENDER_PAGE_SIZE);
+            }}
           />
           Mostrar apenas &quot;{categoriaNaoCategorizada}&quot;
         </label>
@@ -100,12 +120,15 @@ export function RevisaoTable({
           <input
             type="checkbox"
             checked={lowConfidence}
-            onChange={(e) => setLowConfidence(e.target.checked)}
+            onChange={(e) => {
+              setLowConfidence(e.target.checked);
+              setRenderLimit(RENDER_PAGE_SIZE);
+            }}
           />
           Mostrar apenas baixa confiança (&lt;0.6)
         </label>
         <span className="text-sm text-muted-foreground">
-          {visible.length} de {transactions.length} transações
+          Exibindo {renderizadas.length} de {visible.length} filtradas ({transactions.length} no total)
         </span>
       </div>
 
@@ -131,7 +154,7 @@ export function RevisaoTable({
             </tr>
           </thead>
           <tbody>
-            {visible.map((tx) => (
+            {renderizadas.map((tx) => (
               <tr key={tx.tx_hash} className="border-b border-border last:border-0">
                 <td className="p-2 whitespace-nowrap text-muted-foreground">{tx.date}</td>
                 <td className="p-2">{tx.description}</td>
@@ -171,6 +194,16 @@ export function RevisaoTable({
           </tbody>
         </table>
       </div>
+
+      {restantes > 0 && (
+        <button
+          type="button"
+          onClick={() => setRenderLimit((n) => n + RENDER_PAGE_SIZE)}
+          className="text-xs font-medium text-foreground hover:underline"
+        >
+          Mostrar mais {Math.min(RENDER_PAGE_SIZE, restantes)} ({restantes} restantes)
+        </button>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button disabled={saving || visible.length === 0} onClick={handleConfirm}>
