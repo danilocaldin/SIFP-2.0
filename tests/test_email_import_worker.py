@@ -4,6 +4,7 @@ IMAP/Postgres real; mensagens sintéticas via email.message.EmailMessage."""
 
 from email.message import EmailMessage
 
+from sifp.api.shared import MAX_UPLOAD_SIZE_BYTES
 from sifp.workers.email_import_worker import _extract_attachments, _extract_sender, _extract_token
 
 
@@ -53,6 +54,21 @@ def test_extract_attachments_finds_named_parts():
 def test_extract_attachments_empty_when_no_attachment():
     msg = _build_message({"To": "x+y@gmail.com"})
     assert _extract_attachments(msg) == []
+
+
+def test_extract_attachments_ignora_anexo_acima_do_limite():
+    """Achado real de auditoria: nenhum limite de tamanho de anexo --
+    um anexo gigante era decodificado inteiro pra memória antes de
+    qualquer validação, mesmo risco já corrigido pro upload manual."""
+    pequeno = b"conteudo pequeno"
+    grande = b"x" * (MAX_UPLOAD_SIZE_BYTES + 1)
+    msg = _build_message(
+        {"To": "x+y@gmail.com"},
+        attachments=[("extrato.xlsx", pequeno), ("gigante.xlsx", grande)],
+    )
+    attachments = _extract_attachments(msg)
+    names = {name for name, _ in attachments}
+    assert names == {"extrato.xlsx"}
 
 
 def test_extract_sender_plain_address():

@@ -25,7 +25,7 @@ import os
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from sifp.api.auth import get_current_user_id, get_current_user_name, get_db
 from sifp.api.shared import (
@@ -209,7 +209,7 @@ class GoalIn(BaseModel):
 
 
 class GoalProgressIn(BaseModel):
-    valor_acumulado: float
+    valor_acumulado: float = Field(ge=0)
 
 
 @router.get("/metas")
@@ -251,11 +251,11 @@ class DespesaFixaIn(BaseModel):
 
 
 class DespesaFixaParcelaIn(BaseModel):
-    parcela_atual: int
+    parcela_atual: int = Field(ge=0)
 
 
 class LimiteAlertaIn(BaseModel):
-    pct: float
+    pct: float = Field(ge=0, le=100)
 
 
 @router.get("/despesas-fixas")

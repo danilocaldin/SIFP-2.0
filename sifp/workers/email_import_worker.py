@@ -20,6 +20,7 @@ from __future__ import annotations
 import email
 import imaplib
 import io
+import logging
 import os
 import re
 from email.message import Message
@@ -30,7 +31,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from sifp.api.shared import categorization_service
+from sifp.api.shared import MAX_UPLOAD_SIZE_BYTES, categorization_service
 from sifp.importers.btg_importer import BTGImporter
 from sifp.importers.btg_investment_importer import BTGInvestmentImporter
 from sifp.repositories.pg.asset_repository import AssetRepository
@@ -40,6 +41,8 @@ from sifp.repositories.pg.connection import DATABASE_URL, scoped_transaction
 from sifp.repositories.pg.transaction_repository import TransactionRepository
 from sifp.services.import_service import ImportService
 from sifp.services.patrimonio_service import PatrimonioService
+
+logger = logging.getLogger(__name__)
 
 IMAP_HOST = os.environ.get("IMAP_HOST", "imap.gmail.com")
 IMAP_PORT = int(os.environ.get("IMAP_PORT", "993"))
@@ -93,14 +96,26 @@ def _registrar_remetente_confiavel(conn: psycopg.Connection, token: str, remeten
 
 
 def _extract_attachments(msg: Message) -> list[tuple[str, bytes]]:
+    """Achado real de auditoria: nenhum limite de tamanho de anexo --
+    um anexo gigante (ou uma zip-bomb) era decodificado inteiro pra
+    memória, mesmo risco já corrigido pro upload manual (ver
+    validar_tamanho_upload em sifp/api/shared.py). Mesmo limite aqui."""
     attachments = []
     for part in msg.walk():
         filename = part.get_filename()
         if not filename:
             continue
         payload = part.get_payload(decode=True)
-        if payload:
-            attachments.append((filename, payload))
+        if not payload:
+            continue
+        if len(payload) > MAX_UPLOAD_SIZE_BYTES:
+            limite_mb = MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)
+            logger.warning(
+                "Anexo '%s' ignorado: %d bytes acima do limite de %dMB.",
+                filename, len(payload), limite_mb,
+            )
+            continue
+        attachments.append((filename, payload))
     return attachments
 
 
@@ -132,13 +147,13 @@ def _import_for_user(user_id: str, filename: str, raw: bytes) -> str:
 
 def run() -> None:
     if not DATABASE_URL:
-        print("SUPABASE_DB_URL não configurada — abortando.")
+        logger.error("SUPABASE_DB_URL não configurada — abortando.")
         return
 
     imap_user = os.environ.get("IMAP_USER")
     imap_password = os.environ.get("IMAP_APP_PASSWORD")
     if not imap_user or not imap_password:
-        print("IMAP_USER/IMAP_APP_PASSWORD não configuradas — abortando.")
+        logger.error("IMAP_USER/IMAP_APP_PASSWORD não configuradas — abortando.")
         return
 
     imap = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
@@ -147,12 +162,12 @@ def run() -> None:
 
     status, data = imap.search(None, "UNSEEN")
     if status != "OK":
-        print("Falha ao buscar e-mails não lidos.")
+        logger.error("Falha ao buscar e-mails não lidos.")
         imap.logout()
         return
 
     ids = data[0].split()
-    print(f"{len(ids)} e-mail(s) não lido(s) encontrado(s).")
+    logger.info("%d e-mail(s) não lido(s) encontrado(s).", len(ids))
 
     lookup_conn = psycopg.connect(DATABASE_URL)
     try:
@@ -165,13 +180,13 @@ def run() -> None:
 
             token = _extract_token(msg)
             if not token:
-                print(f"  [{label}] sem token identificável — ignorado.")
+                logger.warning("[%s] sem token identificável — ignorado.", label)
                 imap.store(msg_id, "+FLAGS", "\\Seen")
                 continue
 
             user_id = _lookup_user_id(lookup_conn, token)
             if not user_id:
-                print(f"  [{label}] token '{token}' não corresponde a nenhum usuário — ignorado.")
+                logger.warning("[%s] token '%s' não corresponde a nenhum usuário — ignorado.", label, token)
                 imap.store(msg_id, "+FLAGS", "\\Seen")
                 continue
 
@@ -183,27 +198,31 @@ def run() -> None:
                 # aceito daqui pra frente pra esse token.
                 if remetente:
                     _registrar_remetente_confiavel(lookup_conn, token, remetente)
-                    print(f"  [{label}] usuário {user_id}: remetente '{remetente}' registrado como confiável pra esse alias.")
+                    logger.info(
+                        "[%s] usuário %s: remetente '%s' registrado como confiável pra esse alias.",
+                        label, user_id, remetente,
+                    )
             elif remetente != confiavel:
-                print(
-                    f"  [{label}] usuário {user_id}: remetente '{remetente}' não é o remetente "
-                    f"confiável ('{confiavel}') desse alias — ignorado por segurança."
+                logger.warning(
+                    "[%s] usuário %s: remetente '%s' não é o remetente confiável ('%s') "
+                    "desse alias — ignorado por segurança.",
+                    label, user_id, remetente, confiavel,
                 )
                 imap.store(msg_id, "+FLAGS", "\\Seen")
                 continue
 
             attachments = _extract_attachments(msg)
             if not attachments:
-                print(f"  [{label}] token '{token}' reconhecido, mas sem anexo — ignorado.")
+                logger.warning("[%s] token '%s' reconhecido, mas sem anexo — ignorado.", label, token)
                 imap.store(msg_id, "+FLAGS", "\\Seen")
                 continue
 
             for filename, raw in attachments:
                 try:
                     resultado = _import_for_user(user_id, filename, raw)
-                    print(f"  [{label}] usuário {user_id}: {filename} -> {resultado}")
-                except Exception as e:
-                    print(f"  [{label}] usuário {user_id}: erro ao importar '{filename}': {e}")
+                    logger.info("[%s] usuário %s: %s -> %s", label, user_id, filename, resultado)
+                except Exception:
+                    logger.exception("[%s] usuário %s: erro ao importar '%s'", label, user_id, filename)
 
             imap.store(msg_id, "+FLAGS", "\\Seen")
     finally:
@@ -212,4 +231,10 @@ def run() -> None:
 
 
 if __name__ == "__main__":
+    # Sem isso, logger.info() não vai pra lugar nenhum: sem handler
+    # configurado, o Python só emite WARNING+ por padrão (o "handler de
+    # último recurso"), e esse worker roda como processo standalone
+    # (cron da Railway), não dentro do Uvicorn -- não herda config de
+    # logging de mais ninguém.
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     run()

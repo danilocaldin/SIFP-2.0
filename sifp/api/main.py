@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from sifp.api.routes_saas import router as saas_router
 from sifp.api.shared import (
@@ -297,7 +297,7 @@ class GoalIn(BaseModel):
 
 
 class GoalProgressIn(BaseModel):
-    valor_acumulado: float
+    valor_acumulado: float = Field(ge=0)
 
 
 @app.get("/api/metas")
@@ -338,11 +338,11 @@ class DespesaFixaIn(BaseModel):
 
 
 class DespesaFixaParcelaIn(BaseModel):
-    parcela_atual: int
+    parcela_atual: int = Field(ge=0)
 
 
 class LimiteAlertaIn(BaseModel):
-    pct: float
+    pct: float = Field(ge=0, le=100)
 
 
 @app.get("/api/despesas-fixas")

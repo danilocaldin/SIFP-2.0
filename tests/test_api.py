@@ -266,6 +266,23 @@ def test_ciclo_completo_de_meta():
         assert not any(m["id"] == goal_id for m in metas_finais)
 
 
+def test_atualizar_progresso_meta_com_valor_negativo_e_rejeitado():
+    resp = client.patch("/api/metas/1", json={"valor_acumulado": -100.0})
+    assert resp.status_code == 422
+
+
+def test_atualizar_parcela_despesa_fixa_com_valor_negativo_e_rejeitado():
+    resp = client.patch("/api/despesas-fixas/1/parcela", json={"parcela_atual": -1})
+    assert resp.status_code == 422
+
+
+def test_definir_limite_alerta_fora_da_faixa_0_100_e_rejeitado():
+    resp = client.put("/api/despesas-fixas/limite-alerta", json={"pct": 150.0})
+    assert resp.status_code == 422
+    resp_negativo = client.put("/api/despesas-fixas/limite-alerta", json={"pct": -10.0})
+    assert resp_negativo.status_code == 422
+
+
 def test_criar_meta_com_dados_invalidos_e_rejeitada():
     resp = client.post("/api/metas", json={"nome": "", "valor_necessario": 100.0, "prazo": "2030-01-01"})
     assert resp.status_code == 400
