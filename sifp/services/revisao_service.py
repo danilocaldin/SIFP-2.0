@@ -13,11 +13,12 @@ from __future__ import annotations
 import pandas as pd
 
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO, CATEGORIAS_PADRAO, SELF_TRANSFER_CATEGORY
+from sifp.importers.br_format_utils import normalize_description_key
 from sifp.intelligence.categorization import is_pix_or_transfer
 
 
 def _situacao(row, learned_map: dict) -> str:
-    entry = learned_map.get(row["description"])
+    entry = learned_map.get(normalize_description_key(row["description"]))
     if entry and entry["variable"]:
         hist = ", ".join(f"{c} ({n}x)" for c, n in entry["history"])
         return f"Variável — já foi: {hist}"

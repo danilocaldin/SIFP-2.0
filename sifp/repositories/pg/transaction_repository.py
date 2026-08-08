@@ -21,6 +21,7 @@ import psycopg
 import pandas as pd
 
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
+from sifp.importers.br_format_utils import normalize_description_key
 from sifp.repositories.transaction_repository import make_tx_hash, normalize_tx_date
 
 __all__ = ["TransactionRepository", "make_tx_hash", "normalize_tx_date"]
@@ -106,20 +107,18 @@ class TransactionRepository:
         """Ver docstring completa na versão SQLite — mesma lógica, só a
         fonte da conexão muda."""
         df = pd.read_sql_query(
-            """
-            SELECT description, category, COUNT(*) as n
-            FROM transactions
-            WHERE human_confirmed = true
-            GROUP BY description, category
-            """,
+            "SELECT description, category FROM transactions WHERE human_confirmed = true",
             conn,
         )
 
+        df["chave"] = df["description"].apply(normalize_description_key)
+        counts = df.groupby(["chave", "category"]).size().reset_index(name="n")
+
         learned = {}
-        for desc, group in df.groupby("description"):
+        for chave, group in counts.groupby("chave"):
             history = sorted(zip(group["category"], group["n"]), key=lambda x: x[1], reverse=True)
             if len(history) == 1:
-                learned[desc] = {"category": history[0][0], "variable": False, "history": history}
+                learned[chave] = {"category": history[0][0], "variable": False, "history": history}
             else:
-                learned[desc] = {"category": None, "variable": True, "history": history}
+                learned[chave] = {"category": None, "variable": True, "history": history}
         return learned

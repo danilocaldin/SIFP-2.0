@@ -179,8 +179,8 @@ def test_bulk_update_mixed_batch_only_confirms_real_categories(repo):
 
     # e a memoria por descricao nao deve nem saber que "Mercado" existiu
     learned = repo.get_learned_categories()
-    assert "Uber" in learned
-    assert "Mercado" not in learned
+    assert "UBER" in learned
+    assert "MERCADO" not in learned
 
 
 def test_learned_categories_stable_vs_variable(repo):
@@ -204,12 +204,42 @@ def test_learned_categories_stable_vs_variable(repo):
 
     learned = repo.get_learned_categories()
 
-    assert learned["Uber"]["variable"] is False
-    assert learned["Uber"]["category"] == "Transporte"
+    assert learned["UBER"]["variable"] is False
+    assert learned["UBER"]["category"] == "Transporte"
 
-    assert learned["Pix Fulano"]["variable"] is True
-    assert learned["Pix Fulano"]["category"] is None
-    assert dict(learned["Pix Fulano"]["history"]) == {"Moradia": 1, "Lazer": 1}
+    assert learned["PIX FULANO"]["variable"] is True
+    assert learned["PIX FULANO"]["category"] is None
+    assert dict(learned["PIX FULANO"]["history"]) == {"Moradia": 1, "Lazer": 1}
+
+
+def test_learned_categories_normaliza_acento_e_caixa(repo):
+    """Achado real de auditoria: a mesma contraparte formatada diferente
+    entre extratos ("José Silva" vs "JOSE SILVA") virava duas entradas
+    na memória, perdendo a categorização já confirmada pelo usuário
+    sempre que a formatação variava."""
+    df = pd.DataFrame(
+        {
+            "date": ["2026-06-01", "2026-06-02"],
+            "description": ["Pix José Silva", "PIX JOSE SILVA"],
+            "value": [-100.0, -50.0],
+            "category": ["Ajuda Familiar", "Ajuda Familiar"],
+            "confidence": [0.99, 0.99],
+            "bank_category": ["", ""],
+            "self_transfer": [False, False],
+            "merchant": ["José Silva", "Jose Silva"],
+            "category_source": ["human", "human"],
+        }
+    )
+    repo.insert_new(df)
+    all_tx = repo.get_all()
+    repo.bulk_update_categories(list(zip(all_tx["tx_hash"], all_tx["category"])))
+
+    learned = repo.get_learned_categories()
+
+    assert len(learned) == 1
+    entry = next(iter(learned.values()))
+    assert entry["variable"] is False
+    assert entry["category"] == "Ajuda Familiar"
 
 
 def test_get_training_data_excludes_nao_categorizado(repo):

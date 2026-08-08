@@ -83,9 +83,11 @@ def category_breakdown(df: pd.DataFrame) -> pd.DataFrame:
     "diversificar Não categorizado")."""
     gastos = df[(df["value"] < 0) & (df["category"] != CATEGORIA_NAO_CATEGORIZADO)].copy()
     if gastos.empty:
-        return pd.DataFrame(columns=["category", "value_abs", "pct"])
+        return pd.DataFrame(columns=["category", "value_abs", "pct", "n_transacoes"])
     gastos["value_abs"] = gastos["value"].abs()
-    by_cat = gastos.groupby("category", as_index=False)["value_abs"].sum()
+    by_cat = gastos.groupby("category", as_index=False).agg(
+        value_abs=("value_abs", "sum"), n_transacoes=("value_abs", "size")
+    )
     by_cat = by_cat.sort_values("value_abs", ascending=False).reset_index(drop=True)
     total = by_cat["value_abs"].sum()
     by_cat["pct"] = (by_cat["value_abs"] / total * 100) if total else 0.0

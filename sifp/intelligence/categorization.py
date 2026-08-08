@@ -50,7 +50,7 @@ from sklearn.pipeline import Pipeline
 
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO, SELF_TRANSFER_CATEGORY
 from sifp.domain.models import CategorySource, CategorySuggestion
-from sifp.importers.br_format_utils import strip_accents
+from sifp.importers.br_format_utils import normalize_description_key, strip_accents
 
 DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "categorizer_model.joblib"
 
@@ -214,8 +214,9 @@ class CategorizationService:
         learned_map: dict | None = None,
         self_transfer: bool = False,
     ) -> CategorySuggestion:
-        if learned_map and description in learned_map:
-            entry = learned_map[description]
+        chave = normalize_description_key(description)
+        if learned_map and chave in learned_map:
+            entry = learned_map[chave]
             if entry["variable"]:
                 return CategorySuggestion(
                     CATEGORIA_NAO_CATEGORIZADO, 0.0, CategorySource.LEARNED_VARIABLE

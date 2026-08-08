@@ -19,6 +19,7 @@ import pandas as pd
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO, SELF_TRANSFER_CATEGORY
 from sifp.domain.models import Diagnostic, DiagnosticSeverity
 from sifp.services.formatting import format_brl_md as _brl
+from sifp.services.indicator_service import exclude_current_month
 
 # _brl formata 'R\$ 1.234,56' (padrão brasileiro, '$' escapado): Streamlit
 # (e qualquer markdown baseado em markdown-it) trata um par de '$' como
@@ -34,6 +35,7 @@ from sifp.services.formatting import format_brl_md as _brl
 TAXA_POUPANCA_BAIXA_PCT = 10.0
 TAXA_POUPANCA_CRITICA_PCT = 0.0
 CONCENTRACAO_CATEGORIA_ALTA_PCT = 30.0
+CONCENTRACAO_MIN_TRANSACOES = 5
 MESES_NEGATIVOS_JANELA = 3
 MESES_NEGATIVOS_LIMIAR = 2
 PENDENTES_QTD_LIMIAR = 15
@@ -79,8 +81,19 @@ def check_saldo_negativo_recorrente(monthly: pd.DataFrame) -> list[Diagnostic]:
     ]
 
 
-def check_taxa_poupanca_baixa(summary: dict, periodo_label: str) -> list[Diagnostic]:
-    """summary: saída de indicator_service.period_summary() do mês mais recente."""
+def check_taxa_poupanca_baixa(
+    summary: dict, periodo_label: str, month: str | None = None, hoje: str | None = None,
+) -> list[Diagnostic]:
+    """summary: saída de indicator_service.period_summary() do mês mais recente.
+    `month`/`hoje` (injetável pra teste) servem só pra silenciar a regra
+    no mês em andamento -- achado real de auditoria: nos primeiros dias
+    do mês, com o salário ainda não caído, a receita fica minúscula e a
+    razão saldo/receita vira um número absurdo (ex: -700%), tecnicamente
+    correto mas sem nenhum sentido como alerta."""
+    if month is not None:
+        hoje_ts = pd.Timestamp(hoje) if hoje else pd.Timestamp.now()
+        if month == hoje_ts.strftime("%Y-%m"):
+            return []
     taxa = summary.get("taxa_poupanca")
     if taxa is None or summary.get("receitas", 0) <= 0:
         return []
@@ -115,6 +128,12 @@ def check_taxa_poupanca_baixa(summary: dict, periodo_label: str) -> list[Diagnos
 def check_concentracao_categoria(by_cat: pd.DataFrame, periodo_label: str) -> list[Diagnostic]:
     """by_cat: saída de indicator_service.category_breakdown() do mês mais recente."""
     if by_cat.empty:
+        return []
+    # Achado real de auditoria: com poucas transações no período, a
+    # categoria de maior gasto naturalmente "concentra" boa parte (ou
+    # 100%, com só 1 lançamento) sem que isso signifique nada -- o
+    # diagnóstico só faz sentido com uma amostra mínima de transações.
+    if "n_transacoes" in by_cat.columns and int(by_cat["n_transacoes"].sum()) < CONCENTRACAO_MIN_TRANSACOES:
         return []
     top = by_cat.iloc[0]
     if top["pct"] < CONCENTRACAO_CATEGORIA_ALTA_PCT:
@@ -433,6 +452,10 @@ def check_tendencia_categoria(category_trend_df: pd.DataFrame) -> list[Diagnosti
     """
     if category_trend_df.empty:
         return []
+    # Mês em andamento tem gasto parcial (poucos dias) -- entrar na
+    # janela "recente" distorce a comparação (parece queda de gasto
+    # mesmo sem mudança real de comportamento).
+    category_trend_df = exclude_current_month(category_trend_df)
     n = TENDENCIA_CATEGORIA_MESES_JANELA
     meses = sorted(category_trend_df["month"].unique())
     if len(meses) < n * 2:
@@ -793,7 +816,7 @@ def run_diagnostics(
     """
     diagnostics: list[Diagnostic] = []
     diagnostics += check_saldo_negativo_recorrente(monthly)
-    diagnostics += check_taxa_poupanca_baixa(latest_summary, latest_period_label)
+    diagnostics += check_taxa_poupanca_baixa(latest_summary, latest_period_label, month=latest_month, hoje=hoje)
     diagnostics += check_concentracao_categoria(latest_by_cat, latest_period_label)
     diagnostics += check_transacoes_pendentes(all_tx)
     diagnostics += check_reserva_emergencia(patrimonio_total, despesa_media_mensal)

@@ -10,6 +10,7 @@ import pytest
 
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO, SELF_TRANSFER_CATEGORY
 from sifp.domain.models import CategorySource
+from sifp.importers.br_format_utils import normalize_description_key
 from sifp.intelligence.categorization import CategorizationService, apply_keyword_rules, is_pix_or_transfer
 
 
@@ -80,13 +81,28 @@ def test_precedence_self_transfer_beats_keyword_and_bank_category(service):
 def test_precedence_learned_stable_beats_everything(service):
     """Usuário sempre confirmou um Netflix específico como 'Lazer' — deve
     vencer até a regra padrão do sistema (que diria 'Assinaturas')."""
+    descricao = "Compra no débito autorizada - Netflix"
     learned_map = {
-        "Compra no débito autorizada - Netflix": {
+        normalize_description_key(descricao): {
+            "category": "Lazer", "variable": False, "history": [("Lazer", 3)],
+        }
+    }
+    result = service.predict(descricao, bank_category=None, learned_map=learned_map)
+    assert result.category == "Lazer"
+    assert result.source == CategorySource.LEARNED_STABLE
+
+
+def test_precedence_learned_stable_ignora_diferenca_de_acento_e_caixa(service):
+    """Achado real de auditoria: a mesma contraparte formatada diferente
+    entre extratos ("Compra ... Netflix" vs "COMPRA ... NETFLIX") tinha
+    que continuar reconhecendo a categoria já confirmada."""
+    learned_map = {
+        normalize_description_key("Compra no débito autorizada - Netflix"): {
             "category": "Lazer", "variable": False, "history": [("Lazer", 3)],
         }
     }
     result = service.predict(
-        "Compra no débito autorizada - Netflix", bank_category=None, learned_map=learned_map
+        "COMPRA NO DEBITO AUTORIZADA - NETFLIX", bank_category=None, learned_map=learned_map
     )
     assert result.category == "Lazer"
     assert result.source == CategorySource.LEARNED_STABLE
@@ -95,14 +111,13 @@ def test_precedence_learned_stable_beats_everything(service):
 def test_precedence_learned_variable_forces_review(service):
     """Descrição com histórico de categorias diferentes -> sempre
     'Não categorizado', mesmo que uma regra bateria."""
+    descricao = "Pix enviado - Maria Jose Vieira"
     learned_map = {
-        "Pix enviado - Maria Jose Vieira": {
+        normalize_description_key(descricao): {
             "category": None, "variable": True, "history": [("Moradia", 2), ("Lazer", 1)],
         }
     }
-    result = service.predict(
-        "Pix enviado - Maria Jose Vieira", bank_category=None, learned_map=learned_map
-    )
+    result = service.predict(descricao, bank_category=None, learned_map=learned_map)
     assert result.category == CATEGORIA_NAO_CATEGORIZADO
     assert result.confidence == 0.0
     assert result.source == CategorySource.LEARNED_VARIABLE

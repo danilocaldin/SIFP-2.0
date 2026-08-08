@@ -163,3 +163,28 @@ def test_project_patrimonio_com_rendimento_taxa_exatamente_menos_100():
         patrimonio_atual=1000.0, saldo_medio_mensal=0.0, taxa_anual_pct=-100.0, meses=1
     )
     assert result.iloc[0]["patrimonio_projetado"] == pytest.approx(0.0)
+
+
+def test_project_patrimonio_com_rendimento_nao_aplica_taxa_sobre_patrimonio_negativo():
+    """Achado real de auditoria: com o patrimônio já negativo (mais
+    dívida que investimento), multiplicar por (1 + taxa_mensal positiva)
+    tornava o número MAIS negativo a cada mês -- como se a dívida
+    "rendesse" à taxa de investimento, acelerando o buraco em vez de só
+    refletir o aporte/gasto do mês."""
+    result = proj.project_patrimonio_com_rendimento(
+        patrimonio_atual=-1000.0, saldo_medio_mensal=0.0, taxa_anual_pct=12.68, meses=3
+    )
+    # sem aporte e sem "rendimento" sobre saldo negativo, o patrimônio
+    # fica parado em -1000 (não afunda mais a cada mês)
+    assert list(result["patrimonio_projetado"]) == pytest.approx([-1000.0, -1000.0, -1000.0])
+
+
+def test_project_patrimonio_com_rendimento_volta_a_compor_quando_fica_positivo():
+    result = proj.project_patrimonio_com_rendimento(
+        patrimonio_atual=-100.0, saldo_medio_mensal=200.0, taxa_anual_pct=12.68, meses=2
+    )
+    taxa_mensal = (1 + 12.68 / 100) ** (1 / 12) - 1
+    # mes 1: -100 (negativo, sem rendimento) + 200 aporte = 100
+    # mes 2: 100 (agora positivo) rende + 200 aporte
+    assert result.iloc[0]["patrimonio_projetado"] == pytest.approx(100.0)
+    assert result.iloc[1]["patrimonio_projetado"] == pytest.approx(100.0 * (1 + taxa_mensal) + 200.0)

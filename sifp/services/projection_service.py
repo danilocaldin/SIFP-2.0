@@ -98,7 +98,13 @@ def project_patrimonio_com_rendimento(
     rows = []
     acumulado = patrimonio_atual
     for offset in range(1, meses + 1):
-        acumulado = acumulado * (1 + taxa_mensal) + saldo_medio_mensal
+        # Achado real de auditoria: com o patrimônio já negativo (mais
+        # dívida que investimento), aplicar a taxa mensal fazia o número
+        # ficar MAIS negativo a cada mês -- como se a dívida "rendesse"
+        # à taxa de investimento. Rendimento só se aplica sobre saldo
+        # positivo de verdade investido; dívida não compõe a essa taxa.
+        rendimento = acumulado * (1 + taxa_mensal) if acumulado > 0 else acumulado
+        acumulado = rendimento + saldo_medio_mensal
         rows.append({"mes_offset": offset, "patrimonio_projetado": acumulado})
     return pd.DataFrame(rows, columns=["mes_offset", "patrimonio_projetado"])
 

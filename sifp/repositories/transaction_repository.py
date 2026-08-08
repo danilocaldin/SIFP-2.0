@@ -18,6 +18,7 @@ from pathlib import Path
 import pandas as pd
 
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
+from sifp.importers.br_format_utils import normalize_description_key
 from sifp.repositories.connection import DEFAULT_DB_PATH, get_connection
 
 
@@ -154,7 +155,11 @@ class TransactionRepository:
         """
         Constrói a "memória" do sistema a partir de todas as transações
         que o usuário já confirmou manualmente, agrupadas por descrição
-        exata.
+        normalizada (sem acento, maiúscula) -- a mesma contraparte pode
+        chegar com formatação de texto ligeiramente diferente entre
+        extratos ("José Silva" vs "JOSE SILVA"), e sem normalizar isso
+        virava duas entradas na memória, perdendo a categorização já
+        confirmada pelo usuário sempre que a formatação variava.
 
         Para cada descrição:
           - categoria sempre igual -> "estável":
@@ -167,21 +172,19 @@ class TransactionRepository:
         """
         conn = self._connect()
         df = pd.read_sql_query(
-            """
-            SELECT description, category, COUNT(*) as n
-            FROM transactions
-            WHERE human_confirmed = 1
-            GROUP BY description, category
-            """,
+            "SELECT description, category FROM transactions WHERE human_confirmed = 1",
             conn,
         )
         conn.close()
 
+        df["chave"] = df["description"].apply(normalize_description_key)
+        counts = df.groupby(["chave", "category"]).size().reset_index(name="n")
+
         learned = {}
-        for desc, group in df.groupby("description"):
+        for chave, group in counts.groupby("chave"):
             history = sorted(zip(group["category"], group["n"]), key=lambda x: x[1], reverse=True)
             if len(history) == 1:
-                learned[desc] = {"category": history[0][0], "variable": False, "history": history}
+                learned[chave] = {"category": history[0][0], "variable": False, "history": history}
             else:
-                learned[desc] = {"category": None, "variable": True, "history": history}
+                learned[chave] = {"category": None, "variable": True, "history": history}
         return learned

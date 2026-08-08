@@ -20,6 +20,17 @@ def strip_accents(text: str) -> str:
     )
 
 
+def normalize_description_key(description: str) -> str:
+    """Chave de comparação pra "memória" de categoria por descrição
+    (TransactionRepository.get_learned_categories) -- achado real de
+    auditoria: agrupar/comparar pela descrição crua (sem tirar
+    acento/caixa) fazia a mesma contraparte ("José Silva" vs "JOSE
+    SILVA", conforme o banco formata o extrato) virar duas entradas
+    diferentes na memória, perdendo a categorização já confirmada pelo
+    usuário sempre que a formatação variava."""
+    return strip_accents(description or "").strip().upper()
+
+
 def normalize_col(col) -> str:
     return strip_accents(str(col)).strip().lower()
 

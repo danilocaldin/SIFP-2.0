@@ -86,6 +86,25 @@ def test_taxa_poupanca_ignora_mes_sem_receita():
     assert diag.check_taxa_poupanca_baixa(summary, "Jun/2026") == []
 
 
+def test_taxa_poupanca_ignora_mes_corrente_em_andamento():
+    """Achado real de auditoria: nos primeiros dias do mês, com só uma
+    despesa registrada e o salário ainda não caído, a receita é
+    minúscula e a taxa de poupança vira um número absurdo (ex: -700%) --
+    tecnicamente correto, mas sem sentido nenhum como alerta."""
+    hoje = pd.Timestamp.now()
+    mes_atual = hoje.strftime("%Y-%m")
+    summary = {"receitas": 10.0, "despesas": 700.0, "saldo": -690.0, "taxa_poupanca": -6900.0}
+    assert diag.check_taxa_poupanca_baixa(summary, "mês atual", month=mes_atual) == []
+
+
+def test_taxa_poupanca_continua_disparando_pra_mes_ja_fechado():
+    hoje = pd.Timestamp.now()
+    mes_passado = (hoje - pd.DateOffset(months=1)).strftime("%Y-%m")
+    summary = {"receitas": 5000, "despesas": 6000, "saldo": -1000, "taxa_poupanca": -20.0}
+    result = diag.check_taxa_poupanca_baixa(summary, "mês passado", month=mes_passado)
+    assert len(result) == 1
+
+
 # ---------------------------------------------------------------------
 # concentracao por categoria
 # ---------------------------------------------------------------------
@@ -108,6 +127,33 @@ def test_concentracao_dispara_acima_do_limiar():
 
 def test_concentracao_ignora_periodo_sem_gastos():
     assert diag.check_concentracao_categoria(pd.DataFrame(columns=["category", "value_abs", "pct"]), "Jun/2026") == []
+
+
+def test_concentracao_ignora_periodo_com_poucas_transacoes():
+    """Achado real de auditoria: com só 1 transação no período, a única
+    categoria naturalmente concentra 100% dos gastos -- isso não é um
+    sinal real de concentração de risco, é só falta de dado."""
+    from sifp.services import indicator_service as ind
+
+    df = pd.DataFrame({
+        "date": ["2026-06-01"], "value": [-900.0], "category": ["Moradia"],
+    })
+    by_cat = ind.category_breakdown(df)
+    assert diag.check_concentracao_categoria(by_cat, "Jun/2026") == []
+
+
+def test_concentracao_dispara_com_transacoes_suficientes_mesmo_se_poucas_categorias():
+    from sifp.services import indicator_service as ind
+
+    df = pd.DataFrame({
+        "date": ["2026-06-01", "2026-06-05", "2026-06-10", "2026-06-15", "2026-06-20"],
+        "value": [-900.0, -50.0, -50.0, -50.0, -50.0],
+        "category": ["Moradia", "Lazer", "Lazer", "Lazer", "Lazer"],
+    })
+    by_cat = ind.category_breakdown(df)  # 5 transações, Moradia = 900/1100 = ~82%
+    result = diag.check_concentracao_categoria(by_cat, "Jun/2026")
+    assert len(result) == 1
+    assert "Moradia" in result[0].titulo
 
 
 # ---------------------------------------------------------------------
@@ -393,6 +439,26 @@ def test_tendencia_nao_dispara_com_historico_insuficiente():
     # so 4 meses -- precisa de 6 (2x janela de 3) pra comparar
     trend = _trend_df({"2026-03": 100, "2026-04": 100, "2026-05": 100, "2026-06": 100})
     assert diag.check_tendencia_categoria(trend) == []
+
+
+def test_tendencia_ignora_mes_corrente_incompleto():
+    """Achado real de auditoria: o mês em andamento (poucos dias, gasto
+    parcial) entrava na janela "recente" da comparação, distorcendo a
+    tendência calculada -- um mês só começando parece "gasto caindo"
+    mesmo sem nenhuma mudança de comportamento real."""
+    hoje = pd.Timestamp.now()
+    meses_fechados = [(hoje - pd.DateOffset(months=i)).strftime("%Y-%m") for i in range(6, 0, -1)]
+    mes_atual = hoje.strftime("%Y-%m")
+    valores = {m: 100 for m in meses_fechados[:3]}
+    valores.update({m: 200 for m in meses_fechados[3:]})
+    # mes corrente com valor bem baixo (só começou) -- se entrar na
+    # janela recente, puxa a média recente pra baixo e mascara o
+    # crescimento real de 100%
+    valores[mes_atual] = 5
+    trend = _trend_df(valores)
+    result = diag.check_tendencia_categoria(trend)
+    assert len(result) == 1
+    assert result[0].codigo == "categoria_crescendo_Lazer"
 
 
 def test_tendencia_nao_dispara_quando_crescimento_pequeno():
