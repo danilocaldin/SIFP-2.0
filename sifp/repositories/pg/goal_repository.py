@@ -32,9 +32,10 @@ class GoalRepository:
         cur = conn.cursor()
         cur.execute("UPDATE goals SET valor_acumulado = %s WHERE id = %s", (valor_acumulado, goal_id))
 
-    def delete(self, conn: psycopg.Connection, goal_id: int) -> None:
+    def delete(self, conn: psycopg.Connection, goal_id: int) -> bool:
         cur = conn.cursor()
         cur.execute("DELETE FROM goals WHERE id = %s", (goal_id,))
+        return cur.rowcount > 0
 
     def get_all(self, conn: psycopg.Connection) -> pd.DataFrame:
         return pd.read_sql_query("SELECT * FROM goals ORDER BY prazo ASC", conn)

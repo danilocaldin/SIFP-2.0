@@ -58,12 +58,14 @@ class DespesaFixaRepository:
         conn.commit()
         conn.close()
 
-    def delete(self, despesa_id: int) -> None:
+    def delete(self, despesa_id: int) -> bool:
         conn = self._connect()
         cur = conn.cursor()
         cur.execute("DELETE FROM despesas_fixas WHERE id = ?", (despesa_id,))
         conn.commit()
+        apagou = cur.rowcount > 0
         conn.close()
+        return apagou
 
     def get_all(self, apenas_ativas: bool = True) -> pd.DataFrame:
         conn = self._connect()

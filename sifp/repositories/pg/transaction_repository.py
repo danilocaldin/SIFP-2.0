@@ -100,8 +100,10 @@ class TransactionRepository:
                 unresolved,
             )
 
-    def delete(self, conn: psycopg.Connection, tx_hash: str) -> None:
-        conn.cursor().execute("DELETE FROM transactions WHERE tx_hash = %s", (tx_hash,))
+    def delete(self, conn: psycopg.Connection, tx_hash: str) -> bool:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM transactions WHERE tx_hash = %s", (tx_hash,))
+        return cur.rowcount > 0
 
     def get_learned_categories(self, conn: psycopg.Connection) -> dict:
         """Ver docstring completa na versão SQLite — mesma lógica, só a

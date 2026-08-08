@@ -234,7 +234,8 @@ def atualizar_progresso_meta(goal_id: int, body: GoalProgressIn, conn: psycopg.C
 
 @router.delete("/metas/{goal_id}")
 def excluir_meta(goal_id: int, conn: psycopg.Connection = Depends(get_db)):
-    _repos(conn)["goal_repo"].delete(goal_id)
+    if not _repos(conn)["goal_repo"].delete(goal_id):
+        raise HTTPException(status_code=404, detail="Meta não encontrada.")
     return {"ok": True}
 
 
@@ -293,7 +294,8 @@ def encerrar_despesa_fixa(despesa_id: int, conn: psycopg.Connection = Depends(ge
 
 @router.delete("/despesas-fixas/{despesa_id}")
 def excluir_despesa_fixa(despesa_id: int, conn: psycopg.Connection = Depends(get_db)):
-    _repos(conn)["despesa_fixa_repo"].delete(despesa_id)
+    if not _repos(conn)["despesa_fixa_repo"].delete(despesa_id):
+        raise HTTPException(status_code=404, detail="Despesa fixa não encontrada.")
     return {"ok": True}
 
 
@@ -467,13 +469,15 @@ def revisao_retreinar(conn: psycopg.Connection = Depends(get_db)):
 
 @router.delete("/transacoes/{tx_hash}")
 def excluir_transacao(tx_hash: str, conn: psycopg.Connection = Depends(get_db)):
-    _repos(conn)["transaction_repo"].delete(tx_hash)
+    if not _repos(conn)["transaction_repo"].delete(tx_hash):
+        raise HTTPException(status_code=404, detail="Transação não encontrada.")
     return {"ok": True}
 
 
 @router.delete("/patrimonio/{position_key}")
 def excluir_ativo(position_key: str, conn: psycopg.Connection = Depends(get_db)):
-    _repos(conn)["asset_repo"].delete(position_key)
+    if not _repos(conn)["asset_repo"].delete(position_key):
+        raise HTTPException(status_code=404, detail="Ativo não encontrado.")
     return {"ok": True}
 
 

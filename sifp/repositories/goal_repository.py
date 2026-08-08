@@ -37,12 +37,14 @@ class GoalRepository:
         conn.commit()
         conn.close()
 
-    def delete(self, goal_id: int) -> None:
+    def delete(self, goal_id: int) -> bool:
         conn = self._connect()
         cur = conn.cursor()
         cur.execute("DELETE FROM goals WHERE id = ?", (goal_id,))
         conn.commit()
+        apagou = cur.rowcount > 0
         conn.close()
+        return apagou
 
     def get_all(self) -> pd.DataFrame:
         conn = self._connect()

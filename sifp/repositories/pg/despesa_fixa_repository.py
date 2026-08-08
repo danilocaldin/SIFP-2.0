@@ -46,9 +46,10 @@ class DespesaFixaRepository:
         cur = conn.cursor()
         cur.execute("UPDATE despesas_fixas SET ativa = %s WHERE id = %s", (ativa, despesa_id))
 
-    def delete(self, conn: psycopg.Connection, despesa_id: int) -> None:
+    def delete(self, conn: psycopg.Connection, despesa_id: int) -> bool:
         cur = conn.cursor()
         cur.execute("DELETE FROM despesas_fixas WHERE id = %s", (despesa_id,))
+        return cur.rowcount > 0
 
     def get_all(self, conn: psycopg.Connection, apenas_ativas: bool = True) -> pd.DataFrame:
         query = "SELECT * FROM despesas_fixas"

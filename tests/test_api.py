@@ -266,6 +266,29 @@ def test_ciclo_completo_de_meta():
         assert not any(m["id"] == goal_id for m in metas_finais)
 
 
+def test_excluir_meta_inexistente_retorna_404():
+    """Achado real de auditoria: delete() não checava rowcount --
+    apagar um id inexistente respondia "ok" igual a um apagado de
+    verdade, escondendo bugs (ex: id errado, corrida entre abas)."""
+    resp = client.delete("/api/metas/999999999")
+    assert resp.status_code == 404
+
+
+def test_excluir_transacao_inexistente_retorna_404():
+    resp = client.delete("/api/transacoes/hash-que-nao-existe")
+    assert resp.status_code == 404
+
+
+def test_excluir_ativo_inexistente_retorna_404():
+    resp = client.delete("/api/patrimonio/chave-que-nao-existe")
+    assert resp.status_code == 404
+
+
+def test_excluir_despesa_fixa_inexistente_retorna_404():
+    resp = client.delete("/api/despesas-fixas/999999999")
+    assert resp.status_code == 404
+
+
 def test_atualizar_progresso_meta_com_valor_negativo_e_rejeitado():
     resp = client.patch("/api/metas/1", json={"valor_acumulado": -100.0})
     assert resp.status_code == 422

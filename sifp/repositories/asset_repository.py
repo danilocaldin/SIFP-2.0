@@ -65,11 +65,16 @@ class AssetRepository:
         conn.close()
         return df
 
-    def delete(self, position_key: str) -> None:
+    def delete(self, position_key: str) -> bool:
+        """True se um ativo de verdade foi apagado -- achado real de
+        auditoria: sem checar rowcount, apagar um position_key
+        inexistente respondia "ok" igual a um apagado de verdade."""
         conn = self._connect()
-        conn.execute("DELETE FROM assets WHERE position_key = ?", (position_key,))
+        cur = conn.execute("DELETE FROM assets WHERE position_key = ?", (position_key,))
         conn.commit()
+        apagou = cur.rowcount > 0
         conn.close()
+        return apagou
 
     def get_latest_positions(self) -> pd.DataFrame:
         """Posições do extrato mais recente de cada instituição — usado

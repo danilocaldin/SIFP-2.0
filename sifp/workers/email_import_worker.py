@@ -89,8 +89,16 @@ def _remetente_confiavel(conn: psycopg.Connection, token: str) -> str | None:
 
 
 def _registrar_remetente_confiavel(conn: psycopg.Connection, token: str, remetente: str) -> None:
+    """Achado real de auditoria: o UPDATE incondicional tinha uma corrida
+    não-atômica entre execuções sobrepostas do worker -- duas rodadas
+    concorrentes podiam ler remetente_confiavel=NULL ao mesmo tempo e a
+    segunda a commitar vencia, mesmo que a primeira já tivesse
+    "confiado" num remetente diferente. O WHERE ...IS NULL torna
+    "confiar no primeiro uso" atômico no próprio banco: só grava se
+    ainda não tinha sido definido por outra execução."""
     conn.cursor().execute(
-        "UPDATE import_aliases SET remetente_confiavel = %s WHERE token = %s", (remetente, token)
+        "UPDATE import_aliases SET remetente_confiavel = %s WHERE token = %s AND remetente_confiavel IS NULL",
+        (remetente, token),
     )
     conn.commit()
 

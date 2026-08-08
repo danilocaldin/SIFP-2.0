@@ -145,11 +145,13 @@ class TransactionRepository:
         conn.commit()
         conn.close()
 
-    def delete(self, tx_hash: str) -> None:
+    def delete(self, tx_hash: str) -> bool:
         conn = self._connect()
-        conn.execute("DELETE FROM transactions WHERE tx_hash = ?", (tx_hash,))
+        cur = conn.execute("DELETE FROM transactions WHERE tx_hash = ?", (tx_hash,))
         conn.commit()
+        apagou = cur.rowcount > 0
         conn.close()
+        return apagou
 
     def get_learned_categories(self) -> dict:
         """

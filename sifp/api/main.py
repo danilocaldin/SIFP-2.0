@@ -14,6 +14,7 @@ Rodar com:
 
 import logging
 import os
+import secrets
 
 from dotenv import load_dotenv
 
@@ -94,7 +95,18 @@ def _refresh_model() -> str:
     return categorization_service.train(training_df)
 
 
-app = FastAPI(title="SIFP API")
+# RAILWAY_ENVIRONMENT é injetada automaticamente pela Railway em toda
+# implantação (não precisa configurar nada) -- ausente localmente, então
+# /docs e /redoc continuam abertos em dev, mas desligados em produção
+# (achado real de auditoria: expunham o schema completo da API, sem
+# nenhum motivo pra estar acessível publicamente).
+_em_producao = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+app = FastAPI(
+    title="SIFP API",
+    docs_url=None if _em_producao else "/docs",
+    redoc_url=None if _em_producao else "/redoc",
+    openapi_url=None if _em_producao else "/openapi.json",
+)
 app.include_router(saas_router)
 
 # As rotas pessoais (/api/..., sem o /v2) nunca tiveram autenticação —
@@ -125,7 +137,10 @@ async def require_personal_api_key(request: Request, call_next):
     is_personal_route = path.startswith("/api/") and not path.startswith("/api/v2/")
     expected_key = os.environ.get("SIFP_PERSONAL_API_KEY")
     if is_personal_route and expected_key:
-        if request.headers.get("X-API-Key") != expected_key:
+        # secrets.compare_digest (não !=) -- comparação de string comum
+        # sai assim que acha o primeiro caractere diferente, vazando por
+        # timing quantos caracteres do início a chave tentada acertou.
+        if not secrets.compare_digest(request.headers.get("X-API-Key", ""), expected_key):
             return JSONResponse(status_code=401, content={"detail": "Chave de API inválida ou ausente."})
     return await call_next(request)
 
@@ -139,7 +154,7 @@ async def require_personal_api_key(request: Request, call_next):
 # 401 em vez de ser respondido, quebrando upload/exclusão/chat do app
 # pessoal feitos pelo navegador sempre que SIFP_PERSONAL_API_KEY está
 # configurada (ver test_preflight_cors_nao_e_bloqueado_pela_chave_de_api).
-_cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -321,7 +336,8 @@ def atualizar_progresso_meta(goal_id: int, body: GoalProgressIn):
 
 @app.delete("/api/metas/{goal_id}")
 def excluir_meta(goal_id: int):
-    goal_repo.delete(goal_id)
+    if not goal_repo.delete(goal_id):
+        raise HTTPException(status_code=404, detail="Meta não encontrada.")
     return {"ok": True}
 
 
@@ -377,7 +393,8 @@ def encerrar_despesa_fixa(despesa_id: int):
 
 @app.delete("/api/despesas-fixas/{despesa_id}")
 def excluir_despesa_fixa(despesa_id: int):
-    despesa_fixa_repo.delete(despesa_id)
+    if not despesa_fixa_repo.delete(despesa_id):
+        raise HTTPException(status_code=404, detail="Despesa fixa não encontrada.")
     return {"ok": True}
 
 
@@ -487,11 +504,13 @@ def revisao_retreinar():
 
 @app.delete("/api/transacoes/{tx_hash}")
 def excluir_transacao(tx_hash: str):
-    transaction_repo.delete(tx_hash)
+    if not transaction_repo.delete(tx_hash):
+        raise HTTPException(status_code=404, detail="Transação não encontrada.")
     return {"ok": True}
 
 
 @app.delete("/api/patrimonio/{position_key}")
 def excluir_ativo(position_key: str):
-    asset_repo.delete(position_key)
+    if not asset_repo.delete(position_key):
+        raise HTTPException(status_code=404, detail="Ativo não encontrado.")
     return {"ok": True}
