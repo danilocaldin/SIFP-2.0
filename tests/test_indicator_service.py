@@ -51,6 +51,59 @@ def test_self_transfer_total(sample_df):
     assert ind.self_transfer_total(sample_df) == pytest.approx(1000.0)
 
 
+def test_self_transfer_total_soma_normal_quando_valores_diferentes_mesmo_dia():
+    """Duas transferências reais e distintas no mesmo dia (valores
+    diferentes) não são a mesma coisa contada duas vezes -- soma normal."""
+    df = pd.DataFrame({
+        "date": ["2026-06-02", "2026-06-02"],
+        "value": [-1000.0, 300.0],
+        "category": [SELF_TRANSFER_CATEGORY, SELF_TRANSFER_CATEGORY],
+    })
+    assert ind.self_transfer_total(df) == pytest.approx(1300.0)
+
+
+def test_self_transfer_total_soma_normal_quando_mesmo_valor_dias_diferentes():
+    """Ida e volta do mesmo valor em dias diferentes (ex: mandou 1000 pro
+    investimento numa data, trouxe de volta em outra) são dois movimentos
+    reais ao longo do tempo -- soma normal, não é dupla contagem."""
+    df = pd.DataFrame({
+        "date": ["2026-06-02", "2026-06-20"],
+        "value": [-1000.0, 1000.0],
+        "category": [SELF_TRANSFER_CATEGORY, SELF_TRANSFER_CATEGORY],
+    })
+    assert ind.self_transfer_total(df) == pytest.approx(2000.0)
+
+
+def test_self_transfer_total_pareia_mesmo_valor_e_mesmo_dia():
+    """Achado real de auditoria (double count): quando o usuário importa
+    o extrato de duas contas próprias, a MESMA transferência aparece em
+    ambas -- saída numa, entrada na outra, mesmo valor absoluto, mesma
+    data. Esse par conta como um movimento só (1000), não dois (2000)."""
+    df = pd.DataFrame({
+        "date": ["2026-06-02", "2026-06-02"],
+        "value": [-1000.0, 1000.0],
+        "category": [SELF_TRANSFER_CATEGORY, SELF_TRANSFER_CATEGORY],
+    })
+    assert ind.self_transfer_total(df) == pytest.approx(1000.0)
+
+
+def test_self_transfer_total_pareia_so_o_que_casa_sobra_conta_separado():
+    """3 linhas no mesmo dia e mesmo valor absoluto (2 saídas, 1 entrada):
+    1 par (saída+entrada) conta uma vez, a saída sem par conta separado --
+    2 movimentos de 1000 (2000), não 3 (3000) nem 1 (1000)."""
+    df = pd.DataFrame({
+        "date": ["2026-06-02", "2026-06-02", "2026-06-02"],
+        "value": [-1000.0, -1000.0, 1000.0],
+        "category": [SELF_TRANSFER_CATEGORY] * 3,
+    })
+    assert ind.self_transfer_total(df) == pytest.approx(2000.0)
+
+
+def test_self_transfer_total_vazio_quando_sem_self_transfer():
+    df = pd.DataFrame({"date": ["2026-06-01"], "value": [-50.0], "category": ["Mercado"]})
+    assert ind.self_transfer_total(df) == 0.0
+
+
 def test_category_breakdown_percentages_sum_to_100(sample_df):
     real = ind.exclude_self_transfers(sample_df)
     by_cat = ind.category_breakdown(real)

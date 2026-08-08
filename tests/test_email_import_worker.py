@@ -20,7 +20,7 @@ def _build_message(headers: dict, attachments: list[tuple[str, bytes]] | None = 
 
 def test_extract_token_from_delivered_to():
     msg = _build_message({"Delivered-To": "extratos.sifra+arthur123@gmail.com", "To": "extratos.sifra@gmail.com"})
-    assert _extract_token(msg) == "arthur123"
+    assert _extract_token(msg) == ("arthur123", True)
 
 
 def test_extract_token_prefers_delivered_to_over_to():
@@ -28,17 +28,31 @@ def test_extract_token_prefers_delivered_to_over_to():
         "Delivered-To": "extratos.sifra+certo@gmail.com",
         "To": "extratos.sifra+errado@gmail.com",
     })
-    assert _extract_token(msg) == "certo"
+    assert _extract_token(msg) == ("certo", True)
 
 
 def test_extract_token_falls_back_to_to_header():
+    """Fallback pro To/Cc continua existindo (cobre o encaminhamento
+    manual, onde o próprio usuário digita o endereço), mas o token vem
+    marcado como não-confiável -- ver uso em run() pra não deixar isso
+    registrar o primeiro remetente confiável de um alias novo."""
     msg = _build_message({"To": "extratos.sifra+viaencaminhamento@gmail.com"})
-    assert _extract_token(msg) == "viaencaminhamento"
+    assert _extract_token(msg) == ("viaencaminhamento", False)
 
 
 def test_extract_token_none_when_no_plus_address():
     msg = _build_message({"To": "extratos.sifra@gmail.com"})
-    assert _extract_token(msg) is None
+    assert _extract_token(msg) == (None, False)
+
+
+def test_extract_token_x_original_to_e_confiavel():
+    msg = _build_message({"X-Original-To": "extratos.sifra+abc@gmail.com"})
+    assert _extract_token(msg) == ("abc", True)
+
+
+def test_extract_token_cc_nao_e_confiavel():
+    msg = _build_message({"Cc": "extratos.sifra+abc@gmail.com"})
+    assert _extract_token(msg) == ("abc", False)
 
 
 def test_extract_attachments_finds_named_parts():

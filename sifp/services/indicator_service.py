@@ -157,8 +157,39 @@ def top_expenses(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
 
 def self_transfer_total(df: pd.DataFrame) -> float:
     """Quanto foi movimentado entre contas próprias no período (nota de
-    transparência: não conta como receita/despesa, mas o usuário deve ver o valor)."""
-    return df[df["category"] == SELF_TRANSFER_CATEGORY]["value"].abs().sum()
+    transparência: não conta como receita/despesa, mas o usuário deve ver
+    o valor).
+
+    Cada linha self_transfer é UM lado de uma transferência — o extrato
+    de uma conta só registra o lado que passou por ela (ida OU volta),
+    normalmente em datas diferentes. Somar o valor absoluto de cada linha
+    está certo nesse caso: representa o volume total movimentado ao longo
+    do tempo, não é a mesma transferência contada duas vezes.
+
+    Achado real de auditoria (double count): a única forma de dupla
+    contagem de verdade é o usuário importar o extrato de DUAS contas
+    próprias onde a MESMA transferência aparece nas duas (saída numa,
+    entrada na outra) — nesse caso específico, duas linhas com o MESMO
+    valor absoluto e a MESMA data (par ida/volta instantâneo) contam como
+    um único movimento, não dois. Linhas com valores diferentes ou datas
+    diferentes continuam somadas normalmente (são movimentos distintos de
+    verdade, ver parágrafo acima)."""
+    self_transfers = df[df["category"] == SELF_TRANSFER_CATEGORY]
+    if self_transfers.empty:
+        return 0.0
+
+    dados = pd.DataFrame({
+        "data_dia": pd.to_datetime(self_transfers["date"]).dt.normalize(),
+        "valor": self_transfers["value"],
+        "valor_abs": self_transfers["value"].abs(),
+    })
+
+    total = 0.0
+    for (_, valor_abs), grupo in dados.groupby(["data_dia", "valor_abs"]):
+        pares = min((grupo["valor"] > 0).sum(), (grupo["valor"] < 0).sum())
+        movimentos = len(grupo) - pares
+        total += movimentos * valor_abs
+    return float(total)
 
 
 def category_trend(df: pd.DataFrame) -> pd.DataFrame:

@@ -55,14 +55,32 @@ IMAP_PORT = int(os.environ.get("IMAP_PORT", "993"))
 # endereço de entrega de verdade.
 _TOKEN_RE = re.compile(r"\+([a-zA-Z0-9_-]+)@")
 
+# Delivered-To/X-Original-To são escritos pelo NOSSO servidor de
+# recebimento a partir do endereço real de entrega -- não dá pra forjar
+# sem controlar esse servidor. To/Cc são conteúdo escrito pelo PRÓPRIO
+# remetente (é por isso que existem: cobrem o encaminhamento manual, onde
+# o usuário digita/cola o endereço +token ele mesmo), mas em teoria podem
+# conter qualquer string sem relação nenhuma com a entrega real. Achado
+# de auditoria: um alias novo (sem remetente_confiavel ainda) que só
+# aparece via To/Cc não deveria poder "registrar" esse remetente como
+# confiável na primeira vez -- ver uso de _confiavel em run().
+_HEADERS_CONFIAVEIS = ("Delivered-To", "X-Original-To")
+_HEADERS_FALLBACK = ("To", "Cc")
 
-def _extract_token(msg: Message) -> str | None:
-    for header in ("Delivered-To", "X-Original-To", "To", "Cc"):
+
+def _extract_token(msg: Message) -> tuple[str | None, bool]:
+    """Retorna (token, veio_de_header_confiavel)."""
+    for header in _HEADERS_CONFIAVEIS:
         for value in msg.get_all(header, []):
             m = _TOKEN_RE.search(value)
             if m:
-                return m.group(1)
-    return None
+                return m.group(1), True
+    for header in _HEADERS_FALLBACK:
+        for value in msg.get_all(header, []):
+            m = _TOKEN_RE.search(value)
+            if m:
+                return m.group(1), False
+    return None, False
 
 
 def _lookup_user_id(conn: psycopg.Connection, token: str) -> str | None:
@@ -186,7 +204,7 @@ def run() -> None:
             msg = email.message_from_bytes(msg_data[0][1])
             label = msg_id.decode()
 
-            token = _extract_token(msg)
+            token, token_confiavel = _extract_token(msg)
             if not token:
                 logger.warning("[%s] sem token identificável — ignorado.", label)
                 imap.store(msg_id, "+FLAGS", "\\Seen")
@@ -201,6 +219,20 @@ def run() -> None:
             remetente = _extract_sender(msg)
             confiavel = _remetente_confiavel(lookup_conn, token)
             if confiavel is None:
+                if not token_confiavel:
+                    # Alias ainda sem remetente estabelecido, e o token só
+                    # apareceu em To/Cc (conteúdo do remetente, não da
+                    # entrega real) -- não deixa essa mensagem "sequestrar"
+                    # o primeiro uso do alias. Precisa de um e-mail com
+                    # Delivered-To/X-Original-To confirmando a entrega real
+                    # pra estabelecer o primeiro remetente confiável.
+                    logger.warning(
+                        "[%s] usuário %s: token '%s' achado só em To/Cc e o alias ainda não tem "
+                        "remetente confiável — ignorado por segurança.",
+                        label, user_id, token,
+                    )
+                    imap.store(msg_id, "+FLAGS", "\\Seen")
+                    continue
                 # Primeiro e-mail que chega nesse alias -- "confiar no
                 # primeiro uso": registra esse remetente como o único
                 # aceito daqui pra frente pra esse token.
