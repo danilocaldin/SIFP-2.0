@@ -267,10 +267,30 @@ def _dividas_table(debt_transactions: pd.DataFrame, content_width: float) -> Tab
                 Paragraph(format_brl(abs(row["value"])), _STYLES["td"]),
             ]
         )
+    # Achado real de auditoria: faltava a linha TOTAL que a versão em
+    # texto já tem (report_service.py) -- mesmo padrão de _patrimonio_table.
+    total = debt_transactions["value"].abs().sum()
+    rows.append(
+        [
+            Paragraph("", _STYLES["td_muted"]),
+            Paragraph("TOTAL", _STYLES["td_strong"]),
+            Paragraph(format_brl(total), _STYLES["td_strong"]),
+        ]
+    )
     w = content_width
-    return _data_table(
+    table = _data_table(
         ["Data", "Descrição", "Valor"], rows, [w * 0.18, w * 0.56, w * 0.26], ["left", "left", "right"]
     )
+    last_row = len(rows)
+    table.setStyle(
+        TableStyle(
+            [
+                ("LINEABOVE", (0, last_row), (-1, last_row), 0.8, INK),
+                ("TOPPADDING", (0, last_row), (-1, last_row), 7),
+            ]
+        )
+    )
+    return table
 
 
 def _evolucao_chart(monthly: pd.DataFrame, content_width: float) -> Drawing:
@@ -556,6 +576,16 @@ def generate_pdf_report(
         story.append(legend)
         story.append(Spacer(1, 4))
         story.append(_evolucao_chart(monthly, content_width))
+        # Achado real de auditoria: o gráfico corta pros últimos 12 meses
+        # (mais que isso fica ilegível num gráfico de barras), enquanto o
+        # relatório em texto lista o histórico inteiro sem limite -- sem
+        # aviso nenhum, alguém com mais de 12 meses de dados via números
+        # diferentes entre os dois formatos do mesmo relatório.
+        if len(monthly) > 12:
+            story.append(Spacer(1, 2))
+            story.append(
+                Paragraph(f"Exibindo os últimos 12 de {len(monthly)} meses.", _STYLES["empty"])
+            )
 
     # Patrimônio e investimentos
     story.append(Paragraph("Patrimônio e investimentos", _STYLES["h1"]))
