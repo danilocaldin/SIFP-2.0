@@ -11,6 +11,8 @@ from __future__ import annotations
 import psycopg
 import pandas as pd
 
+from sifp.repositories.pg.connection import read_sql_query
+
 __all__ = ["BalanceRepository"]
 
 
@@ -34,6 +36,6 @@ class BalanceRepository:
         return len(df)
 
     def get_all(self, conn: psycopg.Connection) -> pd.DataFrame:
-        return pd.read_sql_query(
-            "SELECT * FROM daily_balances ORDER BY date ASC", conn, parse_dates=["date"]
+        return read_sql_query(
+            conn, "SELECT * FROM daily_balances ORDER BY date ASC", parse_dates=["date"]
         )

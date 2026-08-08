@@ -11,6 +11,8 @@ from __future__ import annotations
 import psycopg
 import pandas as pd
 
+from sifp.repositories.pg.connection import read_sql_query
+
 __all__ = ["DespesaFixaRepository"]
 
 
@@ -58,4 +60,4 @@ class DespesaFixaRepository:
         if apenas_ativas:
             query += " WHERE ativa = true"
         query += " ORDER BY criado_em ASC"
-        return pd.read_sql_query(query, conn)
+        return read_sql_query(conn, query)

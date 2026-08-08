@@ -14,6 +14,8 @@ from __future__ import annotations
 import psycopg
 import pandas as pd
 
+from sifp.repositories.pg.connection import read_sql_query
+
 __all__ = ["GoalRepository"]
 
 
@@ -39,4 +41,4 @@ class GoalRepository:
         return cur.rowcount > 0
 
     def get_all(self, conn: psycopg.Connection) -> pd.DataFrame:
-        return pd.read_sql_query("SELECT * FROM goals ORDER BY prazo ASC", conn)
+        return read_sql_query(conn, "SELECT * FROM goals ORDER BY prazo ASC")

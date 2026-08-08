@@ -15,6 +15,7 @@ import pandas as pd
 
 from sifp.domain.models import AssetPosition
 from sifp.repositories.asset_repository import _position_key
+from sifp.repositories.pg.connection import read_sql_query
 
 __all__ = ["AssetRepository"]
 
@@ -65,8 +66,8 @@ class AssetRepository:
         return len(positions)
 
     def get_all(self, conn: psycopg.Connection) -> pd.DataFrame:
-        return pd.read_sql_query(
-            "SELECT * FROM assets ORDER BY data_referencia DESC", conn, parse_dates=["data_referencia"]
+        return read_sql_query(
+            conn, "SELECT * FROM assets ORDER BY data_referencia DESC", parse_dates=["data_referencia"]
         )
 
     def delete(self, conn: psycopg.Connection, position_key: str) -> bool:

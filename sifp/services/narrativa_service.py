@@ -24,7 +24,7 @@ import os
 import pandas as pd
 
 from sifp.services import indicator_service as ind
-from sifp.services.formatting import formatar_mes
+from sifp.services.formatting import format_brl, formatar_mes
 from sifp.services.summary_service import SummaryService
 
 MODEL = "claude-haiku-4-5"
@@ -71,16 +71,23 @@ class NarrativaService:
         }
 
     def _montar_prompt(self, ctx: dict) -> str:
+        # Achado real de auditoria: valores em R$ aqui eram formatados cru
+        # (f"R$ {x:.2f}", padrão americano -- sem separador de milhar,
+        # ponto decimal), a mesma classe de bug já corrigida no sistema
+        # inteiro (ver DECISOES_E_LICOES.md), mas que escapou desse
+        # arquivo. Como esses números vão pro PROMPT da Anthropic, o
+        # texto explicativo gerado corria o risco de ecoar o formato
+        # errado de volta pro usuário.
         resumo = ctx["resumo"]
         linhas = [
             f"Mês analisado: {resumo['mes_label']}",
-            f"Saldo do mês: R$ {resumo['saldo']:.2f}",
+            f"Saldo do mês: {format_brl(resumo['saldo'])}",
             f"Taxa de poupança do mês: {resumo['taxa_poupanca_pct']:.1f}%",
         ]
         if resumo["delta_saldo_pct"] is not None:
             linhas.append(f"Variação do saldo em relação ao mês anterior: {resumo['delta_saldo_pct']:.1f}%")
         if resumo["patrimonio_total"]:
-            linhas.append(f"Patrimônio total atual: R$ {resumo['patrimonio_total']:.2f}")
+            linhas.append(f"Patrimônio total atual: {format_brl(resumo['patrimonio_total'])}")
         if resumo["taxa_mes_pct"] is not None:
             linhas.append(f"Rentabilidade dos investimentos no mês: {resumo['taxa_mes_pct']:.2f}%")
 
@@ -88,13 +95,14 @@ class NarrativaService:
             linhas.append("\nÚltimos meses (receitas / despesas / saldo):")
             for m in ctx["monthly_recent"]:
                 linhas.append(
-                    f"- {formatar_mes(m['month'])}: R$ {m['Receitas']:.2f} / R$ {m['Despesas']:.2f} / R$ {m['Saldo']:.2f}"
+                    f"- {formatar_mes(m['month'])}: {format_brl(m['Receitas'])} / "
+                    f"{format_brl(m['Despesas'])} / {format_brl(m['Saldo'])}"
                 )
 
         if ctx["top_categorias"]:
             linhas.append("\nMaiores categorias de gasto no mês:")
             for c in ctx["top_categorias"]:
-                linhas.append(f"- {c['category']}: R$ {c['value_abs']:.2f} ({c['pct']:.1f}% do total)")
+                linhas.append(f"- {c['category']}: {format_brl(c['value_abs'])} ({c['pct']:.1f}% do total)")
 
         diagnosticos = resumo.get("diagnostics") or []
         if diagnosticos:

@@ -11,6 +11,8 @@ from __future__ import annotations
 import psycopg
 import pandas as pd
 
+from sifp.repositories.pg.connection import read_sql_query
+
 __all__ = ["BudgetRepository"]
 
 
@@ -31,7 +33,7 @@ class BudgetRepository:
         cur.execute("DELETE FROM budgets WHERE category = %s", (category,))
 
     def get_all(self, conn: psycopg.Connection) -> pd.DataFrame:
-        return pd.read_sql_query("SELECT * FROM budgets ORDER BY category", conn)
+        return read_sql_query(conn, "SELECT * FROM budgets ORDER BY category")
 
     def get_limits_dict(self, conn: psycopg.Connection) -> dict:
         """{categoria: limite_mensal} — formato conveniente pra comparar

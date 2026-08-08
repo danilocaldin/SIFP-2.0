@@ -13,6 +13,7 @@ import pandas as pd
 
 from sifp.domain.models import Diagnostic
 from sifp.services.formatting import format_brl_number as _num
+from sifp.services.formatting import formatar_mes
 from sifp.services.formatting import unescape_currency as _plain
 
 _SEP = "-" * 60
@@ -75,7 +76,7 @@ def generate_text_report(
     else:
         for _, row in monthly.iterrows():
             lines.append(
-                f"  {row['month']}   R$ {_num(row['Receitas']):>10}   "
+                f"  {formatar_mes(row['month']):<7}   R$ {_num(row['Receitas']):>10}   "
                 f"R$ {_num(row['Despesas']):>10}   R$ {_num(row['Saldo']):>10}"
             )
 

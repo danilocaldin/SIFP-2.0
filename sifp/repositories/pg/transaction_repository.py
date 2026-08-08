@@ -22,6 +22,7 @@ import pandas as pd
 
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
 from sifp.importers.br_format_utils import normalize_description_key
+from sifp.repositories.pg.connection import read_sql_query
 from sifp.repositories.transaction_repository import make_tx_hash, normalize_tx_date
 
 __all__ = ["TransactionRepository", "make_tx_hash", "normalize_tx_date"]
@@ -64,18 +65,18 @@ class TransactionRepository:
         return inserted_hashes
 
     def get_all(self, conn: psycopg.Connection) -> pd.DataFrame:
-        return pd.read_sql_query(
-            "SELECT * FROM transactions ORDER BY date DESC", conn, parse_dates=["date"]
+        return read_sql_query(
+            conn, "SELECT * FROM transactions ORDER BY date DESC", parse_dates=["date"]
         )
 
     def get_training_data(self, conn: psycopg.Connection) -> pd.DataFrame:
         """Transações já classificadas manualmente, usadas para treinar o modelo de ML."""
-        return pd.read_sql_query(
+        return read_sql_query(
+            conn,
             """
             SELECT description, category FROM transactions
             WHERE category IS NOT NULL AND category != %s
             """,
-            conn,
             params=(CATEGORIA_NAO_CATEGORIZADO,),
         )
 
@@ -108,9 +109,9 @@ class TransactionRepository:
     def get_learned_categories(self, conn: psycopg.Connection) -> dict:
         """Ver docstring completa na versão SQLite — mesma lógica, só a
         fonte da conexão muda."""
-        df = pd.read_sql_query(
-            "SELECT description, category FROM transactions WHERE human_confirmed = true",
+        df = read_sql_query(
             conn,
+            "SELECT description, category FROM transactions WHERE human_confirmed = true",
         )
 
         df["chave"] = df["description"].apply(normalize_description_key)

@@ -27,7 +27,23 @@ class ImportAliasRepository:
         # opaco usado como credencial (o token FAZ PARTE do endereço de
         # e-mail de importação, então precisa ser difícil de adivinhar).
         token = secrets.token_urlsafe(32)
-        cur.execute("INSERT INTO import_aliases (token) VALUES (%s) RETURNING token", (token,))
+        # Achado real de auditoria: duas requisições concorrentes na
+        # primeira visita à tela Perfil (duas abas, ou reentrância do
+        # React) podiam ambas passar pelo SELECT acima vendo "sem token"
+        # e ambas tentar o INSERT -- a segunda violava a constraint
+        # UNIQUE em user_id e estourava 500 em vez de simplesmente
+        # devolver o token que a primeira acabou de criar. ON CONFLICT
+        # com um UPDATE de no-op torna isso atômico: se outra requisição
+        # já ganhou a corrida, devolve o token dela (via RETURNING), não
+        # o gerado aqui.
+        cur.execute(
+            """
+            INSERT INTO import_aliases (token) VALUES (%s)
+            ON CONFLICT (user_id) DO UPDATE SET token = import_aliases.token
+            RETURNING token
+            """,
+            (token,),
+        )
         return cur.fetchone()[0]
 
     def get_remetente_confiavel(self, conn: psycopg.Connection) -> str | None:

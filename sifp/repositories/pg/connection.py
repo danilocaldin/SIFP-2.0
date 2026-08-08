@@ -30,6 +30,7 @@ import os
 from contextlib import contextmanager
 from typing import Iterator
 
+import pandas as pd
 import psycopg
 from psycopg_pool import ConnectionPool
 
@@ -59,6 +60,35 @@ def _get_pool() -> ConnectionPool:
             open=True,
         )
     return _pool
+
+
+def read_sql_query(
+    conn: psycopg.Connection,
+    query: str,
+    params: tuple | None = None,
+    parse_dates: list[str] | None = None,
+) -> pd.DataFrame:
+    """Substitui `pd.read_sql_query(query, conn, parse_dates=...)` para
+    conexões psycopg3 -- mesma assinatura relevante, drop-in.
+
+    Achado real de auditoria: pandas não reconhece `psycopg.Connection`
+    como um dos backends que sabe tratar de verdade (não é
+    `sqlite3.Connection`, nem SQLAlchemy, nem ADBC) -- cai num fallback
+    que emite `UserWarning` ("Other DBAPI2 objects are not tested") e
+    envolve a conexão com tratamento de erro pensado pra `sqlite3.Error`,
+    que não captura nenhuma falha real do Postgres (deadlock, timeout,
+    erro de sintaxe passam direto sem o rollback/wrap que o pandas
+    tentaria fazer). Buscar via cursor nativo do psycopg evita esse
+    caminho por inteiro, sem precisar adotar SQLAlchemy só pra isso."""
+    with conn.cursor() as cur:
+        cur.execute(query, params)
+        rows = cur.fetchall()
+        columns = [desc.name for desc in cur.description] if cur.description else []
+    df = pd.DataFrame(rows, columns=columns)
+    for col in parse_dates or []:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col])
+    return df
 
 
 @contextmanager

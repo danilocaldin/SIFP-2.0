@@ -142,6 +142,22 @@ def test_report_contains_debts(summary, by_cat, by_merchant, monthly, diagnostic
     assert "200,00" in report
 
 
+def test_report_formata_mes_na_tabela_de_evolucao(summary, by_cat, by_merchant, monthly, diagnostics, asset_positions, debt_transactions):
+    """Achado real de auditoria: a tabela de evolução mensal mostrava o mês
+    cru ("2026-06"), enquanto o cabeçalho do mesmo relatório já usa o
+    formato bonito ("Jun/2026") -- inconsistência dentro do mesmo documento."""
+    report = generate_text_report(
+        "Jun/2026", summary, by_cat, by_merchant, monthly, diagnostics, asset_positions, debt_transactions
+    )
+    inicio = report.index("EVOLUÇÃO MENSAL")
+    fim = report.index("DIAGNÓSTICOS")
+    trecho = report[inicio:fim]
+    assert "Mai/2026" in trecho
+    assert "Jun/2026" in trecho
+    assert "2026-05" not in trecho
+    assert "2026-06" not in trecho
+
+
 def test_report_handles_empty_sections_gracefully(summary, monthly):
     empty_df = pd.DataFrame(columns=["category", "value_abs", "pct"])
     empty_merchant = pd.DataFrame(columns=["merchant", "value_abs", "n_transacoes"])

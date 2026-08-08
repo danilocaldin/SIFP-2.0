@@ -8,6 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 
+// Achado real de auditoria: sem essa guarda, acessar /login no deploy
+// pessoal (sem SAAS_MODE, sem as credenciais do Supabase configuradas
+// nesse projeto Vercel) chamava createClient() que lança
+// "supabaseUrl is required" de forma síncrona -- caía na tela genérica
+// de erro em vez de simplesmente não existir, diferente do padrão já
+// usado em /perfil pro mesmo cenário.
+const SAAS_MODE = process.env.NEXT_PUBLIC_SAAS_MODE === "true";
+
 const LINK_INVALIDO_MSG =
   'Esse link expirou ou já foi usado. Peça um novo convite ou clique em "esqueci minha senha".';
 
@@ -28,6 +36,14 @@ function readHashParams(): URLSearchParams | null {
 }
 
 export default function LoginPage() {
+  if (!SAAS_MODE) {
+    return (
+      <main className="flex min-h-[60vh] w-full flex-1 items-center justify-center px-6 text-center">
+        <p className="text-sm text-muted-foreground">Essa página existe só no Sifra multiusuário.</p>
+      </main>
+    );
+  }
+
   return (
     <Suspense fallback={null}>
       <LoginPageContent />
@@ -67,13 +83,20 @@ function LoginPageContent() {
     // sessão já criada no servidor) quanto o fragmento de um link de
     // recuperação clicado com outra sessão já ativa -- ver proxy.ts.
     if (modo !== "login") return;
+    // Achado real de auditoria: sem essa checagem, um usuário que clica
+    // num link de convite/recuperação vencido enquanto JÁ está logado
+    // nesse navegador (por outro caminho) era redirecionado pra "/" antes
+    // de conseguir ler "Esse link expirou ou já foi usado..." -- a
+    // mensagem que /auth/confirm mandou mostrar (?erro=link_invalido)
+    // nunca chegava a aparecer.
+    if (erroHash) return;
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
         router.replace("/");
       }
     });
-  }, [modo, router]);
+  }, [modo, erroHash, router]);
 
   useEffect(() => {
     const hashParams = readHashParams();

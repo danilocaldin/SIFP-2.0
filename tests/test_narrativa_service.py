@@ -128,6 +128,24 @@ def test_explicar_mes_retorna_texto_do_cliente_mockado(service, monkeypatch):
     assert "Jun/2026" in capture["messages"][0]["content"]
 
 
+def test_prompt_usa_formatacao_de_moeda_pt_br(service, monkeypatch):
+    """Achado real de auditoria: o prompt formatava valores em R$ no
+    padrão americano (f"R$ {x:.2f}" -- sem separador de milhar, ponto
+    decimal) em vez do padrão brasileiro já usado no resto do sistema.
+    Como esse texto vai pro modelo, o risco é o modelo ecoar o formato
+    errado de volta pro usuário na explicação gerada."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-fake-for-test")
+    monkeypatch.setitem(__import__("sys").modules, "anthropic", _fake_anthropic_module())
+
+    service.explicar_mes()
+
+    prompt = _FakeAnthropicClient.last_capture["messages"][0]["content"]
+    # saldo de junho: 5000 (Salario) - 500 (Mercado) = 4500
+    assert "4.500,00" in prompt
+    assert "4500.00" not in prompt
+    assert "4500,00" not in prompt
+
+
 def test_explicar_com_contexto_nao_toca_o_banco(service, monkeypatch):
     """Achado real de auditoria: sem separar 'ler o contexto' de 'chamar
     a Anthropic', uma conexão Postgres ficava presa durante toda a
