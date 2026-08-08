@@ -74,6 +74,7 @@ export function PatrimonioAssetsTable({ assets }: { assets: AssetPosition[] }) {
                   disabled={deletingKey === a.position_key}
                   onClick={() => handleDelete(a)}
                   title="Excluir ativo"
+                  aria-label={`Excluir ${a.nome}`}
                 >
                   {deletingKey === a.position_key ? "…" : "🗑️"}
                 </button>

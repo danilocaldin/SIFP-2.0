@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { DiagnosticCard } from "@/components/diagnostic-card";
+import { buttonVariants } from "@/components/ui/button";
 import { getResumo } from "@/lib/api-server";
 
 export default async function DiagnosticosPage() {
@@ -6,8 +8,11 @@ export default async function DiagnosticosPage() {
 
   if (!resumo.has_data) {
     return (
-      <main className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center gap-2 px-6 text-center">
+      <main className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center gap-4 px-6 text-center">
         <h1 className="text-xl font-medium">Ainda não há dados importados</h1>
+        <Link href="/upload" className={buttonVariants({ variant: "default" })}>
+          Importar extrato
+        </Link>
       </main>
     );
   }

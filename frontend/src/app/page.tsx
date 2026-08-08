@@ -3,6 +3,7 @@ import { MonthlyEvolutionChart } from "@/components/charts/monthly-evolution-cha
 import { DiagnosticCard } from "@/components/diagnostic-card";
 import { NarrativaButton } from "@/components/narrativa-button";
 import { Card, CardContent } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
 import { getDashboard, getResumo } from "@/lib/api-server";
 import { formatBRL, formatPct, formatPctSigned } from "@/lib/format";
 
@@ -11,11 +12,14 @@ export default async function Home() {
 
   if (!resumo.has_data) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-2 px-6 text-center">
+      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-4 px-6 text-center">
         <h1 className="text-xl font-medium">Ainda não há dados importados</h1>
         <p className="text-sm text-muted-foreground">
           Importe um extrato para começar a ver como você está financeiramente.
         </p>
+        <Link href="/upload" className={buttonVariants({ variant: "default" })}>
+          Importar extrato
+        </Link>
       </main>
     );
   }

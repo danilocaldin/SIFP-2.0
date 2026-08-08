@@ -113,12 +113,14 @@ function PasskeyCard() {
   async function buscarPasskeys(): Promise<PasskeyItem[]> {
     const supabase = createClient();
     const { data, error } = await supabase.auth.passkey.list();
-    return error ? [] : (data ?? []);
+    if (error) throw error;
+    return data ?? [];
   }
 
   useEffect(() => {
     buscarPasskeys()
       .then(setPasskeys)
+      .catch(() => setErro("Não foi possível carregar seus dispositivos cadastrados. Tente recarregar a página."))
       .finally(() => setCarregando(false));
   }, []);
 
@@ -136,7 +138,11 @@ function PasskeyCard() {
       }
       return;
     }
-    setPasskeys(await buscarPasskeys());
+    try {
+      setPasskeys(await buscarPasskeys());
+    } catch {
+      setErro("Dispositivo cadastrado, mas não foi possível atualizar a lista. Recarregue a página.");
+    }
   }
 
   async function handleExcluir(passkeyId: string) {
@@ -186,6 +192,7 @@ function PasskeyCard() {
                   disabled={excluindoId === p.id}
                   onClick={() => handleExcluir(p.id)}
                   title="Excluir passkey"
+                  aria-label={`Excluir passkey: ${p.friendly_name || "Dispositivo sem nome"}`}
                 >
                   {excluindoId === p.id ? "…" : "🗑️"}
                 </button>
@@ -218,6 +225,7 @@ function EmailImportacaoCard() {
   useEffect(() => {
     getEmailImportacao()
       .then(aplicarResultado)
+      .catch((err) => setErro(err instanceof Error ? err.message : "Erro desconhecido."))
       .finally(() => setCarregando(false));
   }, []);
 
@@ -241,7 +249,13 @@ function EmailImportacaoCard() {
     }
   }
 
-  if (carregando || !email) return null;
+  if (carregando) return null;
+  // Sem e-mail E sem erro: recurso legitimamente não configurado nesse
+  // deploy (503) -- aí sim o card não se aplica e fica invisível. Com
+  // erro, mostra o card com a mensagem em vez de sumir sem explicação
+  // (achado real de auditoria: antes, qualquer falha de rede/servidor
+  // fazia o card inteiro desaparecer, indistinguível de "não existe").
+  if (!email && !erro) return null;
 
   return (
     <Card className="mt-6">
@@ -253,37 +267,41 @@ function EmailImportacaoCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex items-center gap-2">
-          <code className="flex-1 rounded-md border border-border bg-muted px-3 py-2 text-sm break-all">
-            {email}
-          </code>
-          <Button type="button" variant="outline" onClick={handleCopiar}>
-            {copiado ? "Copiado!" : "Copiar"}
-          </Button>
-        </div>
+        {email && (
+          <>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 rounded-md border border-border bg-muted px-3 py-2 text-sm break-all">
+                {email}
+              </code>
+              <Button type="button" variant="outline" onClick={handleCopiar}>
+                {copiado ? "Copiado!" : "Copiar"}
+              </Button>
+            </div>
 
-        <div className="text-xs text-muted-foreground">
-          {remetenteConfiavel ? (
-            <p>
-              Por segurança, só e-mails vindos de <strong>{remetenteConfiavel}</strong> são
-              aceitos nesse endereço.{" "}
-              <button
-                type="button"
-                onClick={handleResetar}
-                disabled={resetando}
-                className="underline underline-offset-2 hover:text-foreground disabled:opacity-50"
-              >
-                {resetando ? "Trocando…" : "Mudei de e-mail de encaminhamento"}
-              </button>
-            </p>
-          ) : (
-            <p>
-              Ainda não recebemos nenhum e-mail nesse endereço. O primeiro remetente que enviar
-              um extrato aqui vira o único aceito daqui pra frente (proteção contra alguém tentar
-              enviar um extrato falso, mesmo que descubra esse endereço).
-            </p>
-          )}
-        </div>
+            <div className="text-xs text-muted-foreground">
+              {remetenteConfiavel ? (
+                <p>
+                  Por segurança, só e-mails vindos de <strong>{remetenteConfiavel}</strong> são
+                  aceitos nesse endereço.{" "}
+                  <button
+                    type="button"
+                    onClick={handleResetar}
+                    disabled={resetando}
+                    className="underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+                  >
+                    {resetando ? "Trocando…" : "Mudei de e-mail de encaminhamento"}
+                  </button>
+                </p>
+              ) : (
+                <p>
+                  Ainda não recebemos nenhum e-mail nesse endereço. O primeiro remetente que enviar
+                  um extrato aqui vira o único aceito daqui pra frente (proteção contra alguém tentar
+                  enviar um extrato falso, mesmo que descubra esse endereço).
+                </p>
+              )}
+            </div>
+          </>
+        )}
         {erro && <p className="text-xs text-destructive">⚠️ {erro}</p>}
       </CardContent>
     </Card>

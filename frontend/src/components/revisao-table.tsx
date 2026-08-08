@@ -161,6 +161,7 @@ export function RevisaoTable({
                     disabled={deletingHash === tx.tx_hash}
                     onClick={() => handleDelete(tx)}
                     title="Excluir transação"
+                    aria-label={`Excluir transação: ${tx.description}`}
                   >
                     {deletingHash === tx.tx_hash ? "…" : "🗑️"}
                   </button>

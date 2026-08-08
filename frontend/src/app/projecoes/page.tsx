@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { ProjectionChart } from "@/components/charts/projection-chart";
 import { HorizonteSelect } from "@/components/horizonte-select";
 import { Card, CardContent } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
 import { getProjecoes } from "@/lib/api-server";
 import { formatBRL, formatPct } from "@/lib/format";
 
@@ -17,8 +19,11 @@ export default async function ProjecoesPage({
 
   if (!projecoes.has_data) {
     return (
-      <main className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center gap-2 px-6 text-center">
+      <main className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center gap-4 px-6 text-center">
         <h1 className="text-xl font-medium">Ainda não há dados importados</h1>
+        <Link href="/upload" className={buttonVariants({ variant: "default" })}>
+          Importar extrato
+        </Link>
       </main>
     );
   }

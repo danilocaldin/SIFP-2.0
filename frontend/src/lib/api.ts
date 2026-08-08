@@ -63,7 +63,12 @@ export async function getEmailImportacao(): Promise<
   const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/perfil/email-importacao`, {
     headers: await authHeadersClient(),
   });
-  if (!res.ok) return null;
+  // 503 = a importação por e-mail não está configurada nesse deploy
+  // (EMAIL_IMPORT_BASE ausente) -- não é erro, é o card não se aplicar
+  // aqui. Qualquer outra falha (rede, 401, 500) é um erro de verdade e
+  // não deveria ficar indistinguível de "recurso não existe".
+  if (res.status === 503) return null;
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao buscar o e-mail de importação."));
   return res.json();
 }
 

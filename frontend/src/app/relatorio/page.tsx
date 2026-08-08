@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { ReportActions } from "@/components/report-actions";
 import { ReportMonthSelect } from "@/components/report-month-select";
+import { buttonVariants } from "@/components/ui/button";
 import { getRelatorio } from "@/lib/api-server";
 
 export default async function RelatorioPage({
@@ -12,8 +14,11 @@ export default async function RelatorioPage({
 
   if (!relatorio.has_data) {
     return (
-      <main className="mx-auto flex min-h-[60vh] w-full max-w-4xl flex-col items-center justify-center gap-2 px-6 text-center">
+      <main className="mx-auto flex min-h-[60vh] w-full max-w-4xl flex-col items-center justify-center gap-4 px-6 text-center">
         <h1 className="text-xl font-medium">Ainda não há dados importados</h1>
+        <Link href="/upload" className={buttonVariants({ variant: "default" })}>
+          Importar extrato
+        </Link>
       </main>
     );
   }

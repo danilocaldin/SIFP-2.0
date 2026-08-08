@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { MonthlyEvolutionChart } from "@/components/charts/monthly-evolution-chart";
 import { DailyBalanceChart } from "@/components/charts/daily-balance-chart";
 import { CategoryBreakdownSection } from "@/components/category-breakdown-section";
 import { DashboardTransactionsSection } from "@/components/dashboard-transactions-section";
 import { MonthSelect } from "@/components/month-select";
 import { Card, CardContent } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -25,8 +27,11 @@ export default async function DashboardPage({
 
   if (!dashboard.has_data) {
     return (
-      <main className="mx-auto flex min-h-[60vh] w-full max-w-4xl flex-col items-center justify-center gap-2 px-6 text-center">
+      <main className="mx-auto flex min-h-[60vh] w-full max-w-4xl flex-col items-center justify-center gap-4 px-6 text-center">
         <h1 className="text-xl font-medium">Ainda não há dados importados</h1>
+        <Link href="/upload" className={buttonVariants({ variant: "default" })}>
+          Importar extrato
+        </Link>
       </main>
     );
   }
