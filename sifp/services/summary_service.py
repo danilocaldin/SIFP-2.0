@@ -50,6 +50,14 @@ class SummaryService:
         by_cat = ind.category_breakdown(period_df)
         latest_assets = self.asset_repo.get_latest_positions()
         patrimonio_total = float(latest_assets["saldo_liquido"].sum()) if not latest_assets.empty else 0.0
+        # Achado real de auditoria: check_reserva_emergencia só enxergava
+        # investimentos importados por PDF -- um cliente com dinheiro na
+        # conta corrente e nenhum PDF importado recebia "reserva 0" (crítico),
+        # o oposto da realidade. Soma o saldo mais recente da conta (quando
+        # há extrato XLS/XLSX com essa coluna) só pra ESSE diagnóstico
+        # específico -- o "patrimônio total" mostrado no resto da tela
+        # continua sendo só investimentos, por design.
+        liquidez_disponivel = patrimonio_total + ind.latest_balance(self.balance_repo.get_all())
         monthly_fechados = ind.exclude_current_month(monthly)
         despesa_media_mensal = (
             float(monthly_fechados["Despesas"].mean()) if not monthly_fechados.empty else 0.0
@@ -69,7 +77,7 @@ class SummaryService:
             latest_period_label=month_label,
             latest_by_cat=by_cat,
             all_tx=all_tx_full,
-            patrimonio_total=patrimonio_total,
+            patrimonio_total=liquidez_disponivel,
             despesa_media_mensal=despesa_media_mensal,
             budget_limits=self.budget_repo.get_limits_dict(),
             goals=self.goal_repo.get_all(),

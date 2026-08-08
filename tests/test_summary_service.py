@@ -111,6 +111,45 @@ def test_diagnostics_for_month_nao_conta_mes_corrente_incompleto_no_saldo_negati
     assert "saldo_negativo_recorrente" not in codigos
 
 
+def test_diagnostics_for_month_reserva_emergencia_considera_saldo_em_conta(tmp_db_path):
+    """Achado real de auditoria: check_reserva_emergencia só enxergava
+    investimentos importados por PDF -- um cliente com dinheiro de
+    verdade guardado na conta corrente (extrato XLS/XLSX, sem nenhum PDF
+    de investimento) recebia "reserva 0, cobre 0 meses" com severidade
+    crítica, o oposto da realidade."""
+    init_db(tmp_db_path)
+    transaction_repo = TransactionRepository(tmp_db_path)
+    balance_repo = BalanceRepository(tmp_db_path)
+    hoje = pd.Timestamp.now()
+    mes_2 = (hoje - pd.DateOffset(months=2)).strftime("%Y-%m")
+    mes_1 = (hoje - pd.DateOffset(months=1)).strftime("%Y-%m")
+
+    tx = pd.DataFrame([
+        {"date": f"{mes_2}-05", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
+        {"date": f"{mes_2}-10", "description": "Mercado", "value": -5000.0, "category": "Mercado"},
+        {"date": f"{mes_1}-05", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
+        {"date": f"{mes_1}-10", "description": "Mercado", "value": -5000.0, "category": "Mercado"},
+    ])
+    transaction_repo.insert_new(tx)
+    # 60 mil na conta corrente -- 12x a despesa média mensal (5000),
+    # bem acima da meta de 3 meses de reserva
+    balance_repo.insert_many(pd.DataFrame([{"date": f"{mes_1}-15", "balance": 60000.0}]))
+
+    service = SummaryService(
+        transaction_repo, balance_repo, AssetRepository(tmp_db_path),
+        BudgetRepository(tmp_db_path), GoalRepository(tmp_db_path),
+        DespesaFixaRepository(tmp_db_path), PreferenciaRepository(tmp_db_path),
+    )
+    all_tx = transaction_repo.get_all()
+    all_tx["date"] = pd.to_datetime(all_tx["date"])
+    all_tx["month"] = all_tx["date"].dt.to_period("M").astype(str)
+
+    diagnostics = service.diagnostics_for_month(all_tx, all_tx, mes_1, "mês")
+
+    codigos = {d.codigo for d in diagnostics}
+    assert "reserva_emergencia_insuficiente" not in codigos
+
+
 def test_build_resumo_no_data():
     from sifp.repositories.connection import init_db as init
     import tempfile, os

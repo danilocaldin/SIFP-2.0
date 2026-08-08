@@ -245,3 +245,15 @@ def average_balance(balances_df: pd.DataFrame) -> dict:
     if balances_df.empty:
         return {"saldo_medio": 0.0, "dias": 0}
     return {"saldo_medio": float(balances_df["balance"].mean()), "dias": len(balances_df)}
+
+
+def latest_balance(balances_df: pd.DataFrame) -> float:
+    """Saldo mais recente da conta corrente (BalanceRepository.get_all(),
+    ordenado por data ASC) — usado como liquidez imediatamente disponível
+    em diagnósticos como reserva de emergência, que sem isso só enxergava
+    investimentos importados por PDF e ignorava dinheiro parado na conta.
+    0.0 se não há nenhum saldo diário importado (só extratos XLS/XLSX do
+    BTG trazem essa coluna)."""
+    if balances_df.empty:
+        return 0.0
+    return float(balances_df.sort_values("date").iloc[-1]["balance"])
