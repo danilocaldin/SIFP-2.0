@@ -201,7 +201,7 @@ def test_criar_e_remover_limite_de_orcamento():
     valor_original = limites_antes.get(categoria)
 
     try:
-        resp = client.post("/api/orcamento/limites", json={"category": categoria, "valor": 123.45})
+        resp = client.post("/api/orcamento/limites", json={"categoria": categoria, "valor": 123.45})
         assert resp.status_code == 200
 
         limites = client.get("/api/orcamento").json()["limites"]
@@ -210,11 +210,11 @@ def test_criar_e_remover_limite_de_orcamento():
         if valor_original is None:
             client.delete(f"/api/orcamento/limites/{categoria}")
         else:
-            client.post("/api/orcamento/limites", json={"category": categoria, "valor": valor_original})
+            client.post("/api/orcamento/limites", json={"categoria": categoria, "valor": valor_original})
 
 
 def test_criar_limite_com_valor_invalido_e_rejeitado():
-    resp = client.post("/api/orcamento/limites", json={"category": "Mercado", "valor": 0})
+    resp = client.post("/api/orcamento/limites", json={"categoria": "Mercado", "valor": 0})
     assert resp.status_code == 400
 
 
@@ -222,7 +222,7 @@ def test_criar_limite_com_categoria_inexistente_e_rejeitado():
     """Achado real de auditoria: uma categoria digitada errada (via
     chamada direta à API, não pela UI) virava rótulo permanente de treino
     do modelo de ML e voltava como sugestão pra sempre."""
-    resp = client.post("/api/orcamento/limites", json={"category": "Categoria Que Nao Existe", "valor": 100.0})
+    resp = client.post("/api/orcamento/limites", json={"categoria": "Categoria Que Nao Existe", "valor": 100.0})
     assert resp.status_code == 422
 
 

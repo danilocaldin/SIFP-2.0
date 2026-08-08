@@ -175,10 +175,10 @@ def projecoes(horizonte: int = 12, conn: psycopg.Connection = Depends(get_db)):
 
 
 class LimiteIn(BaseModel):
-    category: str
+    categoria: str
     valor: float
 
-    _validar_categoria = field_validator("category")(validar_categoria)
+    _validar_categoria = field_validator("categoria")(validar_categoria)
 
 
 @router.get("/orcamento")
@@ -192,13 +192,13 @@ def orcamento(conn: psycopg.Connection = Depends(get_db)):
 def criar_limite(body: LimiteIn, conn: psycopg.Connection = Depends(get_db)):
     if body.valor <= 0:
         raise HTTPException(status_code=400, detail="Informe um valor maior que zero.")
-    _repos(conn)["budget_repo"].set_limit(body.category, body.valor)
+    _repos(conn)["budget_repo"].set_limit(body.categoria, body.valor)
     return {"ok": True}
 
 
-@router.delete("/orcamento/limites/{category}")
-def remover_limite(category: str, conn: psycopg.Connection = Depends(get_db)):
-    _repos(conn)["budget_repo"].remove_limit(category)
+@router.delete("/orcamento/limites/{categoria}")
+def remover_limite(categoria: str, conn: psycopg.Connection = Depends(get_db)):
+    _repos(conn)["budget_repo"].remove_limit(categoria)
     return {"ok": True}
 
 

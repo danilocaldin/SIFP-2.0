@@ -80,17 +80,17 @@ export async function resetarRemetenteEmailImportacao(): Promise<void> {
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao resetar o remetente confiável."));
 }
 
-export async function criarLimite(category: string, valor: number): Promise<void> {
+export async function criarLimite(categoria: string, valor: number): Promise<void> {
   const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/orcamento/limites`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
-    body: JSON.stringify({ category, valor }),
+    body: JSON.stringify({ categoria, valor }),
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao salvar o limite."));
 }
 
-export async function removerLimite(category: string): Promise<void> {
-  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/orcamento/limites/${encodeURIComponent(category)}`, {
+export async function removerLimite(categoria: string): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/orcamento/limites/${encodeURIComponent(categoria)}`, {
     method: "DELETE",
     headers: await authHeadersClient(),
   });

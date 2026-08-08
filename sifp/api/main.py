@@ -280,10 +280,10 @@ def projecoes(horizonte: int = 12):
 
 
 class LimiteIn(BaseModel):
-    category: str
+    categoria: str
     valor: float
 
-    _validar_categoria = field_validator("category")(validar_categoria)
+    _validar_categoria = field_validator("categoria")(validar_categoria)
 
 
 @app.get("/api/orcamento")
@@ -295,13 +295,13 @@ def orcamento():
 def criar_limite(body: LimiteIn):
     if body.valor <= 0:
         raise HTTPException(status_code=400, detail="Informe um valor maior que zero.")
-    budget_repo.set_limit(body.category, body.valor)
+    budget_repo.set_limit(body.categoria, body.valor)
     return {"ok": True}
 
 
-@app.delete("/api/orcamento/limites/{category}")
-def remover_limite(category: str):
-    budget_repo.remove_limit(category)
+@app.delete("/api/orcamento/limites/{categoria}")
+def remover_limite(categoria: str):
+    budget_repo.remove_limit(categoria)
     return {"ok": True}
 
 
