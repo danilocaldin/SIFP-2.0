@@ -157,11 +157,11 @@ class BTGInvestmentImporter:
         try:
             with pdfplumber.open(io.BytesIO(raw_bytes)) as pdf:
                 full_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
-        except Exception:
+        except Exception as e:
             raise ValueError(
                 "Não foi possível ler o PDF. Verifique se o arquivo não está "
                 "corrompido e se é um extrato de conta investimento do BTG."
-            )
+            ) from e
 
         if not full_text.strip():
             raise ValueError(

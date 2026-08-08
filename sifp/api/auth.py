@@ -5,7 +5,7 @@ Autenticação do SaaS multiusuário: valida o JWT que o Supabase Auth emite
 pro usuário logado (enviado pelo frontend em `Authorization: Bearer <jwt>`)
 e expõe a dependency que toda rota de dado do usuário deve usar:
 
-    @app.get("/api/algo")
+    @router.get("/algo")  # router = APIRouter(prefix="/api/v2"), ver routes_saas.py
     def algo(conn = Depends(get_db)):
         ...
 

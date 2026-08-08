@@ -80,8 +80,12 @@ def validar_categoria(cls, v: str) -> str:
     DespesaFixaIn, RevisaoLoteIn, RevisaoUpdate, em main.py e
     routes_saas.py). Achado real de auditoria: sem essa checagem, uma
     categoria digitada errada (via chamada direta à API, não pela UI)
-    virava rótulo permanente de treino do modelo de ML e voltava como
-    sugestão pra sempre."""
+    ficava salva e quebrava qualquer agrupamento/breakdown por
+    categoria — no app pessoal (main.py, ainda retreina) também virava
+    rótulo permanente de treino do modelo de ML; no SaaS (routes_saas.py)
+    esse segundo risco não existe mais desde que o retreino automático
+    foi desligado (ver módulo shared.py acima), mas a validação continua
+    necessária pelo primeiro motivo."""
     if v not in CATEGORIAS_PADRAO:
         raise ValueError(
             f"Categoria inválida. Use uma das categorias existentes: {', '.join(CATEGORIAS_PADRAO)}."

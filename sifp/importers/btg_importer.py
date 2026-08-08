@@ -228,12 +228,12 @@ def _read_btg_excel(uploaded_file, ext: str = "xls") -> tuple[pd.DataFrame, pd.D
             tables = pd.read_html(io.BytesIO(raw_bytes))
             df_raw = tables[0]
             df_raw.columns = range(df_raw.shape[1])
-        except Exception:
+        except Exception as e:
             raise ValueError(
                 "Não foi possível abrir o arquivo Excel. Verifique se ele não "
                 "está corrompido e se a extensão (.xls/.xlsx) corresponde ao "
                 "formato real do arquivo."
-            )
+            ) from e
 
     header_info = _find_excel_header(df_raw)
     if header_info is None:
