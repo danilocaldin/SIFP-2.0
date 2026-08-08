@@ -110,6 +110,15 @@ app.include_router(saas_router)
 # um os.environ.get() por request é irrelevante.
 
 
+if not os.environ.get("SIFP_PERSONAL_API_KEY"):
+    logger.warning(
+        "SIFP_PERSONAL_API_KEY não está configurada -- as rotas pessoais (/api/...) estão "
+        "respondendo sem exigir autenticação nenhuma neste processo. Se isso for produção, "
+        "qualquer pessoa que descubra a URL pode ler/apagar os dados financeiros do app "
+        "pessoal e queimar a chave da Anthropic via /api/chat."
+    )
+
+
 @app.middleware("http")
 async def require_personal_api_key(request: Request, call_next):
     path = request.url.path
