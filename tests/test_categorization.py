@@ -56,6 +56,14 @@ def test_keyword_rule_termo_mais_especifico_vence_mercado_livre_vs_mercado():
     assert apply_keyword_rules("Compra no débito autorizada - Mercado Sao Jose") == "Mercado"
 
 
+def test_keyword_rule_mercado_pago_nao_e_supermercado():
+    """Achado real de auditoria: "Mercado Pago" é uma fintech de
+    pagamentos (tipo PayPal), não supermercado -- "MERCADO" como palavra
+    isolada batia mesmo dentro de "MERCADO PAGO"."""
+    assert apply_keyword_rules("Compra no débito autorizada - Mercado Pago*Loja") != "Mercado"
+    assert apply_keyword_rules("Compra no débito autorizada - Mercado Sao Jose") == "Mercado"
+
+
 def test_precedence_keyword_rule_beats_bank_category(service):
     result = service.predict("Compra no débito autorizada - Uber", bank_category="Outra Categoria")
     assert result.category == "Transporte"

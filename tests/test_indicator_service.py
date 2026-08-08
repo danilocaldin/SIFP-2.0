@@ -112,6 +112,33 @@ def test_month_over_month_delta_percent_change():
     assert delta["saldo"] is None  # divisão por zero (saldo anterior era 0) -> None, não crash
 
 
+def test_monthly_evolution_preenche_mes_sem_nenhuma_movimentacao():
+    """Achado real de auditoria: groupby("month") só gera linha pros
+    meses que têm transação -- um mês pulado (sem nenhum lançamento)
+    simplesmente sumia da tabela, e "últimos 3 meses" (.tail(3)) em
+    quem consome isso silenciosamente olhava mais pro passado do que
+    3 meses corridos, sem nenhum aviso."""
+    df = pd.DataFrame({
+        "date": ["2026-04-01", "2026-04-05", "2026-06-01", "2026-06-05"],
+        "value": [5000.0, -1000.0, 5000.0, -1000.0],
+    })
+    result = ind.monthly_evolution(df)
+    assert list(result["month"]) == ["2026-04", "2026-05", "2026-06"]
+    mes_vazio = result[result["month"] == "2026-05"].iloc[0]
+    assert mes_vazio["Receitas"] == pytest.approx(0.0)
+    assert mes_vazio["Despesas"] == pytest.approx(0.0)
+    assert mes_vazio["Saldo"] == pytest.approx(0.0)
+
+
+def test_monthly_evolution_sem_meses_pulados_fica_igual():
+    df = pd.DataFrame({
+        "date": ["2026-05-01", "2026-06-01"],
+        "value": [1000.0, 2000.0],
+    })
+    result = ind.monthly_evolution(df)
+    assert list(result["month"]) == ["2026-05", "2026-06"]
+
+
 def test_net_worth_history_sums_multiple_assets_same_date():
     assets = pd.DataFrame({
         "instituicao": ["BTG Pactual", "BTG Pactual", "BTG Pactual", "BTG Pactual"],

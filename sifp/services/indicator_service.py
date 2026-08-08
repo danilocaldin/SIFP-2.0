@@ -109,7 +109,11 @@ def merchant_concentration(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
 
 def monthly_evolution(df: pd.DataFrame) -> pd.DataFrame:
     """Receita/Despesa/Saldo por mês (já sem transferências internas), para
-    comparar a evolução ao longo do tempo."""
+    comparar a evolução ao longo do tempo. Preenche meses sem NENHUMA
+    transação com zero -- groupby só gera linha pros meses que têm dado,
+    e um mês pulado silenciosamente "sumia" da tabela, fazendo quem
+    consome isso com .tail(N) (ex: saldo médio dos "últimos 3 meses")
+    olhar mais pro passado do que N meses corridos, sem aviso nenhum."""
     if df.empty:
         return pd.DataFrame(columns=["month", "Receitas", "Despesas", "Saldo"])
     work = df.copy()
@@ -122,6 +126,15 @@ def monthly_evolution(df: pd.DataFrame) -> pd.DataFrame:
             }
         )
     ).reset_index()
+    todos_os_meses = pd.period_range(
+        work["month"].min(), work["month"].max(), freq="M"
+    ).astype(str)
+    monthly = (
+        monthly.set_index("month")
+        .reindex(todos_os_meses, fill_value=0.0)
+        .rename_axis("month")
+        .reset_index()
+    )
     monthly["Saldo"] = monthly["Receitas"] - monthly["Despesas"]
     return monthly.sort_values("month").reset_index(drop=True)
 

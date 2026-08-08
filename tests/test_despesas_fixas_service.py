@@ -92,10 +92,16 @@ def test_preferencia_set_substitui_valor_anterior(repos):
 # DespesasFixasService
 # ---------------------------------------------------------------------
 def _com_receita(transaction_repo):
+    # 3 meses consecutivos terminando bem antes de "hoje" -- meses
+    # hardcoded (ex: sempre abr/mai/jun) deixariam um buraco em relação
+    # à data real do teste assim que monthly_evolution passou a
+    # preencher meses sem movimentação (ver #140), incluindo o mês vazio
+    # na janela dos "últimos 3 meses" sem querer.
+    hoje = pd.Timestamp.now()
+    meses = [(hoje - pd.DateOffset(months=i)).strftime("%Y-%m") for i in range(3, 0, -1)]
     tx = pd.DataFrame([
-        {"date": "2026-04-05", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
-        {"date": "2026-05-05", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
-        {"date": "2026-06-05", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
+        {"date": f"{m}-05", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"}
+        for m in meses
     ])
     transaction_repo.insert_new(tx)
 
@@ -135,7 +141,7 @@ def test_receita_media_mensal_ignora_mes_corrente_incompleto(repos):
     """Um salário que ainda não caiu (mês em andamento) não pode puxar
     a receita média pra baixo -- inflaria pct_comprometido artificialmente."""
     despesa_fixa_repo, preferencia_repo, transaction_repo = repos
-    _com_receita(transaction_repo)  # abr/mai/jun 2026, R$5000 cada -> media 5000
+    _com_receita(transaction_repo)  # 3 meses fechados antes de hoje, R$5000 cada -> media 5000
 
     hoje = pd.Timestamp.now()
     tx_mes_atual = pd.DataFrame([{

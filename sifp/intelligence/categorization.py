@@ -74,7 +74,7 @@ KEYWORD_RULES = {
                          "RENDIMENTO", "DIVIDENDO"],
     "Assinaturas": ["NETFLIX", "AMAZON PRIME", "DISNEY", "HBO", "YOUTUBE PREMIUM",
                      "ASSINATURA", "ICLOUD", "GOOGLE ONE"],
-    "Compras": ["MERCADO LIVRE", "AMAZON", "SHOPEE", "MAGAZINE LUIZA",
+    "Compras": ["MERCADO LIVRE", "MERCADO PAGO", "AMAZON", "SHOPEE", "MAGAZINE LUIZA",
                 "AMERICANAS", "SHEIN"],
     "Transferências": ["PIX ENVIADO", "TED ENVIAD", "DOC ENVIAD", "TRANSFERENCIA"],
     "Investimentos": ["TESOURO DIRETO", "APLICACAO", "RESGATE", "CDB", "FUNDO DE INVESTIMENTO"],
