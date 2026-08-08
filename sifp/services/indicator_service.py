@@ -212,12 +212,25 @@ def net_worth_history(assets_df: pd.DataFrame) -> pd.DataFrame:
     Recebe o histórico completo (AssetRepository.get_all(), não só as
     posições mais recentes) porque é exatamente a variação ao longo do
     tempo que interessa aqui.
+
+    Instituições diferentes são importadas em datas diferentes (extrato
+    de junho do banco A, de julho do banco B) — agrupar só por
+    data_referencia faz o saldo do banco A "sumir" nos pontos em que só
+    o banco B tem extrato novo, parecendo uma queda de patrimônio que não
+    aconteceu. Por isso o saldo de cada instituição é carregado adiante
+    (forward-fill) até o próximo extrato dela chegar, e conta como 0 nas
+    datas anteriores ao primeiro extrato dela (ela ainda não existia no
+    histórico rastreado).
     """
     if assets_df.empty:
         return pd.DataFrame(columns=["data_referencia", "patrimonio_total"])
-    grouped = assets_df.groupby("data_referencia", as_index=False)["saldo_liquido"].sum()
-    grouped = grouped.rename(columns={"saldo_liquido": "patrimonio_total"})
-    return grouped.sort_values("data_referencia").reset_index(drop=True)
+    por_instituicao = assets_df.groupby(["instituicao", "data_referencia"], as_index=False)["saldo_liquido"].sum()
+    todas_datas = sorted(por_instituicao["data_referencia"].unique())
+    pivot = por_instituicao.pivot(index="data_referencia", columns="instituicao", values="saldo_liquido")
+    pivot = pivot.reindex(todas_datas).ffill().fillna(0.0)
+    total = pivot.sum(axis=1).reset_index()
+    total.columns = ["data_referencia", "patrimonio_total"]
+    return total.sort_values("data_referencia").reset_index(drop=True)
 
 
 def average_balance(balances_df: pd.DataFrame) -> dict:

@@ -114,6 +114,7 @@ def test_month_over_month_delta_percent_change():
 
 def test_net_worth_history_sums_multiple_assets_same_date():
     assets = pd.DataFrame({
+        "instituicao": ["BTG Pactual", "BTG Pactual", "BTG Pactual", "BTG Pactual"],
         "data_referencia": ["2026-05-31", "2026-05-31", "2026-06-30", "2026-06-30"],
         "saldo_liquido": [1000.0, 500.0, 1100.0, 520.0],
     })
@@ -123,16 +124,37 @@ def test_net_worth_history_sums_multiple_assets_same_date():
 
 
 def test_net_worth_history_single_snapshot():
-    assets = pd.DataFrame({"data_referencia": ["2026-06-30"], "saldo_liquido": [3006.49]})
+    assets = pd.DataFrame({
+        "instituicao": ["BTG Pactual"], "data_referencia": ["2026-06-30"], "saldo_liquido": [3006.49],
+    })
     result = ind.net_worth_history(assets)
     assert len(result) == 1
     assert result.iloc[0]["patrimonio_total"] == pytest.approx(3006.49)
 
 
 def test_net_worth_history_empty():
-    assets = pd.DataFrame(columns=["data_referencia", "saldo_liquido"])
+    assets = pd.DataFrame(columns=["instituicao", "data_referencia", "saldo_liquido"])
     result = ind.net_worth_history(assets)
     assert result.empty
+
+
+def test_net_worth_history_nao_confunde_extratos_assincronos_de_bancos_diferentes_com_queda():
+    """Achado real de auditoria: agrupar só por data_referencia fazia o
+    extrato de junho do BTG e o de julho da XP virarem 2 pontos
+    separados -- o ponto de julho só tinha a XP (a BTG "sumia" porque
+    não tinha extrato de julho ainda), parecendo uma queda de
+    patrimônio de ~60% quando na real o patrimônio total cresceu (BTG
+    mantido + XP novo). O valor da BTG precisa ser carregado adiante até
+    o próximo extrato dela chegar."""
+    assets = pd.DataFrame({
+        "instituicao": ["BTG Pactual", "XP"],
+        "data_referencia": ["2026-06-30", "2026-07-15"],
+        "saldo_liquido": [3000.0, 2000.0],
+    })
+    result = ind.net_worth_history(assets)
+    valores = dict(zip(result["data_referencia"], result["patrimonio_total"]))
+    assert valores["2026-06-30"] == pytest.approx(3000.0)  # só a BTG existia ainda
+    assert valores["2026-07-15"] == pytest.approx(5000.0)  # BTG carregada + XP nova
 
 
 def test_category_trend_breaks_down_by_month_and_category():

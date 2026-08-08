@@ -528,6 +528,24 @@ CUSTO_DINHEIRO_PARADO_MIN_DIAS = 15  # amostra mínima de dias de saldo pra conf
 CUSTO_DINHEIRO_PARADO_LIMIAR_RS = 30.0  # abaixo disso não vale a pena nem mencionar
 
 
+def _taxa_referencia_dinheiro_parado(latest_assets: pd.DataFrame) -> tuple[float | None, str | None]:
+    """Escolhe qual ativo usar como referência de "quanto o dinheiro
+    parado deixou de render". Pegar o primeiro ativo importado (ordem
+    arbitrária, vem de como o banco devolve as linhas) é errado quando
+    esse ativo por acaso é renda variável (ex: fundo de ações com
+    benchmark IBOV) -- o número fica sem sentido financeiro pra comparar
+    com conta corrente. Prefere um ativo com benchmark CDI (a referência
+    de baixo risco padrão no Brasil); na ausência de um, cai pro menor
+    benchmark_12m_pct disponível (estimativa conservadora, evita inflar
+    o "custo de oportunidade" com a taxa de um ativo de risco)."""
+    com_taxa = latest_assets[latest_assets["benchmark_12m_pct"].notna()]
+    if com_taxa.empty:
+        return None, None
+    cdi = com_taxa[com_taxa["benchmark"].astype(str).str.upper() == "CDI"]
+    escolhido = cdi.iloc[0] if not cdi.empty else com_taxa.loc[com_taxa["benchmark_12m_pct"].idxmin()]
+    return escolhido.get("benchmark_12m_pct"), escolhido.get("benchmark")
+
+
 def check_custo_dinheiro_parado(
     saldo_medio_conta_corrente: float, dias: int, taxa_anual_referencia: float | None, benchmark_nome: str | None,
 ) -> list[Diagnostic]:
@@ -790,12 +808,12 @@ def run_diagnostics(
     if weekend_stats is not None:
         diagnostics += check_gasto_fim_de_semana(weekend_stats)
     if balance_stats is not None and latest_assets is not None and not latest_assets.empty:
-        primeiro_ativo = latest_assets.iloc[0]
+        taxa_referencia, nome_referencia = _taxa_referencia_dinheiro_parado(latest_assets)
         diagnostics += check_custo_dinheiro_parado(
             saldo_medio_conta_corrente=balance_stats.get("saldo_medio", 0.0),
             dias=balance_stats.get("dias", 0),
-            taxa_anual_referencia=primeiro_ativo.get("benchmark_12m_pct"),
-            benchmark_nome=primeiro_ativo.get("benchmark"),
+            taxa_anual_referencia=taxa_referencia,
+            benchmark_nome=nome_referencia,
         )
     diagnostics += check_transacao_anomala(all_tx, latest_month)
     diagnostics += check_assinatura_reajustada(all_tx, latest_month)

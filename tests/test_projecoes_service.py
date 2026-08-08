@@ -58,6 +58,34 @@ def test_build_projecoes_positive_saldo_projects_growth(repos):
     assert len(result["chart"]) > 0
 
 
+def test_build_projecoes_ignora_mes_corrente_incompleto_no_saldo_medio(repos):
+    """Achado real de auditoria: saldo_medio/faixa usavam a evolução
+    mensal SEM excluir o mês em andamento -- um mês corrente com poucos
+    dias de despesa (e talvez sem a receita do mês ainda) distorcia a
+    média usada de base pra projeção inteira."""
+    hoje = pd.Timestamp.now()
+    mes_2 = (hoje - pd.DateOffset(months=2)).strftime("%Y-%m")
+    mes_1 = (hoje - pd.DateOffset(months=1)).strftime("%Y-%m")
+    mes_atual = hoje.strftime("%Y-%m")
+    tx = pd.DataFrame([
+        {"date": f"{mes_2}-01", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
+        {"date": f"{mes_2}-05", "description": "Mercado", "value": -1000.0, "category": "Mercado"},
+        {"date": f"{mes_1}-01", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
+        {"date": f"{mes_1}-05", "description": "Mercado", "value": -1000.0, "category": "Mercado"},
+        # mes corrente: só uma despesa registrada até agora, sem receita
+        # ainda -- saldo bem negativo, mas o mês não fechou.
+        {"date": f"{mes_atual}-01", "description": "Mercado", "value": -3000.0, "category": "Mercado"},
+    ])
+    repos["transaction_repo"].insert_new(tx)
+    service = ProjecoesService(repos["transaction_repo"], repos["asset_repo"], repos["goal_repo"])
+
+    result = service.build_projecoes(horizonte=12)
+
+    # média dos 2 meses FECHADOS (4000 cada), não puxada pro negativo
+    # pelo mês corrente parcial
+    assert result["saldo_medio_3m"] == pytest.approx(4000.0)
+
+
 def test_build_projecoes_negative_saldo_skips_chart(repos):
     tx = pd.DataFrame([
         {"date": "2026-06-01", "description": "Salario", "value": 1000.0, "category": "Salário/Receita"},

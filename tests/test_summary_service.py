@@ -73,6 +73,44 @@ def service(tmp_db_path):
     )
 
 
+def test_diagnostics_for_month_nao_conta_mes_corrente_incompleto_no_saldo_negativo(tmp_db_path):
+    """Achado real de auditoria: check_saldo_negativo_recorrente recebia
+    a evolução mensal SEM excluir o mês em andamento -- um mês corrente
+    com poucos dias (ainda sem receita registrada, só umas despesas) já
+    contava como "mês fechado no vermelho", inflando severidade de um
+    diagnóstico que deveria olhar só pra meses de verdade encerrados."""
+    init_db(tmp_db_path)
+    transaction_repo = TransactionRepository(tmp_db_path)
+    hoje = pd.Timestamp.now()
+    mes_2 = (hoje - pd.DateOffset(months=2)).strftime("%Y-%m")
+    mes_1 = (hoje - pd.DateOffset(months=1)).strftime("%Y-%m")
+    mes_atual = hoje.strftime("%Y-%m")
+
+    tx = pd.DataFrame([
+        {"date": f"{mes_2}-05", "description": "Salario", "value": 2000.0, "category": "Salário/Receita"},
+        {"date": f"{mes_2}-10", "description": "Mercado", "value": -500.0, "category": "Mercado"},
+        {"date": f"{mes_1}-05", "description": "Salario", "value": 1000.0, "category": "Salário/Receita"},
+        {"date": f"{mes_1}-10", "description": "Mercado", "value": -1500.0, "category": "Mercado"},
+        {"date": f"{mes_atual}-01", "description": "Mercado", "value": -300.0, "category": "Mercado"},
+    ])
+    transaction_repo.insert_new(tx)
+    service = SummaryService(
+        transaction_repo, BalanceRepository(tmp_db_path), AssetRepository(tmp_db_path),
+        BudgetRepository(tmp_db_path), GoalRepository(tmp_db_path),
+        DespesaFixaRepository(tmp_db_path), PreferenciaRepository(tmp_db_path),
+    )
+    all_tx = transaction_repo.get_all()
+    all_tx["date"] = pd.to_datetime(all_tx["date"])
+    all_tx["month"] = all_tx["date"].dt.to_period("M").astype(str)
+
+    diagnostics = service.diagnostics_for_month(all_tx, all_tx, mes_atual, "mês atual")
+
+    codigos = {d.codigo for d in diagnostics}
+    # só mes_1 fechou negativo -- 1 de 2 meses fechados é menos que o
+    # limiar de 2, então a regra não deveria disparar
+    assert "saldo_negativo_recorrente" not in codigos
+
+
 def test_build_resumo_no_data():
     from sifp.repositories.connection import init_db as init
     import tempfile, os
@@ -165,3 +203,31 @@ def test_build_resumo_projeta_mesmo_com_saldo_medio_negativo(tmp_db_path):
     assert resumo["projecao_12m"] is not None
     # patrimonio_total=0 + 12 meses de saldo_medio_3m negativo -> negativo
     assert resumo["projecao_12m"] < 0
+
+
+def test_build_resumo_saldo_medio_3m_ignora_mes_corrente_incompleto(tmp_db_path):
+    """Achado real de auditoria: saldo_medio_3m (base da projeção de 12
+    meses na tela Resumo) usava monthly SEM excluir o mês em andamento."""
+    init_db(tmp_db_path)
+    transaction_repo = TransactionRepository(tmp_db_path)
+    hoje = pd.Timestamp.now()
+    mes_2 = (hoje - pd.DateOffset(months=2)).strftime("%Y-%m")
+    mes_1 = (hoje - pd.DateOffset(months=1)).strftime("%Y-%m")
+    mes_atual = hoje.strftime("%Y-%m")
+    tx = pd.DataFrame([
+        {"date": f"{mes_2}-01", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
+        {"date": f"{mes_2}-05", "description": "Mercado", "value": -1000.0, "category": "Mercado"},
+        {"date": f"{mes_1}-01", "description": "Salario", "value": 5000.0, "category": "Salário/Receita"},
+        {"date": f"{mes_1}-05", "description": "Mercado", "value": -1000.0, "category": "Mercado"},
+        {"date": f"{mes_atual}-01", "description": "Mercado", "value": -3000.0, "category": "Mercado"},
+    ])
+    transaction_repo.insert_new(tx)
+    svc = SummaryService(
+        transaction_repo, BalanceRepository(tmp_db_path), AssetRepository(tmp_db_path),
+        BudgetRepository(tmp_db_path), GoalRepository(tmp_db_path),
+        DespesaFixaRepository(tmp_db_path), PreferenciaRepository(tmp_db_path),
+    )
+
+    resumo = svc.build_resumo(lambda periodo: periodo)
+
+    assert resumo["saldo_medio_3m"] == pytest.approx(4000.0)

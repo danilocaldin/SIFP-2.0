@@ -30,8 +30,12 @@ class ProjecoesService:
         all_tx["month"] = all_tx["date"].dt.to_period("M").astype(str)
         all_tx_real = ind.exclude_self_transfers(all_tx)
         monthly = ind.monthly_evolution(all_tx_real)
-        saldo_medio = proj.average_monthly_saldo(monthly, janela=3)
-        faixa = proj.saldo_range(monthly, janela=3)
+        # Sem o mês em andamento -- ver mesmo motivo em summary_service.py
+        # (average_monthly_saldo): um mês corrente incompleto distorce a
+        # média/faixa usada como base da projeção.
+        monthly_fechados = ind.exclude_current_month(monthly)
+        saldo_medio = proj.average_monthly_saldo(monthly_fechados, janela=3)
+        faixa = proj.saldo_range(monthly_fechados, janela=3)
 
         latest_assets = self.asset_repo.get_latest_positions()
         patrimonio_atual = float(latest_assets["saldo_liquido"].sum()) if not latest_assets.empty else 0.0

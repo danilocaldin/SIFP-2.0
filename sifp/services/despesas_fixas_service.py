@@ -47,8 +47,10 @@ class DespesasFixasService:
 
     def build_despesas_fixas(self) -> dict:
         despesas_df = self.despesa_fixa_repo.get_all(apenas_ativas=True)
+        hoje = pd.Timestamp.now().strftime("%Y-%m-%d")
 
         despesas = []
+        total_mensal = 0.0
         for _, row in despesas_df.iterrows():
             parcelas_totais = row.get("parcelas_totais")
             parcela_atual = row.get("parcela_atual")
@@ -69,7 +71,16 @@ class DespesasFixasService:
                 }
             )
 
-        total_mensal = float(despesas_df["valor_mensal"].sum()) if not despesas_df.empty else 0.0
+            # Achado real de auditoria: "ativa" só reflete se o usuário
+            # clicou em Encerrar/Excluir manualmente -- uma parcelada com
+            # todas as parcelas já pagas, ou uma despesa cadastrada com
+            # antecedência (data_inicio no futuro), continuava contando
+            # no total mensal comprometido até alguém notar e agir.
+            # Continua aparecendo na lista (pra ser notada), só não soma.
+            ja_concluida = parcelas_restantes == 0
+            ainda_nao_comecou = str(row["data_inicio"]) > hoje
+            if not ja_concluida and not ainda_nao_comecou:
+                total_mensal += float(row["valor_mensal"])
         receita_media = self._receita_media_mensal()
         pct_comprometido = (total_mensal / receita_media * 100) if receita_media > 0 else None
         margem_mensal = (receita_media - total_mensal) if receita_media > 0 else None

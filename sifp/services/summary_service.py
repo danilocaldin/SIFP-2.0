@@ -60,7 +60,11 @@ class SummaryService:
         ).build_despesas_fixas()
 
         return diag.run_diagnostics(
-            monthly=monthly,
+            # monthly_fechados (sem o mês em andamento) -- ver comentário
+            # acima de despesa_media_mensal: um mês corrente incompleto
+            # não deveria contar como "mês fechado no vermelho" em
+            # check_saldo_negativo_recorrente.
+            monthly=monthly_fechados,
             latest_summary=summary,
             latest_period_label=month_label,
             latest_by_cat=by_cat,
@@ -127,7 +131,10 @@ class SummaryService:
 
         diagnostics = self.diagnostics_for_month(all_tx, all_tx_real, latest_month, latest_label)
 
-        saldo_medio_3m = proj.average_monthly_saldo(monthly, janela=3)
+        # Sem o mês em andamento -- um mês corrente incompleto puxaria a
+        # média artificialmente pra baixo (poucos dias de despesa) ou pra
+        # cima (salário ainda não caiu), distorcendo a projeção.
+        saldo_medio_3m = proj.average_monthly_saldo(ind.exclude_current_month(monthly), janela=3)
         # Calcula mesmo com saldo médio negativo -- é justamente quem está
         # gastando mais do que ganha que mais precisa ver a trajetória
         # (patrimônio caindo), não só quem está com saldo positivo.

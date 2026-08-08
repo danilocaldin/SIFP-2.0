@@ -166,6 +166,45 @@ def test_build_despesas_fixas_despesa_inativa_nao_conta(repos):
     assert result["despesas"] == []
 
 
+def test_build_despesas_fixas_parcelada_concluida_nao_conta_no_total(repos):
+    """Achado real de auditoria: parcela_atual == parcelas_totais (todas
+    as parcelas já pagas) continuava somando no total mensal comprometido
+    até o usuário clicar em "Encerrar" manualmente -- a despesa some do
+    orçamento de verdade, mas o sistema continuava contando ela."""
+    despesa_fixa_repo, preferencia_repo, transaction_repo = repos
+    _com_receita(transaction_repo)
+    despesa_fixa_repo.create("Plano de saúde", "Saúde", 450.0, "recorrente", "2026-01-01")
+    despesa_fixa_repo.create(
+        "Notebook", "Compras", 300.0, "parcelada", "2026-01-01", parcela_atual=10, parcelas_totais=10
+    )
+
+    svc = DespesasFixasService(despesa_fixa_repo, preferencia_repo, transaction_repo)
+    result = svc.build_despesas_fixas()
+
+    assert result["total_mensal"] == pytest.approx(450.0)  # só o plano de saúde
+    # continua visível na lista (pra usuário notar e encerrar), só não conta
+    notebook = next(d for d in result["despesas"] if d["nome"] == "Notebook")
+    assert notebook["parcelas_restantes"] == 0
+
+
+def test_build_despesas_fixas_data_inicio_futura_nao_conta_no_total(repos):
+    """Achado real de auditoria: uma despesa fixa com data_inicio no
+    futuro (cadastrada com antecedência) já comprometia a renda do mês
+    atual, antes mesmo de começar a valer."""
+    despesa_fixa_repo, preferencia_repo, transaction_repo = repos
+    _com_receita(transaction_repo)
+    despesa_fixa_repo.create("Plano de saúde", "Saúde", 450.0, "recorrente", "2026-01-01")
+    futuro = (pd.Timestamp.now() + pd.DateOffset(months=2)).strftime("%Y-%m-%d")
+    despesa_fixa_repo.create("Academia nova", "Saúde", 150.0, "recorrente", futuro)
+
+    svc = DespesasFixasService(despesa_fixa_repo, preferencia_repo, transaction_repo)
+    result = svc.build_despesas_fixas()
+
+    assert result["total_mensal"] == pytest.approx(450.0)  # só o plano de saúde
+    academia = next(d for d in result["despesas"] if d["nome"] == "Academia nova")
+    assert academia is not None  # continua visível na lista
+
+
 def test_set_e_get_limite_alerta_pct(repos):
     despesa_fixa_repo, preferencia_repo, transaction_repo = repos
     svc = DespesasFixasService(despesa_fixa_repo, preferencia_repo, transaction_repo)

@@ -531,6 +531,34 @@ def test_run_diagnostics_integra_dinheiro_parado():
     assert "custo_dinheiro_parado" in codigos
 
 
+def test_run_diagnostics_dinheiro_parado_usa_cdi_mesmo_quando_nao_e_o_primeiro_ativo():
+    """Achado real de auditoria: a taxa de referência vinha de
+    latest_assets.iloc[0] -- se o primeiro ativo importado por acaso é
+    renda variável (ex: fundo com benchmark IBOV), o "custo de deixar
+    dinheiro parado" saía calculado com uma taxa de ações, sem sentido
+    financeiro nenhum pra comparar com conta corrente."""
+    monthly = pd.DataFrame({"month": ["2026-06"], "Receitas": [5000], "Despesas": [2000], "Saldo": [3000]})
+    summary = {"receitas": 5000, "despesas": 2000, "saldo": 3000, "taxa_poupanca": 60.0}
+    by_cat = pd.DataFrame({"category": ["Mercado"], "value_abs": [2000.0], "pct": [100.0]})
+    all_tx = pd.DataFrame({"category": ["Mercado"] * 10})
+    assets = pd.DataFrame({
+        "identificador": ["cnpj1", "cnpj2"], "nome": ["Fundo Ações", "Fundo CDB"],
+        "rentabilidade_12m_pct": [22.0, 14.87],
+        "benchmark": ["IBOV", "CDI"], "benchmark_12m_pct": [30.0, 14.78],
+    })
+    balance_stats = {"saldo_medio": 5000.0, "dias": 180}
+
+    result = diag.run_diagnostics(
+        monthly=monthly, latest_summary=summary, latest_period_label="Jun/2026",
+        latest_by_cat=by_cat, all_tx=all_tx,
+        latest_assets=assets, balance_stats=balance_stats,
+    )
+    dinheiro_parado = next(d for d in result if d.codigo == "custo_dinheiro_parado")
+    assert "CDI" in dinheiro_parado.descricao
+    assert "IBOV" not in dinheiro_parado.descricao
+    assert dinheiro_parado.impacto_financeiro == pytest.approx(5000 * 0.1478 * 180 / 365, rel=1e-3)
+
+
 # ---------------------------------------------------------------------
 # transação anômala (Fase 6 -- detecção de anomalia estatística, sem IA)
 # ---------------------------------------------------------------------
