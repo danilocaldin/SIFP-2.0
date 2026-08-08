@@ -87,10 +87,19 @@ function GoalRow({ goal }: { goal: Goal }) {
       : 0;
 
   async function handleSave() {
+    // Achado real de auditoria: `Number(valor) || 0` tratava campo vazio
+    // (ou qualquer entrada inválida) como "0" e salvava direto, sem erro
+    // nem confirmação -- zerava o progresso acumulado da meta em
+    // silêncio. Validar antes, igual ao form de criar meta acima.
+    const numero = Number(valor);
+    if (valor.trim() === "" || Number.isNaN(numero) || numero < 0) {
+      setError("Informe um valor válido (maior ou igual a zero).");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await atualizarProgressoMeta(goal.id, Number(valor) || 0);
+      await atualizarProgressoMeta(goal.id, numero);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido.");

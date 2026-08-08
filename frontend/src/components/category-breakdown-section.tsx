@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CategoryBarChart } from "@/components/charts/category-bar-chart";
 import { getDashboardCategoria } from "@/lib/api";
 import { formatBRL } from "@/lib/format";
@@ -17,6 +17,11 @@ export function CategoryBreakdownSection({
   const [transacoes, setTransacoes] = useState<CategoryTransaction[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Achado real de auditoria: sem isso, clicar em duas categorias rápido
+  // deixava a corrida decidir -- se a resposta da PRIMEIRA categoria
+  // chegasse DEPOIS da segunda, ela sobrescrevia a lista já exibida, e a
+  // tela mostrava o título de uma categoria com as transações de outra.
+  const requestIdRef = useRef(0);
 
   async function handleCategoryClick(categoria: string) {
     if (selected === categoria) {
@@ -26,12 +31,16 @@ export function CategoryBreakdownSection({
     setSelected(categoria);
     setCarregando(true);
     setErro(null);
+    const requestId = ++requestIdRef.current;
     try {
-      setTransacoes(await getDashboardCategoria(categoria, month));
+      const resultado = await getDashboardCategoria(categoria, month);
+      if (requestId !== requestIdRef.current) return; // resposta de um clique antigo -- ignora
+      setTransacoes(resultado);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       setErro(err instanceof Error ? err.message : "Erro desconhecido.");
     } finally {
-      setCarregando(false);
+      if (requestId === requestIdRef.current) setCarregando(false);
     }
   }
 

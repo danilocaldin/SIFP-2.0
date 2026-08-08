@@ -96,7 +96,11 @@ export default async function DashboardPage({
             <p className="mb-2 text-xs text-muted-foreground">Clique numa categoria pra ver as transações.</p>
           )}
           {dashboard.by_category.length > 0 ? (
-            <CategoryBreakdownSection data={dashboard.by_category} month={dashboard.selected_month} />
+            <CategoryBreakdownSection
+              key={dashboard.selected_month}
+              data={dashboard.by_category}
+              month={dashboard.selected_month}
+            />
           ) : (
             <p className="text-sm text-muted-foreground">Sem despesas no período selecionado.</p>
           )}
@@ -182,7 +186,12 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <DashboardTransactionsSection month={dashboard.selected_month} />
+      {/* Achado real de auditoria: sem a `key`, o painel não observava
+          troca de mês -- continuava mostrando as transações do mês antigo
+          até fechar/reabrir manualmente. `key={month}` remonta o
+          componente do zero (fechado, sem dado carregado) sempre que o
+          mês muda, sem precisar de um efeito setando estado. */}
+      <DashboardTransactionsSection key={dashboard.selected_month} month={dashboard.selected_month} />
     </main>
   );
 }

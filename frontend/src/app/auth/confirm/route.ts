@@ -12,7 +12,15 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/";
+  // Achado real de auditoria (open redirect): "next" vinha direto da query
+  // string sem validação. new URL(destino, base) IGNORA a base quando
+  // destino já é uma URL absoluta -- um link com next=https://phish.exemplo
+  // (o domínio no link em si continua sendo o nosso, então a vítima confia)
+  // redirecionava pra fora do site depois da confirmação. Só aceita um
+  // caminho relativo local (começa com "/", não com "//" -- URL
+  // scheme-relative é o mesmo ataque disfarçado).
+  const rawNext = searchParams.get("next");
+  const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
 
   if (token_hash && type) {
     const supabase = await createClient();
