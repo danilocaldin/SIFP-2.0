@@ -141,12 +141,18 @@ def monthly_evolution(df: pd.DataFrame) -> pd.DataFrame:
 
 def top_expenses(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
     """Os N maiores gastos individuais do período (complementa a visão por
-    categoria — às vezes um lançamento único é mais revelador que a soma)."""
+    categoria — às vezes um lançamento único é mais revelador que a soma).
+    Sempre devolve só as 4 colunas documentadas -- achado real de
+    auditoria: o caminho vazio devolvia só essas 4, mas o caminho com
+    dados devolvia TODAS as colunas originais de df (value, merchant,
+    category_source etc.), formatos diferentes conforme o período tinha
+    ou não gastos."""
+    colunas = ["date", "description", "category", "value_abs"]
     top = df[df["value"] < 0].copy()
     if top.empty:
-        return pd.DataFrame(columns=["date", "description", "category", "value_abs"])
+        return pd.DataFrame(columns=colunas)
     top["value_abs"] = top["value"].abs()
-    return top.sort_values("value_abs", ascending=False).head(n).reset_index(drop=True)
+    return top.sort_values("value_abs", ascending=False).head(n)[colunas].reset_index(drop=True)
 
 
 def self_transfer_total(df: pd.DataFrame) -> float:

@@ -177,6 +177,14 @@ def test_pendentes_dispara_por_percentual():
     assert len(result) == 1
 
 
+def test_pendentes_nao_dispara_com_poucas_transacoes_no_total():
+    """Achado real de auditoria: com poucas transações no total, 1 pendente já
+    é um percentual alto (ex: 1 de 3 = 33%) e disparava o diagnóstico mesmo
+    sem haver de fato "muitas" transações pendentes."""
+    all_tx = pd.DataFrame({"category": ["Mercado", "Lazer", CATEGORIA_NAO_CATEGORIZADO]})
+    assert diag.check_transacoes_pendentes(all_tx) == []
+
+
 # ---------------------------------------------------------------------
 # reserva de emergencia
 # ---------------------------------------------------------------------

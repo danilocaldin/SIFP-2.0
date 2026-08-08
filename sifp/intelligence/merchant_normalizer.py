@@ -87,9 +87,12 @@ class MerchantNormalizer:
 
         # Descrições no formato "Tipo de transação - Contraparte" (padrão
         # do extrato em Excel do BTG, e comum em outros bancos BR): o
-        # estabelecimento está depois do último " - ".
+        # estabelecimento está depois do PRIMEIRO " - " (não do último --
+        # achado real de auditoria: um nome de contraparte que ele mesmo
+        # contém " - ", ex: "Compra ... - Uber - Sao Paulo", cortava no
+        # último separador e perdia "Uber", sobrando só "Sao Paulo").
         if " - " in text:
-            text = text.rsplit(" - ", 1)[-1].strip()
+            text = text.split(" - ", 1)[-1].strip()
 
         text = _TRAILING_CODE_RE.sub("", text).strip()
         text = _strip_leading_numeric_code(text)

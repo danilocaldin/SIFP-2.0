@@ -40,6 +40,7 @@ MESES_NEGATIVOS_JANELA = 3
 MESES_NEGATIVOS_LIMIAR = 2
 PENDENTES_QTD_LIMIAR = 15
 PENDENTES_PCT_LIMIAR = 5.0
+PENDENTES_MIN_TOTAL = 20  # abaixo disso, % vira ruído (1 de 3 = 33%) — só a qtd absoluta conta
 RESERVA_EMERGENCIA_MESES_ALVO = 3.0
 
 
@@ -168,7 +169,8 @@ def check_transacoes_pendentes(all_tx: pd.DataFrame) -> list[Diagnostic]:
     pendentes = int((all_tx["category"] == CATEGORIA_NAO_CATEGORIZADO).sum())
     total = len(all_tx)
     pct = pendentes / total * 100 if total else 0.0
-    if pendentes < PENDENTES_QTD_LIMIAR and pct < PENDENTES_PCT_LIMIAR:
+    dispara_por_pct = total >= PENDENTES_MIN_TOTAL and pct >= PENDENTES_PCT_LIMIAR
+    if pendentes < PENDENTES_QTD_LIMIAR and not dispara_por_pct:
         return []
 
     return [

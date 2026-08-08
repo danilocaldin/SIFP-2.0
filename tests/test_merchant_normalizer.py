@@ -53,6 +53,14 @@ def test_normalize_nao_casa_alias_dentro_de_outra_palavra(normalizer, descriptio
     assert normalizer.normalize(description) == expected
 
 
+def test_normalize_corta_no_primeiro_separador_nao_no_ultimo(normalizer):
+    """Achado real de auditoria: com múltiplos " - " na descrição, cortar
+    no ÚLTIMO (rsplit) perdia parte do nome da contraparte quando ela
+    mesma contém um "-" (ex: nome da loja + filial)."""
+    resultado = normalizer.normalize("Compra no débito autorizada - Loja XYZ - Filial 2")
+    assert resultado == "Loja Xyz - Filial 2"
+
+
 def test_normalize_unknown_merchant_falls_back_to_title_case(normalizer):
     assert normalizer.normalize("Pix enviado - Maria Jose Vieira") == "Maria Jose Vieira"
 

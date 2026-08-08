@@ -97,6 +97,18 @@ def test_top_expenses_ordered_descending(sample_df):
     assert top.iloc[0]["description"] == "Mercado"
 
 
+def test_top_expenses_mesmas_colunas_vazio_ou_nao(sample_df):
+    """Achado real de auditoria: o caminho vazio devolvia só 4 colunas,
+    mas o caminho com dados devolvia todas as colunas originais do df
+    (value, merchant, category_source etc.) -- formato inconsistente
+    conforme o período tinha ou não gastos."""
+    real = ind.exclude_self_transfers(sample_df)
+    com_dados = ind.top_expenses(real, n=2)
+    vazio = ind.top_expenses(real[real["value"] > 0])  # só receita, sem gasto
+    assert list(com_dados.columns) == ["date", "description", "category", "value_abs"]
+    assert list(vazio.columns) == list(com_dados.columns)
+
+
 def test_month_over_month_delta_none_when_no_previous():
     current = {"receitas": 100, "despesas": 50, "saldo": 50}
     delta = ind.month_over_month_delta(current, None)
