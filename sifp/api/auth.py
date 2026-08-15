@@ -23,12 +23,14 @@ re-busca sozinho se o `kid` mudar), sem guardar nenhum segredo aqui.
 from __future__ import annotations
 
 import os
+import uuid
 from typing import Iterator
 
 import jwt
 import psycopg
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 
+from sifp.repositories.pg.advisor_link_repository import AdvisorLinkRepository
 from sifp.repositories.pg.connection import scoped_transaction
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
@@ -87,6 +89,40 @@ def get_current_user_name(payload: dict = Depends(get_token_payload)) -> str | N
     return nome.strip() if isinstance(nome, str) and nome.strip() else None
 
 
-def get_db(user_id: str = Depends(get_current_user_id)) -> Iterator[psycopg.Connection]:
-    with scoped_transaction(user_id) as conn:
-        yield conn
+def get_db(
+    request: Request,
+    user_id: str = Depends(get_current_user_id),
+    visualizar_cliente: str | None = Header(default=None, alias="X-Sifra-Visualizar-Cliente"),
+) -> Iterator[psycopg.Connection]:
+    """Caso normal: conexão escopada pro próprio usuário logado. Caso
+    "assessor visualizando cliente" (recurso de assessor, ver
+    advisor_link_repository.py): o header X-Sifra-Visualizar-Cliente troca
+    a IDENTIDADE da conexão pra do cliente, reaproveitando toda a camada de
+    services/repositories sem duplicar rota nenhuma.
+
+    Ponto mais crítico de segurança do recurso inteiro (ver plano/teste
+    dedicado em tests/test_advisor_impersonation.py): sem o bloqueio de
+    método abaixo, a RLS de escrita (`WITH CHECK (user_id = auth.uid())`)
+    aceitaria uma escrita normalmente depois que a conexão "vira" o
+    cliente — por isso o 403 tem que acontecer ANTES de abrir a conexão
+    do cliente, não depois."""
+    if not visualizar_cliente:
+        with scoped_transaction(user_id) as conn:
+            yield conn
+        return
+
+    if request.method != "GET":
+        raise HTTPException(status_code=403, detail="Visualização como cliente é somente leitura.")
+
+    try:
+        client_id = str(uuid.UUID(visualizar_cliente))
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Cliente inválido.")
+
+    with scoped_transaction(user_id) as advisor_conn:
+        vinculado = AdvisorLinkRepository().vinculo_aceito(advisor_conn, user_id, client_id)
+    if not vinculado:
+        raise HTTPException(status_code=403, detail="Você não tem acesso aos dados desse cliente.")
+
+    with scoped_transaction(client_id) as client_conn:
+        yield client_conn
