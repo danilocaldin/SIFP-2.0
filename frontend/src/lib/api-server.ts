@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+
 import type {
   Dashboard,
   DespesasFixasData,
@@ -10,6 +12,7 @@ import type {
   Revisao,
 } from "@/lib/types";
 import { API_PREFIX, SAAS_MODE } from "@/lib/api";
+import { CLIENTE_ID_COOKIE } from "@/lib/impersonation";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 // Buscas (GET) usadas só por Server Components — separado de api.ts de
@@ -51,7 +54,15 @@ async function authHeadersServer(): Promise<Record<string, string>> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  return session ? { Authorization: `Bearer ${session.access_token}` } : {};
+  const headers: Record<string, string> = session ? { Authorization: `Bearer ${session.access_token}` } : {};
+
+  // Mesma lógica de api.ts::authHeadersClient -- ver comentário lá. Aqui o
+  // cookie chega via next/headers (o navegador já enviou junto com a
+  // requisição), não via document.cookie.
+  const clienteId = (await cookies()).get(CLIENTE_ID_COOKIE)?.value;
+  if (clienteId) headers["X-Sifra-Visualizar-Cliente"] = clienteId;
+
+  return headers;
 }
 
 export async function getResumo(): Promise<Resumo> {

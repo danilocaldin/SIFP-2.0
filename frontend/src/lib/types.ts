@@ -355,3 +355,20 @@ export interface RevisaoEmpty {
 }
 
 export type Revisao = RevisaoData | RevisaoEmpty;
+
+// Espelha os payloads de /api/v2/assessor/... e /api/v2/cliente/vinculos
+// (sifp/repositories/pg/advisor_link_repository.py, recurso de assessor).
+
+export type StatusVinculoAssessor = "pendente" | "aceito" | "revogado";
+
+export interface VinculoAssessor {
+  id: number;
+  advisor_id: string;
+  client_id: string | null;
+  client_email: string;
+  status: StatusVinculoAssessor;
+  convidado_em: string;
+  aceito_em: string | null;
+  revogado_em: string | null;
+  revogado_por: string | null;
+}

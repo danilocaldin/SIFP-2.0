@@ -49,6 +49,27 @@ DATABASE_URL = os.environ.get("SUPABASE_DB_URL", "")
 _pool: ConnectionPool | None = None
 
 
+def _desligar_prepared_statements(conn: psycopg.Connection) -> None:
+    """Achado real de auditoria (recurso de assessor, Fase 3): o Supavisor
+    (transaction pooler do Supabase) pode trocar a conexão física de rede
+    por baixo de uma mesma conexão lógica do pool a qualquer momento entre
+    checkouts. psycopg3 prepara automaticamente no servidor qualquer
+    statement repetido 5+ vezes (`prepare_threshold`, default 5) -- como
+    TODA `scoped_transaction()` roda exatamente os mesmos dois comandos
+    ("SET LOCAL role authenticated" + o set_config), isso sempre acontece
+    cedo. Quando o Supavisor troca a conexão física, o statement "_pg3_0"
+    preparado na física antiga não existe (ou já existe outro com o mesmo
+    nome de outra sessão) na física nova -> InvalidSqlStatementName /
+    DuplicatePreparedStatement, aleatório e intermitente. Isso sempre foi
+    um risco latente (qualquer request já abria uma scoped_transaction),
+    mas só ficou fácil de reproduzir quando o recurso de assessor passou a
+    abrir DUAS conexões por requisição (uma pra checar o vínculo, outra
+    pro cliente) em auth.py::get_db, dobrando a velocidade de atingir o
+    threshold. Desligar o preparo automático (recomendação oficial do
+    Supabase pra qualquer pooler em modo transação) resolve na raiz."""
+    conn.prepare_threshold = None
+
+
 def _get_pool() -> ConnectionPool:
     global _pool
     if _pool is None:
@@ -57,6 +78,7 @@ def _get_pool() -> ConnectionPool:
             min_size=1,
             max_size=10,
             max_idle=300,  # segundos -- Supavisor já fecha conexões ociosas por conta própria
+            configure=_desligar_prepared_statements,
             open=True,
         )
     return _pool

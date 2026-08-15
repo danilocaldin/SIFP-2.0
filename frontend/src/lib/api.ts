@@ -8,8 +8,10 @@ import type {
   TipoDespesaFixa,
   UploadPersistSummary,
   UploadPreview,
+  VinculoAssessor,
 } from "@/lib/types";
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { clienteIdVisualizadoNoNavegador } from "@/lib/impersonation";
 
 // Este arquivo é seguro pra importar de Client Components — nunca toca
 // next/headers nem nada exclusivo de servidor. As buscas (get*) usadas por
@@ -45,7 +47,19 @@ async function authHeadersClient(): Promise<Record<string, string>> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  return session ? { Authorization: `Bearer ${session.access_token}` } : {};
+  const headers: Record<string, string> = session ? { Authorization: `Bearer ${session.access_token}` } : {};
+
+  // Recurso de assessor: se o assessor está "visualizando como cliente"
+  // (cookie setado em /clientes), toda chamada carrega esse header -- o
+  // backend (sifp/api/auth.py::get_db) troca a identidade da conexão pro
+  // cliente em requisições GET com vínculo aceito, e bloqueia com 403
+  // qualquer método de escrita enquanto o header estiver presente. Não
+  // precisa de tratamento especial aqui: é exatamente o comportamento
+  // desejado (nenhuma tela precisa saber que está em modo visualização).
+  const clienteId = clienteIdVisualizadoNoNavegador();
+  if (clienteId) headers["X-Sifra-Visualizar-Cliente"] = clienteId;
+
+  return headers;
 }
 
 async function parseErrorDetail(res: Response, fallback: string): Promise<string> {
@@ -326,4 +340,32 @@ export async function enviarMensagemChat(mensagens: ChatMensagem[]): Promise<Cha
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao enviar a mensagem."));
   return res.json();
+}
+
+// Recurso de assessor (ver sifp/repositories/pg/advisor_link_repository.py).
+
+export async function listarClientesAssessor(): Promise<VinculoAssessor[]> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/assessor/clientes`, {
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao buscar seus clientes."));
+  return res.json();
+}
+
+export async function convidarCliente(email: string): Promise<{ id: number }> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/assessor/convites`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao enviar o convite."));
+  return res.json();
+}
+
+export async function revogarClientePeloAssessor(linkId: number): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/assessor/clientes/${linkId}/revogar`, {
+    method: "POST",
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao revogar o acesso."));
 }

@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { Sidebar } from "@/components/sidebar";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -35,7 +36,10 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <ServiceWorkerRegister />
           <Sidebar />
-          <div className="flex min-h-full flex-1 flex-col overflow-x-hidden">{children}</div>
+          <div className="flex min-h-full flex-1 flex-col overflow-x-hidden">
+            <ImpersonationBanner />
+            {children}
+          </div>
         </ThemeProvider>
       </body>
     </html>

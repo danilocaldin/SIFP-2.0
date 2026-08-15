@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Upload,
   User,
+  Users,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -152,9 +153,21 @@ export function Sidebar() {
       {SAAS_MODE && (
         <>
           <Link
+            href="/clientes"
+            title="Clientes"
+            className={`mt-2 flex items-center justify-center gap-2.5 rounded-md px-0 py-2 text-sm transition-colors md:justify-start md:px-2.5 md:py-1.5 ${
+              pathname === "/clientes"
+                ? "bg-brand-teal/15 font-medium text-brand-teal"
+                : "text-white/65 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <Users size={17} strokeWidth={2} className="flex-shrink-0" />
+            <span className="hidden md:inline">Clientes</span>
+          </Link>
+          <Link
             href="/perfil"
             title="Perfil"
-            className={`mt-2 flex items-center justify-center gap-2.5 rounded-md px-0 py-2 text-sm transition-colors md:justify-start md:px-2.5 md:py-1.5 ${
+            className={`mt-0.5 flex items-center justify-center gap-2.5 rounded-md px-0 py-2 text-sm transition-colors md:justify-start md:px-2.5 md:py-1.5 ${
               pathname === "/perfil"
                 ? "bg-brand-teal/15 font-medium text-brand-teal"
                 : "text-white/65 hover:bg-white/5 hover:text-white"
