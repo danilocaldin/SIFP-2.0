@@ -138,6 +138,52 @@ create table if not exists import_aliases (
 -- tabela antes dessa mudança (rodar este arquivo de novo é seguro).
 alter table import_aliases add column if not exists remetente_confiavel text;
 
+-- Recurso de assessor financeiro: vínculo assessor<->cliente, somente
+-- leitura, mediante convite aceito explicitamente pelo cliente (nunca
+-- automático — ver docs/análise LGPD). Uma linha por par, ciclo de vida
+-- inteiro nela (nunca deletada -- histórico de consentimento é evidência,
+-- LGPD art. 8º §5º: o ônus da prova de que houve consentimento é do
+-- controlador). Reconvidar depois de revogado faz UPDATE na mesma linha
+-- (volta pra 'pendente'), não duplica -- o unique(advisor_id, client_id)
+-- já impede duas linhas pro mesmo par.
+create table if not exists advisor_links (
+    id bigint generated always as identity primary key,
+    advisor_id uuid not null references auth.users(id) on delete cascade,
+    client_id uuid not null references auth.users(id) on delete cascade,
+    -- Denormalizado de propósito: auth.users é uma tabela protegida do
+    -- Supabase, não dá pra fazer join nela com a role authenticated --
+    -- guardar o e-mail aqui evita precisar disso só pra listar convites.
+    client_email text not null,
+    status text not null default 'pendente' check (status in ('pendente', 'aceito', 'revogado')),
+    convidado_em timestamptz not null default now(),
+    aceito_em timestamptz,
+    revogado_em timestamptz,
+    -- Quem revogou (assessor ou cliente) -- decide se o cliente precisa
+    -- ser avisado (revogação pelo próprio assessor, sem o cliente pedir,
+    -- é o caso que precisa de aviso).
+    revogado_por uuid references auth.users(id),
+    unique (advisor_id, client_id)
+);
+
+alter table advisor_links enable row level security;
+drop policy if exists advisor_links_select on advisor_links;
+drop policy if exists advisor_links_insert on advisor_links;
+drop policy if exists advisor_links_update on advisor_links;
+-- SELECT: os dois lados do vínculo enxergam a própria linha.
+create policy advisor_links_select on advisor_links for select to authenticated
+    using (advisor_id = auth.uid() or client_id = auth.uid());
+-- INSERT: só o assessor cria o convite (o cliente nunca insere aqui, só aceita/revoga).
+create policy advisor_links_insert on advisor_links for insert to authenticated
+    with check (advisor_id = auth.uid());
+-- UPDATE: os dois lados podem mudar status (aceitar/revogar) -- qual
+-- transição cada lado pode fazer é regra de aplicação (rota da API), RLS
+-- não distingue coluna por coluna.
+create policy advisor_links_update on advisor_links for update to authenticated
+    using (advisor_id = auth.uid() or client_id = auth.uid())
+    with check (advisor_id = auth.uid() or client_id = auth.uid());
+grant select, insert, update on advisor_links to authenticated;
+grant usage, select on sequence advisor_links_id_seq to authenticated;
+
 -- RLS: habilita e cria uma política única por tabela (cobre SELECT/INSERT/
 -- UPDATE/DELETE — USING filtra leitura, WITH CHECK filtra escrita, ambos
 -- exigindo user_id = auth.uid()). auth.uid() já existe em todo projeto
@@ -156,6 +202,31 @@ begin
             t
         );
         execute format('grant select, insert, update, delete on %I to authenticated', t);
+    end loop;
+end $$;
+
+-- Acesso somente-leitura do assessor aos dados financeiros de um cliente
+-- vinculado (status 'aceito'). Política ADICIONAL, só de SELECT, ao lado
+-- da tenant_isolation acima -- políticas permissivas do Postgres se
+-- combinam com OR, então isso não precisa (nem pode, com segurança)
+-- alterar a política existente. "preferencias" e "import_aliases" ficam
+-- de fora de propósito: configuração de conta, não dado financeiro do
+-- cliente. A separação de "qual identidade a conexão está usando agora"
+-- (o próprio assessor vs. um cliente específico) é feita na camada de
+-- aplicação (ver sifp/api/auth.py::get_db) -- essa política sozinha só
+-- garante que a linha É legível quando a conexão já está "como" o cliente.
+do $$
+declare
+    t text;
+begin
+    foreach t in array array['transactions', 'daily_balances', 'assets', 'budgets', 'goals', 'despesas_fixas']
+    loop
+        execute format('drop policy if exists advisor_read on %I', t);
+        execute format(
+            'create policy advisor_read on %I for select to authenticated '
+            'using (user_id in (select client_id from advisor_links where advisor_id = auth.uid() and status = ''aceito''))',
+            t
+        );
     end loop;
 end $$;
 
