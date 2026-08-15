@@ -25,14 +25,40 @@ from sifp.repositories.pg.connection import read_sql_query
 __all__ = ["AdvisorLinkRepository"]
 
 
+def _sem_nat(df: pd.DataFrame) -> pd.DataFrame:
+    """`aceito_em`/`revogado_em` são timestamptz opcionais -- assim que
+    QUALQUER linha da consulta tem um valor real, pandas infere a coluna
+    inteira como datetime64 e as ausências viram `pandas.NaT` em vez de
+    `None`. FastAPI não reconhece `NaT` como nulo e serializa pra JSON
+    como a STRING literal "NaT" (achado real de auditoria, confirmado
+    rodando `jsonable_encoder` local) -- troca por None antes de devolver
+    pro service/rota, senão o front recebe "NaT" em vez de null.
+
+    `.astype(object)` primeiro é necessário: sem isso, `.where(...)`
+    numa coluna datetime64 reintroduz `NaT` (o `None` é convertido de
+    volta pro "nulo nativo" do dtype datetime) em vez de virar `None`
+    de verdade -- confirmado testando as duas formas lado a lado."""
+    return df.astype(object).where(pd.notnull(df), None)
+
+
 class AdvisorLinkRepository:
     def convidar(self, conn: psycopg.Connection, advisor_id: str, client_email: str) -> int:
-        """Cria o convite ou, se já existir um pendente/revogado pro mesmo
-        par (assessor, e-mail), reaproveita a linha em vez de duplicar --
-        volta pra 'pendente', limpa aceito_em/revogado_em/revogado_por."""
+        """Cria o convite ou, se já existir QUALQUER linha pro mesmo par
+        (assessor, e-mail) -- pendente, aceita ou revogada, com client_id
+        já reivindicado ou ainda NULL -- reaproveita em vez de duplicar:
+        volta pra 'pendente', limpa aceito_em/revogado_em/revogado_por.
+
+        Importante NÃO filtrar por `client_id IS NULL` aqui (achado real
+        de auditoria): se já existisse uma linha antiga com client_id
+        reivindicado (ex: convite aceito e depois revogado) e essa busca
+        ignorasse ela, um reconvite criaria uma SEGUNDA linha pro mesmo
+        par -- e o próximo claim_pending() do cliente bateria no índice
+        único `advisor_links_advisor_client_uidx (advisor_id, client_id)`
+        e quebraria com UniqueViolation (500), porque o mesmo par
+        (advisor_id, client_id) já existiria na linha antiga."""
         cur = conn.cursor()
         cur.execute(
-            "SELECT id FROM advisor_links WHERE advisor_id = %s AND lower(client_email) = lower(%s) AND client_id IS NULL",
+            "SELECT id FROM advisor_links WHERE advisor_id = %s AND lower(client_email) = lower(%s)",
             (advisor_id, client_email),
         )
         existing = cur.fetchone()
@@ -62,17 +88,21 @@ class AdvisorLinkRepository:
         )
 
     def list_as_advisor(self, conn: psycopg.Connection, advisor_id: str) -> pd.DataFrame:
-        return read_sql_query(
-            conn,
-            "SELECT * FROM advisor_links WHERE advisor_id = %s ORDER BY convidado_em DESC",
-            (advisor_id,),
+        return _sem_nat(
+            read_sql_query(
+                conn,
+                "SELECT * FROM advisor_links WHERE advisor_id = %s ORDER BY convidado_em DESC",
+                (advisor_id,),
+            )
         )
 
     def list_as_client(self, conn: psycopg.Connection, client_id: str) -> pd.DataFrame:
-        return read_sql_query(
-            conn,
-            "SELECT * FROM advisor_links WHERE client_id = %s ORDER BY convidado_em DESC",
-            (client_id,),
+        return _sem_nat(
+            read_sql_query(
+                conn,
+                "SELECT * FROM advisor_links WHERE client_id = %s ORDER BY convidado_em DESC",
+                (client_id,),
+            )
         )
 
     def get_by_id(self, conn: psycopg.Connection, link_id: int) -> dict | None:
