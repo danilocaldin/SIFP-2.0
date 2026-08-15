@@ -25,6 +25,7 @@ casos sem precisar do ML.
 """
 
 import io
+import re
 from datetime import datetime
 
 from fastapi import HTTPException, UploadFile
@@ -109,6 +110,22 @@ def validar_data_iso(cls, v: str) -> str:
         datetime.strptime(v, "%Y-%m-%d")
     except (ValueError, TypeError) as e:
         raise ValueError('Prazo inválido. Use o formato "AAAA-MM-DD".') from e
+    return v
+
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def validar_email(cls, v: str) -> str:
+    """Validator reutilizável (Pydantic v2) pro campo `email` de
+    ConviteAssessorIn (routes_saas.py, recurso de assessor). Normaliza pra
+    minúsculo (e-mail não é case-sensitive na prática, e client_email
+    precisa bater exatamente com o claim do JWT na hora de reivindicar o
+    convite — ver advisor_link_repository.py::claim_pending) e rejeita
+    formato claramente inválido antes de gravar."""
+    v = v.strip().lower()
+    if not _EMAIL_RE.match(v):
+        raise ValueError("E-mail inválido.")
     return v
 
 

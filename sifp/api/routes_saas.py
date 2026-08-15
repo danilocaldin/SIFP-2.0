@@ -27,7 +27,7 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field, field_validator
 
-from sifp.api.auth import get_current_user_id, get_current_user_name, get_db
+from sifp.api.auth import get_current_user_email, get_current_user_id, get_current_user_name, get_db
 from sifp.api.rate_limit import rate_limiter
 from sifp.api.shared import (
     as_file_like,
@@ -35,6 +35,7 @@ from sifp.api.shared import (
     transactions_payload,
     validar_categoria,
     validar_data_iso,
+    validar_email,
     validar_mensagens_chat,
     validar_tamanho_upload,
 )
@@ -43,6 +44,7 @@ logger = logging.getLogger(__name__)
 from sifp.domain.categories import CATEGORIA_NAO_CATEGORIZADO
 from sifp.importers.btg_importer import BTGImporter
 from sifp.importers.btg_investment_importer import BTGInvestmentImporter
+from sifp.repositories.pg.advisor_link_repository import AdvisorLinkRepository
 from sifp.repositories.pg.asset_repository import AssetRepository
 from sifp.repositories.pg.balance_repository import BalanceRepository
 from sifp.repositories.pg.bound import ConnBound
@@ -81,6 +83,7 @@ def _repos(conn: psycopg.Connection) -> dict:
         "despesa_fixa_repo": ConnBound(DespesaFixaRepository(), conn),
         "preferencia_repo": ConnBound(PreferenciaRepository(), conn),
         "import_alias_repo": ConnBound(ImportAliasRepository(), conn),
+        "advisor_link_repo": ConnBound(AdvisorLinkRepository(), conn),
     }
 
 
@@ -338,6 +341,76 @@ def resetar_remetente_email_importacao(conn: psycopg.Connection = Depends(get_db
     """"Esquece" o remetente aprendido — próximo e-mail que chegar,
     de qualquer remetente, vira o novo remetente confiável."""
     _repos(conn)["import_alias_repo"].resetar_remetente_confiavel()
+    return {"ok": True}
+
+
+class ConviteAssessorIn(BaseModel):
+    email: str
+
+    _validar_email = field_validator("email")(validar_email)
+
+
+@router.post("/assessor/convites")
+def convidar_cliente(
+    body: ConviteAssessorIn,
+    advisor_id: str = Depends(get_current_user_id),
+    conn: psycopg.Connection = Depends(get_db),
+):
+    link_id = _repos(conn)["advisor_link_repo"].convidar(advisor_id, body.email)
+    return {"id": link_id}
+
+
+@router.get("/assessor/clientes")
+def listar_clientes_assessor(
+    advisor_id: str = Depends(get_current_user_id),
+    conn: psycopg.Connection = Depends(get_db),
+):
+    df = _repos(conn)["advisor_link_repo"].list_as_advisor(advisor_id)
+    return df.to_dict("records")
+
+
+@router.post("/assessor/clientes/{link_id}/revogar")
+def revogar_cliente_pelo_assessor(
+    link_id: int,
+    advisor_id: str = Depends(get_current_user_id),
+    conn: psycopg.Connection = Depends(get_db),
+):
+    if not _repos(conn)["advisor_link_repo"].revogar_pelo_assessor(link_id, advisor_id):
+        raise HTTPException(status_code=404, detail="Vínculo não encontrado.")
+    return {"ok": True}
+
+
+@router.get("/cliente/vinculos")
+def listar_vinculos_cliente(
+    client_id: str = Depends(get_current_user_id),
+    client_email: str = Depends(get_current_user_email),
+    conn: psycopg.Connection = Depends(get_db),
+):
+    repo = _repos(conn)["advisor_link_repo"]
+    repo.claim_pending(client_id, client_email)
+    df = repo.list_as_client(client_id)
+    return df.to_dict("records")
+
+
+@router.post("/cliente/vinculos/{link_id}/aceitar")
+def aceitar_vinculo(
+    link_id: int,
+    client_id: str = Depends(get_current_user_id),
+    conn: psycopg.Connection = Depends(get_db),
+):
+    if not _repos(conn)["advisor_link_repo"].aceitar(link_id, client_id):
+        raise HTTPException(status_code=404, detail="Convite não encontrado ou já respondido.")
+    return {"ok": True}
+
+
+@router.post("/cliente/vinculos/{link_id}/revogar")
+def revogar_vinculo_pelo_cliente(
+    link_id: int,
+    client_id: str = Depends(get_current_user_id),
+    conn: psycopg.Connection = Depends(get_db),
+):
+    if not _repos(conn)["advisor_link_repo"].revogar_pelo_cliente(link_id, client_id):
+        raise HTTPException(status_code=404, detail="Vínculo não encontrado.")
     return {"ok": True}
 
 

@@ -189,8 +189,12 @@ drop policy if exists advisor_links_update on advisor_links;
 -- "cliente ainda não reivindicou" via client_email = e-mail do próprio
 -- JWT (auth.jwt() ->> 'email' é claim padrão do Supabase Auth), senão o
 -- convidado nunca conseguiria VER o próprio convite pendente pra aceitar.
+-- lower() nos dois lados: e-mail não é case-sensitive na prática, e o
+-- validador do DTO (shared.py::validar_email) já normaliza pra minúsculo
+-- antes de gravar -- sem o lower() aqui, um JWT com e-mail em maiúscula
+-- (comum se o usuário digitou assim no cadastro) nunca bateria.
 create policy advisor_links_select on advisor_links for select to authenticated
-    using (advisor_id = auth.uid() or client_id = auth.uid() or client_email = (auth.jwt() ->> 'email'));
+    using (advisor_id = auth.uid() or client_id = auth.uid() or lower(client_email) = lower(auth.jwt() ->> 'email'));
 -- INSERT: só o assessor cria o convite (o cliente nunca insere aqui, só aceita/revoga).
 create policy advisor_links_insert on advisor_links for insert to authenticated
     with check (advisor_id = auth.uid());
@@ -199,7 +203,7 @@ create policy advisor_links_insert on advisor_links for insert to authenticated
 -- e-mail porque, após a atualização, client_id = auth.uid() já é
 -- verdadeiro pra linha resultante.
 create policy advisor_links_update on advisor_links for update to authenticated
-    using (advisor_id = auth.uid() or client_id = auth.uid() or client_email = (auth.jwt() ->> 'email'))
+    using (advisor_id = auth.uid() or client_id = auth.uid() or lower(client_email) = lower(auth.jwt() ->> 'email'))
     with check (advisor_id = auth.uid() or client_id = auth.uid());
 grant select, insert, update on advisor_links to authenticated;
 grant usage, select on sequence advisor_links_id_seq to authenticated;

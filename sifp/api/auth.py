@@ -67,6 +67,16 @@ def get_current_user_id(payload: dict = Depends(get_token_payload)) -> str:
     return user_id
 
 
+def get_current_user_email(payload: dict = Depends(get_token_payload)) -> str:
+    """E-mail do usuário logado -- claim padrão do Supabase Auth no JWT.
+    Usado pelo recurso de assessor (AdvisorLinkRepository.claim_pending)
+    pra "reivindicar" convites pendentes endereçados a esse e-mail."""
+    email = payload.get("email")
+    if not email:
+        raise HTTPException(status_code=401, detail="Sessão inválida.")
+    return email
+
+
 def get_current_user_name(payload: dict = Depends(get_token_payload)) -> str | None:
     """Nome completo definido pelo próprio usuário (tela de Perfil, no
     frontend — grava em user_metadata via supabase.auth.updateUser). None
