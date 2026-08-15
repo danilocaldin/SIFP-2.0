@@ -149,10 +149,15 @@ alter table import_aliases add column if not exists remetente_confiavel text;
 create table if not exists advisor_links (
     id bigint generated always as identity primary key,
     advisor_id uuid not null references auth.users(id) on delete cascade,
-    client_id uuid not null references auth.users(id) on delete cascade,
-    -- Denormalizado de propósito: auth.users é uma tabela protegida do
-    -- Supabase, não dá pra fazer join nela com a role authenticated --
-    -- guardar o e-mail aqui evita precisar disso só pra listar convites.
+    -- Nullable de propósito: no convite, o assessor só tem o e-mail do
+    -- cliente -- auth.users é uma tabela protegida do Supabase, a role
+    -- authenticated não pode consultar "existe alguém com esse e-mail?"
+    -- sem a Admin API (segredo que ainda não temos, ver client_email
+    -- abaixo). client_id só é preenchido quando o próprio dono do e-mail
+    -- loga e "reivindica" o vínculo (ver claim_pending no repository) --
+    -- funciona tanto pra quem já tem conta quanto, depois, pra quem
+    -- ganhar conta nova via convite por e-mail (fase futura).
+    client_id uuid references auth.users(id) on delete cascade,
     client_email text not null,
     status text not null default 'pendente' check (status in ('pendente', 'aceito', 'revogado')),
     convidado_em timestamptz not null default now(),
@@ -161,25 +166,40 @@ create table if not exists advisor_links (
     -- Quem revogou (assessor ou cliente) -- decide se o cliente precisa
     -- ser avisado (revogação pelo próprio assessor, sem o cliente pedir,
     -- é o caso que precisa de aviso).
-    revogado_por uuid references auth.users(id),
-    unique (advisor_id, client_id)
+    revogado_por uuid references auth.users(id)
 );
+-- Migração idempotente: primeira versão desta tabela tinha client_id
+-- NOT NULL + unique(advisor_id, client_id) inline -- ajusta bancos que já
+-- rodaram essa versão antes de client_id virar nullable.
+alter table advisor_links alter column client_id drop not null;
+alter table advisor_links drop constraint if exists advisor_links_advisor_id_client_id_key;
+
+-- unique só entre linhas já reivindicadas -- várias linhas com
+-- client_id NULL (convites ainda não reivindicados) são permitidas, a
+-- aplicação evita duplicar convite pendente pro mesmo e-mail antes disso
+-- (ver advisor_link_repository.py::convidar).
+create unique index if not exists advisor_links_advisor_client_uidx
+    on advisor_links (advisor_id, client_id) where client_id is not null;
 
 alter table advisor_links enable row level security;
 drop policy if exists advisor_links_select on advisor_links;
 drop policy if exists advisor_links_insert on advisor_links;
 drop policy if exists advisor_links_update on advisor_links;
--- SELECT: os dois lados do vínculo enxergam a própria linha.
+-- SELECT: os dois lados do vínculo enxergam a própria linha -- inclui
+-- "cliente ainda não reivindicou" via client_email = e-mail do próprio
+-- JWT (auth.jwt() ->> 'email' é claim padrão do Supabase Auth), senão o
+-- convidado nunca conseguiria VER o próprio convite pendente pra aceitar.
 create policy advisor_links_select on advisor_links for select to authenticated
-    using (advisor_id = auth.uid() or client_id = auth.uid());
+    using (advisor_id = auth.uid() or client_id = auth.uid() or client_email = (auth.jwt() ->> 'email'));
 -- INSERT: só o assessor cria o convite (o cliente nunca insere aqui, só aceita/revoga).
 create policy advisor_links_insert on advisor_links for insert to authenticated
     with check (advisor_id = auth.uid());
--- UPDATE: os dois lados podem mudar status (aceitar/revogar) -- qual
--- transição cada lado pode fazer é regra de aplicação (rota da API), RLS
--- não distingue coluna por coluna.
+-- UPDATE: mesmo alcance do SELECT pra permitir a "reivindicação" (setar
+-- client_id pela primeira vez) -- o WITH CHECK não precisa da cláusula de
+-- e-mail porque, após a atualização, client_id = auth.uid() já é
+-- verdadeiro pra linha resultante.
 create policy advisor_links_update on advisor_links for update to authenticated
-    using (advisor_id = auth.uid() or client_id = auth.uid())
+    using (advisor_id = auth.uid() or client_id = auth.uid() or client_email = (auth.jwt() ->> 'email'))
     with check (advisor_id = auth.uid() or client_id = auth.uid());
 grant select, insert, update on advisor_links to authenticated;
 grant usage, select on sequence advisor_links_id_seq to authenticated;
