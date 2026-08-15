@@ -67,6 +67,7 @@ from sifp.services.projecoes_service import ProjecoesService
 from sifp.services.relatorio_service import RelatorioService
 from sifp.services.revisao_service import RevisaoService
 from sifp.services.summary_service import SummaryService
+from sifp.services.supabase_admin_service import convidar_conta_nova
 
 router = APIRouter(prefix="/api/v2")
 
@@ -358,6 +359,12 @@ def convidar_cliente(
     conn: psycopg.Connection = Depends(get_db),
 ):
     link_id = _repos(conn)["advisor_link_repo"].convidar(advisor_id, advisor_email, body.email)
+    # Best-effort (Fase 4): se body.email ainda não é usuário Sifra, cria a
+    # conta e dispara o convite por e-mail via Admin API. Se já é usuário,
+    # é um no-op silencioso -- claim_pending cobre esse caso sozinho. Uma
+    # falha aqui nunca derruba a rota: o vínculo em advisor_links já foi
+    # gravado acima e é a fonte de verdade do convite.
+    convidar_conta_nova(body.email)
     return {"id": link_id}
 
 

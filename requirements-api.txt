@@ -1,7 +1,7 @@
 # Subconjunto de requirements.txt usado só pela imagem Docker da API
-# (sifp/api) em produção -- exclui streamlit, plotly, pytest e httpx
-# (usados só pelo app Streamlit e pela suíte de testes, não pela API em
-# runtime), pra manter a imagem de deploy menor e o build mais rápido.
+# (sifp/api) em produção -- exclui streamlit, plotly e pytest (usados só
+# pelo app Streamlit e pela suíte de testes, não pela API em runtime),
+# pra manter a imagem de deploy menor e o build mais rápido.
 pandas>=2.2.0
 scikit-learn>=1.4.0
 joblib>=1.4.0
@@ -19,3 +19,6 @@ psycopg[binary]>=3.2.0
 psycopg-pool>=3.2.0
 pyjwt>=2.10.0
 cryptography>=42.0.0
+# httpx: só pra Admin API do Supabase (recurso de assessor, Fase 4,
+# supabase_admin_service.py) -- volta a fazer parte da imagem de deploy.
+httpx>=0.27.0
