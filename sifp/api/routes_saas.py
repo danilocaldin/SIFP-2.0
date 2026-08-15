@@ -354,9 +354,10 @@ class ConviteAssessorIn(BaseModel):
 def convidar_cliente(
     body: ConviteAssessorIn,
     advisor_id: str = Depends(get_current_user_id),
+    advisor_email: str = Depends(get_current_user_email),
     conn: psycopg.Connection = Depends(get_db),
 ):
-    link_id = _repos(conn)["advisor_link_repo"].convidar(advisor_id, body.email)
+    link_id = _repos(conn)["advisor_link_repo"].convidar(advisor_id, advisor_email, body.email)
     return {"id": link_id}
 
 

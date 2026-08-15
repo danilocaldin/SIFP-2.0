@@ -364,6 +364,7 @@ export type StatusVinculoAssessor = "pendente" | "aceito" | "revogado";
 export interface VinculoAssessor {
   id: number;
   advisor_id: string;
+  advisor_email: string | null;
   client_id: string | null;
   client_email: string;
   status: StatusVinculoAssessor;

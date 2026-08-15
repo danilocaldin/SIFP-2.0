@@ -174,6 +174,14 @@ create table if not exists advisor_links (
 alter table advisor_links alter column client_id drop not null;
 alter table advisor_links drop constraint if exists advisor_links_advisor_id_client_id_key;
 
+-- Migração idempotente (Fase 6, tela do cliente): faltava um jeito do
+-- cliente saber QUEM é o assessor que mandou o convite -- client_email já
+-- existia (denormalizado, mesma razão), mas o e-mail do assessor nunca
+-- tinha sido gravado. Preenchido pela aplicação em convidar() a partir do
+-- e-mail do próprio JWT do assessor (get_current_user_email) -- não
+-- precisa da Admin API, é o mesmo padrão de client_email.
+alter table advisor_links add column if not exists advisor_email text;
+
 -- unique só entre linhas já reivindicadas -- várias linhas com
 -- client_id NULL (convites ainda não reivindicados) são permitidas, a
 -- aplicação evita duplicar convite pendente pro mesmo e-mail antes disso

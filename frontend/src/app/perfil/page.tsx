@@ -4,9 +4,17 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getEmailImportacao, resetarRemetenteEmailImportacao } from "@/lib/api";
+import {
+  aceitarVinculoAssessor,
+  getEmailImportacao,
+  listarVinculosCliente,
+  resetarRemetenteEmailImportacao,
+  revogarVinculoPeloCliente,
+} from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
+import type { VinculoAssessor } from "@/lib/types";
 
 const SAAS_MODE = process.env.NEXT_PUBLIC_SAAS_MODE === "true";
 
@@ -92,6 +100,7 @@ function PerfilForm() {
 
       <PasskeyCard />
       <EmailImportacaoCard />
+      <AssessoresCard />
     </main>
   );
 }
@@ -303,6 +312,159 @@ function EmailImportacaoCard() {
           </>
         )}
         {erro && <p className="text-xs text-destructive">⚠️ {erro}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatarData(iso: string | null): string | null {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function AssessoresCard() {
+  const [vinculos, setVinculos] = useState<VinculoAssessor[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [emAndamentoId, setEmAndamentoId] = useState<number | null>(null);
+
+  async function atualizarLista() {
+    try {
+      setVinculos(await listarVinculosCliente());
+      setErro(null);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro desconhecido.");
+    }
+  }
+
+  useEffect(() => {
+    // Chamada encadeada direto no efeito (não uma função local chamando
+    // setState) -- mesmo padrão do resto desta página, satisfaz
+    // react-hooks/set-state-in-effect.
+    listarVinculosCliente()
+      .then((data) => {
+        setVinculos(data);
+        setErro(null);
+      })
+      .catch((err) => setErro(err instanceof Error ? err.message : "Erro desconhecido."))
+      .finally(() => setCarregando(false));
+  }, []);
+
+  async function handleAceitar(v: VinculoAssessor) {
+    setEmAndamentoId(v.id);
+    setErro(null);
+    try {
+      await aceitarVinculoAssessor(v.id);
+      await atualizarLista();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro desconhecido.");
+    } finally {
+      setEmAndamentoId(null);
+    }
+  }
+
+  async function handleRecusarOuRevogar(v: VinculoAssessor, confirmar: string) {
+    if (!window.confirm(confirmar)) return;
+    setEmAndamentoId(v.id);
+    setErro(null);
+    try {
+      await revogarVinculoPeloCliente(v.id);
+      await atualizarLista();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro desconhecido.");
+    } finally {
+      setEmAndamentoId(null);
+    }
+  }
+
+  if (carregando) return null;
+  // Revogado pelo próprio cliente: já sabe, não precisa continuar vendo.
+  // Revogado pelo assessor (revogado_por != client_id): fica visível como
+  // aviso -- é o mecanismo de "avisar o cliente" acordado com o Danilo,
+  // sem precisar de e-mail/notificação separada.
+  const visiveis = vinculos.filter((v) => v.status !== "revogado" || v.revogado_por !== v.client_id);
+  if (visiveis.length === 0 && !erro) return null;
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="text-base">Assessores com acesso aos seus dados</CardTitle>
+        <CardDescription>
+          Acesso somente leitura — um assessor vinculado vê os mesmos dados que você, exceto seu
+          histórico de chat e esta tela de Perfil. Você pode revogar a qualquer momento.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {erro && <p className="text-sm text-destructive">{erro}</p>}
+        {visiveis.length > 0 && (
+          <ul className="space-y-2">
+            {visiveis.map((v) => (
+              <li key={v.id} className="rounded-md border border-border px-3 py-2.5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{v.advisor_email ?? "Assessor"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {v.status === "pendente" && `Convite recebido em ${formatarData(v.convidado_em)}`}
+                      {v.status === "aceito" && `Acesso concedido em ${formatarData(v.aceito_em)}`}
+                      {v.status === "revogado" &&
+                        `Acesso revogado pelo assessor em ${formatarData(v.revogado_em)}`}
+                    </p>
+                  </div>
+                  <div className="flex flex-shrink-0 items-center gap-2">
+                    {v.status === "pendente" && (
+                      <Badge variant="secondary">Convite pendente</Badge>
+                    )}
+                    {v.status === "aceito" && <Badge variant="default">Ativo</Badge>}
+                    {v.status === "revogado" && <Badge variant="outline">Revogado</Badge>}
+                    {v.status === "pendente" && (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={emAndamentoId === v.id}
+                          onClick={() => handleAceitar(v)}
+                        >
+                          Aceitar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={emAndamentoId === v.id}
+                          onClick={() =>
+                            handleRecusarOuRevogar(
+                              v,
+                              `Recusar o convite de ${v.advisor_email ?? "esse assessor"}?`
+                            )
+                          }
+                        >
+                          Recusar
+                        </Button>
+                      </>
+                    )}
+                    {v.status === "aceito" && (
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-red-700 disabled:opacity-50 dark:hover:text-red-400"
+                        disabled={emAndamentoId === v.id}
+                        onClick={() =>
+                          handleRecusarOuRevogar(
+                            v,
+                            `Revogar o acesso de ${v.advisor_email ?? "esse assessor"} aos seus dados?`
+                          )
+                        }
+                        title="Revogar acesso"
+                        aria-label={`Revogar acesso: ${v.advisor_email ?? "assessor"}`}
+                      >
+                        {emAndamentoId === v.id ? "…" : "🗑️"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </CardContent>
     </Card>
   );

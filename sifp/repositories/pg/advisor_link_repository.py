@@ -42,7 +42,7 @@ def _sem_nat(df: pd.DataFrame) -> pd.DataFrame:
 
 
 class AdvisorLinkRepository:
-    def convidar(self, conn: psycopg.Connection, advisor_id: str, client_email: str) -> int:
+    def convidar(self, conn: psycopg.Connection, advisor_id: str, advisor_email: str, client_email: str) -> int:
         """Cria o convite ou, se já existir QUALQUER linha pro mesmo par
         (assessor, e-mail) -- pendente, aceita ou revogada, com client_id
         já reivindicado ou ainda NULL -- reaproveita em vez de duplicar:
@@ -55,7 +55,12 @@ class AdvisorLinkRepository:
         par -- e o próximo claim_pending() do cliente bateria no índice
         único `advisor_links_advisor_client_uidx (advisor_id, client_id)`
         e quebraria com UniqueViolation (500), porque o mesmo par
-        (advisor_id, client_id) já existiria na linha antiga."""
+        (advisor_id, client_id) já existiria na linha antiga.
+
+        `advisor_email` grava (ou atualiza, se já existia) o e-mail do
+        assessor que está convidando -- é o que a tela do cliente (Fase 6)
+        usa pra mostrar "quem" mandou o convite, já que client_id/advisor_id
+        sozinhos não dizem nada legível pro cliente."""
         cur = conn.cursor()
         cur.execute(
             "SELECT id FROM advisor_links WHERE advisor_id = %s AND lower(client_email) = lower(%s)",
@@ -65,14 +70,14 @@ class AdvisorLinkRepository:
         if existing:
             link_id = existing[0]
             cur.execute(
-                "UPDATE advisor_links SET status = 'pendente', convidado_em = now(), "
+                "UPDATE advisor_links SET status = 'pendente', convidado_em = now(), advisor_email = %s, "
                 "aceito_em = NULL, revogado_em = NULL, revogado_por = NULL WHERE id = %s",
-                (link_id,),
+                (advisor_email, link_id),
             )
             return link_id
         cur.execute(
-            "INSERT INTO advisor_links (advisor_id, client_email) VALUES (%s, %s) RETURNING id",
-            (advisor_id, client_email),
+            "INSERT INTO advisor_links (advisor_id, advisor_email, client_email) VALUES (%s, %s, %s) RETURNING id",
+            (advisor_id, advisor_email, client_email),
         )
         return cur.fetchone()[0]
 

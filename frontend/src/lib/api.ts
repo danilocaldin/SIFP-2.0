@@ -369,3 +369,27 @@ export async function revogarClientePeloAssessor(linkId: number): Promise<void> 
   });
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao revogar o acesso."));
 }
+
+export async function listarVinculosCliente(): Promise<VinculoAssessor[]> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/cliente/vinculos`, {
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao buscar seus assessores."));
+  return res.json();
+}
+
+export async function aceitarVinculoAssessor(linkId: number): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/cliente/vinculos/${linkId}/aceitar`, {
+    method: "POST",
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao aceitar o convite."));
+}
+
+export async function revogarVinculoPeloCliente(linkId: number): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/cliente/vinculos/${linkId}/revogar`, {
+    method: "POST",
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao revogar o acesso."));
+}
