@@ -174,6 +174,18 @@ create table if not exists advisor_links (
 alter table advisor_links alter column client_id drop not null;
 alter table advisor_links drop constraint if exists advisor_links_advisor_id_client_id_key;
 
+-- Migração idempotente (exclusão de conta em autoatendimento, LGPD art.
+-- 18): `revogado_por` não tinha `on delete cascade`/`on delete set null`
+-- -- por padrão o Postgres usa NO ACTION, que bloqueia com erro de FK
+-- qualquer tentativa de excluir (via Admin API) um usuário que já
+-- revogou algum vínculo. `set null` (não `cascade`) porque revogado_por
+-- é só metadado informativo da linha -- a linha em si (e seu histórico
+-- de consentimento) já é apagada corretamente pelo cascade em advisor_id
+-- ou client_id quando um dos dois lados do vínculo exclui a conta.
+alter table advisor_links drop constraint if exists advisor_links_revogado_por_fkey;
+alter table advisor_links add constraint advisor_links_revogado_por_fkey
+    foreign key (revogado_por) references auth.users(id) on delete set null;
+
 -- Migração idempotente (Fase 6, tela do cliente): faltava um jeito do
 -- cliente saber QUEM é o assessor que mandou o convite -- client_email já
 -- existia (denormalizado, mesma razão), mas o e-mail do assessor nunca

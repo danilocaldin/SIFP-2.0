@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   aceitarVinculoAssessor,
+  excluirConta,
   getEmailImportacao,
   listarVinculosCliente,
   resetarRemetenteEmailImportacao,
@@ -101,6 +103,7 @@ function PerfilForm() {
       <PasskeyCard />
       <EmailImportacaoCard />
       <AssessoresCard />
+      <ExcluirContaCard />
     </main>
   );
 }
@@ -464,6 +467,94 @@ function AssessoresCard() {
               </li>
             ))}
           </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ExcluirContaCard() {
+  const router = useRouter();
+  const [email, setEmail] = useState<string | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
+  const [emailDigitado, setEmailDigitado] = useState("");
+  const [excluindo, setExcluindo] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+  }, []);
+
+  function handleCancelar() {
+    setConfirmando(false);
+    setEmailDigitado("");
+    setErro(null);
+  }
+
+  async function handleExcluir() {
+    setExcluindo(true);
+    setErro(null);
+    try {
+      await excluirConta();
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      router.push("/login");
+      router.refresh();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro desconhecido.");
+      setExcluindo(false);
+    }
+  }
+
+  const confirmacaoValida = email !== null && emailDigitado.trim().toLowerCase() === email.toLowerCase();
+
+  return (
+    <Card className="mt-6 border-destructive/30">
+      <CardHeader>
+        <CardTitle className="text-base text-destructive">Excluir minha conta</CardTitle>
+        <CardDescription>
+          Apaga permanentemente sua conta e todos os seus dados no Sifra — transações, patrimônio,
+          orçamento, metas, despesas fixas e vínculos com assessores. Não tem como desfazer.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!confirmando && (
+          <Button type="button" variant="destructive" onClick={() => setConfirmando(true)}>
+            Excluir minha conta
+          </Button>
+        )}
+        {confirmando && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-destructive">
+              Essa ação é definitiva. Pra confirmar, digite seu e-mail ({email ?? "…"}) abaixo.
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="confirmar-exclusao">Digite seu e-mail pra confirmar</Label>
+              <Input
+                id="confirmar-exclusao"
+                value={emailDigitado}
+                onChange={(e) => setEmailDigitado(e.target.value)}
+                placeholder={email ?? ""}
+                disabled={excluindo}
+                autoComplete="off"
+              />
+            </div>
+            {erro && <p className="text-sm text-destructive">{erro}</p>}
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={!confirmacaoValida || excluindo}
+                onClick={handleExcluir}
+              >
+                {excluindo ? "Excluindo…" : "Excluir permanentemente"}
+              </Button>
+              <Button type="button" variant="outline" disabled={excluindo} onClick={handleCancelar}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>

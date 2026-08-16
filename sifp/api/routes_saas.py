@@ -67,7 +67,7 @@ from sifp.services.projecoes_service import ProjecoesService
 from sifp.services.relatorio_service import RelatorioService
 from sifp.services.revisao_service import RevisaoService
 from sifp.services.summary_service import SummaryService
-from sifp.services.supabase_admin_service import convidar_conta_nova
+from sifp.services.supabase_admin_service import AdminApiIndisponivel, convidar_conta_nova, excluir_conta_admin
 
 router = APIRouter(prefix="/api/v2")
 
@@ -342,6 +342,26 @@ def resetar_remetente_email_importacao(conn: psycopg.Connection = Depends(get_db
     """"Esquece" o remetente aprendido — próximo e-mail que chegar,
     de qualquer remetente, vira o novo remetente confiável."""
     _repos(conn)["import_alias_repo"].resetar_remetente_confiavel()
+    return {"ok": True}
+
+
+@router.delete("/perfil/conta")
+def excluir_conta(user_id: str = Depends(get_current_user_id)):
+    """Exclusão de conta em autoatendimento (LGPD art. 18). Sem `conn`/
+    `get_db` de propósito -- a exclusão em si é via Admin API (apaga a
+    linha em auth.users), e o cascade do schema já apaga todo o resto
+    (ver supabase_admin_service.py::excluir_conta_admin). `user_id` vem
+    sempre do JWT real de quem está chamando -- mesmo com o header de
+    "visualizar como cliente" presente numa requisição (o que nem faria
+    sentido aqui, já que essa rota não usa get_db), nunca é possível
+    excluir a conta de outra pessoa por essa rota."""
+    try:
+        excluir_conta_admin(user_id)
+    except AdminApiIndisponivel:
+        logger.exception("Falha ao excluir conta via Admin API (user_id=%s).", user_id)
+        raise HTTPException(
+            status_code=502, detail="Não foi possível excluir sua conta agora. Tente novamente em instantes."
+        )
     return {"ok": True}
 
 

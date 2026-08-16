@@ -94,6 +94,14 @@ export async function resetarRemetenteEmailImportacao(): Promise<void> {
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao resetar o remetente confiável."));
 }
 
+export async function excluirConta(): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/perfil/conta`, {
+    method: "DELETE",
+    headers: await authHeadersClient(),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao excluir a conta."));
+}
+
 export async function criarLimite(categoria: string, valor: number): Promise<void> {
   const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/orcamento/limites`, {
     method: "POST",

@@ -36,7 +36,14 @@ logger = logging.getLogger(__name__)
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
-__all__ = ["convidar_conta_nova"]
+__all__ = ["convidar_conta_nova", "excluir_conta_admin"]
+
+
+class AdminApiIndisponivel(Exception):
+    """Levantada por `excluir_conta_admin` quando a Admin API não pôde
+    confirmar a exclusão -- ao contrário de `convidar_conta_nova`, esta
+    NÃO é best-effort: se a exclusão de conta falhar silenciosamente, o
+    usuário acredita que os dados foram apagados quando não foram."""
 
 
 def convidar_conta_nova(email: str) -> None:
@@ -78,3 +85,39 @@ def convidar_conta_nova(email: str) -> None:
     logger.warning(
         "Admin API do Supabase devolveu %s ao tentar convidar %s: %s", resp.status_code, email, resp.text
     )
+
+
+def excluir_conta_admin(user_id: str) -> None:
+    """Exclusão de conta em autoatendimento (LGPD art. 18, direito de
+    eliminação -- rota `DELETE /perfil/conta`). Excluir a linha em
+    `auth.users` via Admin API é suficiente pra apagar TODOS os dados do
+    usuário: toda tabela (`transactions`, `daily_balances`, `assets`,
+    `budgets`, `goals`, `despesas_fixas`, `preferencias`,
+    `import_aliases`, `advisor_links` como assessor OU cliente) tem
+    `user_id`/`advisor_id`/`client_id` com `on delete cascade` pra
+    `auth.users(id)` (ver schema.sql) -- não precisa (e não deve) apagar
+    tabela por tabela aqui, o Postgres já garante que nada fica órfão.
+
+    Diferente de `convidar_conta_nova`, NÃO é best-effort: levanta
+    `AdminApiIndisponivel` em qualquer falha, pra rota devolver erro real
+    em vez de fingir sucesso pro usuário."""
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise AdminApiIndisponivel("SUPABASE_SERVICE_ROLE_KEY não configurada.")
+
+    try:
+        resp = httpx.delete(
+            f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}",
+            headers={
+                "apikey": SUPABASE_SERVICE_ROLE_KEY,
+                "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+            },
+            timeout=10.0,
+        )
+    except httpx.HTTPError as e:
+        raise AdminApiIndisponivel("Falha de rede ao chamar a Admin API do Supabase.") from e
+
+    if resp.status_code not in (200, 404):
+        # 404 (usuário já não existe) é tratado como sucesso -- idempotente,
+        # cobre o caso de um clique duplo ou uma tentativa anterior que já
+        # excluiu a conta mas a resposta se perdeu antes de chegar no front.
+        raise AdminApiIndisponivel(f"Admin API devolveu {resp.status_code}: {resp.text}")
