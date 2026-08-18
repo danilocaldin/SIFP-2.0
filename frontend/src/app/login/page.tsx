@@ -161,14 +161,18 @@ function LoginPageContent() {
         </CardHeader>
         <CardContent>
           {erroHash && <p className="mb-4 text-sm text-destructive">{erroHash}</p>}
-          {modo === "definir-senha" ? <DefinirSenhaForm /> : <LoginForm />}
+          {modo === "definir-senha" ? (
+            <DefinirSenhaForm />
+          ) : (
+            <LoginForm onCodigoVerificado={() => setModo("definir-senha")} />
+          )}
         </CardContent>
       </Card>
     </main>
   );
 }
 
-function LoginForm() {
+function LoginForm({ onCodigoVerificado }: { onCodigoVerificado: () => void }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -176,6 +180,7 @@ function LoginForm() {
   const [carregando, setCarregando] = useState(false);
   const [entrandoComPasskey, setEntrandoComPasskey] = useState(false);
   const [recuperar, setRecuperar] = useState(false);
+  const [comCodigo, setComCodigo] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -218,6 +223,16 @@ function LoginForm() {
 
   if (recuperar) {
     return <RecuperarSenhaForm emailInicial={email} onVoltar={() => setRecuperar(false)} />;
+  }
+
+  if (comCodigo) {
+    return (
+      <CodigoForm
+        emailInicial={email}
+        onSucesso={onCodigoVerificado}
+        onVoltar={() => setComCodigo(false)}
+      />
+    );
   }
 
   return (
@@ -271,8 +286,97 @@ function LoginForm() {
         >
           Esqueci minha senha
         </button>
+        <button
+          type="button"
+          onClick={() => setComCodigo(true)}
+          className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+        >
+          Recebi um código de acesso
+        </button>
       </form>
     </div>
+  );
+}
+
+function CodigoForm({
+  emailInicial,
+  onSucesso,
+  onVoltar,
+}: {
+  emailInicial: string;
+  onSucesso: () => void;
+  onVoltar: () => void;
+}) {
+  const [email, setEmail] = useState(emailInicial);
+  const [codigo, setCodigo] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [carregando, setCarregando] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErro(null);
+    setCarregando(true);
+
+    const supabase = createClient();
+    const codigoLimpo = codigo.trim();
+    // O código serve tanto pra "esqueci minha senha" (recovery) quanto
+    // pra convite de conta nova (invite) -- não dá pra saber qual é só
+    // olhando o código, então tenta os dois tipos em sequência antes de
+    // desistir, sem pedir pra pessoa escolher uma opção técnica que ela
+    // não tem como saber responder.
+    let { error } = await supabase.auth.verifyOtp({ email, token: codigoLimpo, type: "recovery" });
+    if (error) {
+      ({ error } = await supabase.auth.verifyOtp({ email, token: codigoLimpo, type: "invite" }));
+    }
+
+    setCarregando(false);
+    if (error) {
+      setErro("Código inválido ou expirado. Confira o e-mail e o código, ou peça um novo.");
+      return;
+    }
+    onSucesso();
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <p className="text-sm text-muted-foreground">
+        Digite o e-mail e o código de acesso que você recebeu (não é a senha).
+      </p>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="email-codigo">E-mail</Label>
+        <Input
+          id="email-codigo"
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="codigo">Código de acesso</Label>
+        <Input
+          id="codigo"
+          type="text"
+          required
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          value={codigo}
+          onChange={(e) => setCodigo(e.target.value)}
+        />
+      </div>
+      {erro && <p className="text-sm text-destructive">{erro}</p>}
+      <Button type="submit" disabled={carregando} className="mt-1">
+        {carregando ? "Verificando…" : "Continuar"}
+      </Button>
+      <button
+        type="button"
+        onClick={onVoltar}
+        className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+      >
+        Voltar pro login
+      </button>
+    </form>
   );
 }
 
