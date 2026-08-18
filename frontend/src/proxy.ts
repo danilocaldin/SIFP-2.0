@@ -29,6 +29,11 @@ const PUBLIC_PATHS = new Set([
   "/icons/icon-192",
   "/icons/icon-512",
   "/auth/confirm",
+  // Termos/Privacidade (wizard de cadastro, ver cadastro-wizard.tsx) --
+  // linkados na etapa de aceite ANTES da pessoa terminar de criar a
+  // sessão completa, precisam ser legíveis sem estar autenticado.
+  "/termos",
+  "/privacidade",
 ]);
 
 export async function proxy(request: NextRequest) {

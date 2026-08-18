@@ -34,10 +34,12 @@ from sifp.api.shared import (
     categorization_service,
     transactions_payload,
     validar_categoria,
+    validar_cpf,
     validar_data_iso,
     validar_email,
     validar_mensagens_chat,
     validar_tamanho_upload,
+    validar_telefone,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +55,7 @@ from sifp.repositories.pg.connection import scoped_transaction
 from sifp.repositories.pg.despesa_fixa_repository import DespesaFixaRepository
 from sifp.repositories.pg.goal_repository import GoalRepository
 from sifp.repositories.pg.import_alias_repository import ImportAliasRepository
+from sifp.repositories.pg.perfil_repository import PerfilRepository
 from sifp.repositories.pg.preferencia_repository import PreferenciaRepository
 from sifp.repositories.pg.transaction_repository import TransactionRepository
 from sifp.services.chat_service import ChatIndisponivel, ChatService
@@ -85,6 +88,7 @@ def _repos(conn: psycopg.Connection) -> dict:
         "preferencia_repo": ConnBound(PreferenciaRepository(), conn),
         "import_alias_repo": ConnBound(ImportAliasRepository(), conn),
         "advisor_link_repo": ConnBound(AdvisorLinkRepository(), conn),
+        "perfil_repo": ConnBound(PerfilRepository(), conn),
     }
 
 
@@ -362,6 +366,40 @@ def excluir_conta(user_id: str = Depends(get_current_user_id)):
         raise HTTPException(
             status_code=502, detail="Não foi possível excluir sua conta agora. Tente novamente em instantes."
         )
+    return {"ok": True}
+
+
+class CadastroIn(BaseModel):
+    cpf: str
+    data_nascimento: str  # "YYYY-MM-DD"
+    pais: str
+    estado: str
+    cidade: str
+    termos_aceitos: bool
+    marketing_consent: bool = False
+
+    _validar_cpf = field_validator("cpf")(validar_cpf)
+    _validar_data_nascimento = field_validator("data_nascimento")(validar_data_iso)
+
+
+@router.post("/perfil/cadastro")
+def completar_cadastro(
+    body: CadastroIn,
+    user_id: str = Depends(get_current_user_id),
+    conn: psycopg.Connection = Depends(get_db),
+):
+    """Etapa final do wizard de onboarding (ver frontend/src/components/
+    cadastro-wizard.tsx) -- só grava dados adicionais (CPF/nascimento/
+    endereço/aceite de termos); nome/telefone/senha já foram gravados
+    direto no Supabase Auth (updateUser) antes desta chamada."""
+    if not body.termos_aceitos:
+        raise HTTPException(status_code=400, detail="É preciso aceitar os Termos de Uso e a Política de Privacidade.")
+    try:
+        _repos(conn)["perfil_repo"].criar(
+            user_id, body.cpf, body.data_nascimento, body.pais, body.estado, body.cidade, body.marketing_consent
+        )
+    except psycopg.errors.UniqueViolation:
+        raise HTTPException(status_code=409, detail="Esse CPF já está cadastrado.")
     return {"ok": True}
 
 

@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
+import { validarForcaSenha } from "@/lib/senha";
+import { CadastroWizard } from "@/components/cadastro-wizard";
 
 // Achado real de auditoria: sem essa guarda, acessar /login no deploy
 // pessoal (sem SAAS_MODE, sem as credenciais do Supabase configuradas
@@ -51,10 +53,12 @@ export default function LoginPage() {
   );
 }
 
+type Modo = "carregando" | "login" | "definir-senha" | "cadastro";
+
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [modo, setModo] = useState<"carregando" | "login" | "definir-senha">(() => {
+  const [modo, setModo] = useState<Modo>(() => {
     const hashParams = readHashParams();
     if (!hashParams) {
       return searchParams.get("modo") === "definir-senha" ? "definir-senha" : "login";
@@ -63,6 +67,10 @@ function LoginPageContent() {
     if (!hashParams.get("access_token") || !hashParams.get("refresh_token")) return "login";
     return "carregando"; // token presente — o efeito abaixo processa e decide o próximo modo
   });
+  // Só usado quando modo === "cadastro" -- o wizard mostra o e-mail (fixo,
+  // não editável) e o backend precisa saber pra quem é a sessão, mas não
+  // depende deste estado (usa o token do Supabase, este é só de exibição).
+  const [emailCadastro, setEmailCadastro] = useState("");
   const [erroHash, setErroHash] = useState<string | null>(() => {
     if (readHashParams()?.get("error_code")) return LINK_INVALIDO_MSG;
     // /auth/confirm manda pra cá com ?erro=link_invalido quando o
@@ -116,13 +124,16 @@ function LoginPageContent() {
     const supabase = createClient();
     supabase.auth
       .setSession({ access_token: accessToken, refresh_token: refreshToken })
-      .then(({ error }) => {
+      .then(async ({ data, error }) => {
         if (error) {
           setErroHash("Não foi possível validar o link. Tente pedir um novo.");
           setModo("login");
           return;
         }
-        if (type === "invite" || type === "recovery") {
+        if (type === "invite") {
+          setEmailCadastro(data.user?.email ?? "");
+          setModo("cadastro");
+        } else if (type === "recovery") {
           setModo("definir-senha");
         } else {
           router.push("/");
@@ -151,20 +162,32 @@ function LoginPageContent() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon.svg" alt="Sifra" width={40} height={40} className="mb-2 rounded-[8px]" />
           <CardTitle className="font-display text-xl">
-            {modo === "definir-senha" ? "Defina sua senha" : "Entrar no Sifra"}
+            {modo === "definir-senha" && "Defina sua senha"}
+            {modo === "cadastro" && "Criar sua conta"}
+            {modo === "login" && "Entrar no Sifra"}
           </CardTitle>
           <CardDescription>
-            {modo === "definir-senha"
-              ? "Primeiro acesso — escolha a senha que você vai usar daqui pra frente."
-              : "Acesso por convite — use o e-mail e senha que você recebeu."}
+            {modo === "definir-senha" &&
+              "Primeiro acesso — escolha a senha que você vai usar daqui pra frente."}
+            {modo === "cadastro" && "Falta pouco — complete seu cadastro pra começar a usar o Sifra."}
+            {modo === "login" && "Acesso por convite — use o e-mail e senha que você recebeu."}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {erroHash && <p className="mb-4 text-sm text-destructive">{erroHash}</p>}
-          {modo === "definir-senha" ? (
-            <DefinirSenhaForm />
-          ) : (
-            <LoginForm onCodigoVerificado={() => setModo("definir-senha")} />
+          {modo === "definir-senha" && <DefinirSenhaForm />}
+          {modo === "cadastro" && <CadastroWizard email={emailCadastro} />}
+          {modo === "login" && (
+            <LoginForm
+              onCodigoVerificado={(tipo, email) => {
+                if (tipo === "invite") {
+                  setEmailCadastro(email);
+                  setModo("cadastro");
+                } else {
+                  setModo("definir-senha");
+                }
+              }}
+            />
           )}
         </CardContent>
       </Card>
@@ -172,7 +195,11 @@ function LoginPageContent() {
   );
 }
 
-function LoginForm({ onCodigoVerificado }: { onCodigoVerificado: () => void }) {
+function LoginForm({
+  onCodigoVerificado,
+}: {
+  onCodigoVerificado: (tipo: "recovery" | "invite", email: string) => void;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -304,7 +331,7 @@ function CodigoForm({
   onVoltar,
 }: {
   emailInicial: string;
-  onSucesso: () => void;
+  onSucesso: (tipo: "recovery" | "invite", email: string) => void;
   onVoltar: () => void;
 }) {
   const [email, setEmail] = useState(emailInicial);
@@ -324,8 +351,10 @@ function CodigoForm({
     // olhando o código, então tenta os dois tipos em sequência antes de
     // desistir, sem pedir pra pessoa escolher uma opção técnica que ela
     // não tem como saber responder.
+    let tipo: "recovery" | "invite" = "recovery";
     let { error } = await supabase.auth.verifyOtp({ email, token: codigoLimpo, type: "recovery" });
     if (error) {
+      tipo = "invite";
       ({ error } = await supabase.auth.verifyOtp({ email, token: codigoLimpo, type: "invite" }));
     }
 
@@ -334,7 +363,7 @@ function CodigoForm({
       setErro("Código inválido ou expirado. Confira o e-mail e o código, ou peça um novo.");
       return;
     }
-    onSucesso();
+    onSucesso(tipo, email);
   }
 
   return (
@@ -463,8 +492,9 @@ function DefinirSenhaForm() {
     e.preventDefault();
     setErro(null);
 
-    if (senha.length < 6) {
-      setErro("A senha precisa ter pelo menos 6 caracteres.");
+    const erroForca = validarForcaSenha(senha);
+    if (erroForca) {
+      setErro(erroForca);
       return;
     }
     if (senha !== confirmacao) {

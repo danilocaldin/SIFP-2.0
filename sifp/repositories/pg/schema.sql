@@ -114,6 +114,34 @@ create table if not exists preferencias (
     primary key (user_id, chave)
 );
 
+-- Dados adicionais de cadastro (wizard de onboarding pós-convite, ver
+-- frontend/src/components/cadastro-wizard.tsx) -- nome e telefone ficam
+-- em user_metadata (Supabase Auth), mas CPF precisa de garantia de
+-- unicidade de verdade, que um blob JSON não oferece, daí a tabela
+-- própria. `on delete cascade` libera o CPF automaticamente se a conta
+-- for excluída (recurso de autoatendimento já existente, LGPD art. 18).
+create table if not exists perfis (
+    user_id uuid primary key references auth.users(id) on delete cascade,
+    cpf text not null,
+    data_nascimento date not null,
+    pais text not null default 'Brasil',
+    estado text not null,
+    cidade text not null,
+    -- Data/hora do aceite dos Termos/Privacidade -- LGPD art. 8º §5º, o
+    -- ônus da prova de que houve consentimento é do controlador (mesmo
+    -- raciocínio já aplicado em advisor_links.aceito_em).
+    termos_aceitos_em timestamptz not null default now(),
+    marketing_consent boolean not null default false,
+    created_at timestamptz not null default now()
+);
+create unique index if not exists perfis_cpf_uidx on perfis (cpf);
+alter table perfis enable row level security;
+drop policy if exists perfis_select on perfis;
+drop policy if exists perfis_insert on perfis;
+create policy perfis_select on perfis for select to authenticated using (user_id = auth.uid());
+create policy perfis_insert on perfis for insert to authenticated with check (user_id = auth.uid());
+grant select, insert on perfis to authenticated;
+
 -- Endereço de encaminhamento de e-mail (Módulo 18 — importação
 -- automática via e-mail): token opaco, um por usuário, usado como sufixo
 -- "+token" no endereço de recebimento. O worker (sifp/workers/

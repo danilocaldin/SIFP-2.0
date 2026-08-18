@@ -94,6 +94,23 @@ export async function resetarRemetenteEmailImportacao(): Promise<void> {
   if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao resetar o remetente confiável."));
 }
 
+export async function completarCadastro(dados: {
+  cpf: string;
+  data_nascimento: string;
+  pais: string;
+  estado: string;
+  cidade: string;
+  termos_aceitos: boolean;
+  marketing_consent: boolean;
+}): Promise<void> {
+  const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/perfil/cadastro`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeadersClient()) },
+    body: JSON.stringify(dados),
+  });
+  if (!res.ok) throw new Error(await parseErrorDetail(res, "Falha ao concluir o cadastro."));
+}
+
 export async function excluirConta(): Promise<void> {
   const res = await fetch(`${PUBLIC_API_URL}${API_PREFIX}/perfil/conta`, {
     method: "DELETE",

@@ -129,6 +129,49 @@ def validar_email(cls, v: str) -> str:
     return v
 
 
+def _digitos_verificadores_cpf(cpf: str) -> tuple[int, int]:
+    """Algoritmo padrão de CPF (módulo 11) -- calcula os dois dígitos
+    verificadores a partir dos 9 primeiros dígitos."""
+
+    def _digito(base: str, pesos: range) -> int:
+        soma = sum(int(d) * p for d, p in zip(base, pesos))
+        resto = soma % 11
+        return 0 if resto < 2 else 11 - resto
+
+    primeiro = _digito(cpf[:9], range(10, 1, -1))
+    segundo = _digito(cpf[:9] + str(primeiro), range(11, 1, -1))
+    return primeiro, segundo
+
+
+def validar_cpf(cls, v: str) -> str:
+    """Validator reutilizável (Pydantic v2) pro campo `cpf` de CadastroIn
+    (routes_saas.py, wizard de cadastro). Confere o dígito verificador de
+    verdade (módulo 11), não só o formato -- um CPF com formato correto
+    mas dígito errado (erro de digitação comum) ficaria salvo sem aviso
+    nenhum, e o índice único de CPF (schema.sql) não pega esse tipo de
+    erro, só duplicata exata."""
+    digitos = re.sub(r"\D", "", v)
+    if len(digitos) != 11 or digitos == digitos[0] * 11:
+        raise ValueError("CPF inválido.")
+    primeiro, segundo = _digitos_verificadores_cpf(digitos)
+    if digitos[9] != str(primeiro) or digitos[10] != str(segundo):
+        raise ValueError("CPF inválido.")
+    return digitos
+
+
+_TELEFONE_RE = re.compile(r"^\d{2}9?\d{8}$")
+
+
+def validar_telefone(cls, v: str) -> str:
+    """Validator reutilizável (Pydantic v2) pro campo `telefone` de
+    CadastroIn. Aceita qualquer pontuação (parênteses, espaço, traço) na
+    entrada e normaliza pra só dígitos -- DDD (2) + 8 ou 9 dígitos."""
+    digitos = re.sub(r"\D", "", v)
+    if not _TELEFONE_RE.match(digitos):
+        raise ValueError("Telefone inválido. Use o formato (DDD) 9XXXX-XXXX.")
+    return digitos
+
+
 def as_file_like(file: UploadFile) -> io.BytesIO:
     """Importers/ImportService esperam um arquivo com `.name` (mesma
     interface do UploadedFile do Streamlit) pra decidir o parser pela
