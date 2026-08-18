@@ -16,6 +16,7 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+.coverage
 
 # Outros arquivos soltos no diretório, não fazem parte do projeto
 Claude Setup.exe
