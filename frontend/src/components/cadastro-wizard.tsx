@@ -73,7 +73,13 @@ export function CadastroWizard({ email }: { email: string }) {
         password: dados.senha,
         data: { full_name: dados.nome.trim(), phone: dados.telefone },
       });
-      if (erroSenha) {
+      // "same_password" só acontece se uma tentativa anterior já salvou a
+      // senha com sucesso e falhou depois (ex: rede) antes de completar o
+      // cadastro -- não é um erro de verdade, é sinal de que essa parte já
+      // está feita, então seguimos pro resto em vez de travar a pessoa numa
+      // tela sem saída (ela não tem como "trocar" a senha pra uma diferente
+      // sem voltar etapas, e a mensagem original soava como falha real).
+      if (erroSenha && erroSenha.code !== "same_password") {
         setErro(`Não foi possível salvar seus dados: ${erroSenha.message}.`);
         setCarregando(false);
         return;
