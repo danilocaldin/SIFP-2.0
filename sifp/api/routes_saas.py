@@ -382,6 +382,18 @@ class CadastroIn(BaseModel):
     _validar_data_nascimento = field_validator("data_nascimento")(validar_data_iso)
 
 
+@router.get("/perfil/cadastro")
+def status_cadastro(
+    user_id: str = Depends(get_current_user_id),
+    conn: psycopg.Connection = Depends(get_db),
+):
+    """Usada pela tela de Perfil pra decidir se mostra o card 'Completar
+    cadastro' -- cobre contas que já existiam antes do wizard existir
+    (ex: convidadas direto pelo painel do Supabase) e por isso nunca
+    passaram por ele (ver `CompletarCadastroCard`, perfil/page.tsx)."""
+    return {"completo": _repos(conn)["perfil_repo"].existe(user_id)}
+
+
 @router.post("/perfil/cadastro")
 def completar_cadastro(
     body: CadastroIn,

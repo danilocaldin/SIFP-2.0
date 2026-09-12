@@ -23,7 +23,7 @@ const UFS = [
   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 ];
 
-type Dados = {
+export type Dados = {
   nome: string;
   telefone: string;
   senha: string;
@@ -250,7 +250,7 @@ function EtapaDadosBasicos({
   );
 }
 
-function EtapaDadosAdicionais({
+export function EtapaDadosAdicionais({
   dados,
   onAtualizar,
   onErro,
@@ -260,7 +260,7 @@ function EtapaDadosAdicionais({
   dados: Dados;
   onAtualizar: (campo: Partial<Dados>) => void;
   onErro: (erro: string | null) => void;
-  onVoltar: () => void;
+  onVoltar?: () => void;
   onAvancar: () => void;
 }) {
   function handleSubmit(e: React.FormEvent) {
@@ -332,9 +332,11 @@ function EtapaDadosAdicionais({
         />
       </div>
       <div className="flex items-center gap-3">
-        <Button type="button" variant="outline" onClick={onVoltar}>
-          Voltar
-        </Button>
+        {onVoltar && (
+          <Button type="button" variant="outline" onClick={onVoltar}>
+            Voltar
+          </Button>
+        )}
         <Button type="submit" className="flex-1">
           Continuar
         </Button>
@@ -343,7 +345,7 @@ function EtapaDadosAdicionais({
   );
 }
 
-function EtapaTermos({
+export function EtapaTermos({
   dados,
   onAtualizar,
   onVoltar,

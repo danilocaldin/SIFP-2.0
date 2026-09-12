@@ -17,6 +17,7 @@ import {
 } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import type { VinculoAssessor } from "@/lib/types";
+import { CompletarCadastroCard } from "@/components/completar-cadastro-card";
 
 const SAAS_MODE = process.env.NEXT_PUBLIC_SAAS_MODE === "true";
 
@@ -100,6 +101,7 @@ function PerfilForm() {
         </CardContent>
       </Card>
 
+      <CompletarCadastroCard />
       <PasskeyCard />
       <EmailImportacaoCard />
       <AssessoresCard />
