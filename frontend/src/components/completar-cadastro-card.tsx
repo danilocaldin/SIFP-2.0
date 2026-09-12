@@ -39,7 +39,15 @@ export function CompletarCadastroCard() {
   useEffect(() => {
     statusCadastro()
       .then((r) => setPrecisa(!r.completo))
-      .catch(() => setPrecisa(false))
+      .catch((err) => {
+        // Falha ao verificar (rede, backend fora do ar) não deve ser
+        // confundida com "cadastro já completo" -- mostra o card com o
+        // erro em vez de sumir em silêncio, senão ninguém percebe que o
+        // card devia estar ali (achado real: engolir o erro aqui escondia
+        // o card por completo, sem nenhum indício de falha).
+        setPrecisa(true);
+        setErro(err instanceof Error ? err.message : "Não foi possível verificar seu cadastro.");
+      })
       .finally(() => setCarregando(false));
   }, []);
 
