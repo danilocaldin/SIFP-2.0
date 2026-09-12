@@ -18,6 +18,12 @@
       "runtimeExecutable": "C:\\Users\\User\\Documents\\Danilo\\Danilo\\SIFP - Claude\\dev-frontend.bat",
       "runtimeArgs": [],
       "port": 3000
+    },
+    {
+      "name": "boletim-b3",
+      "runtimeExecutable": "C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+      "runtimeArgs": ["-m", "streamlit", "run", "C:\\Users\\User\\Documents\\Danilo\\Danilo\\agente-financeiro\\app.py", "--server.headless", "true", "--server.port", "8502"],
+      "port": 8502
     }
   ]
 }
