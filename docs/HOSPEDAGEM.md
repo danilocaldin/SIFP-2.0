@@ -4,16 +4,18 @@
 
 | | URL |
 |---|---|
-| **App pessoal do Danilo (uso diário)** | https://frontend-seven-virid-91.vercel.app |
+| **App pessoal do Danilo (uso diário)** | https://sifra-pessoal.vercel.app |
 | **SaaS multiusuário (clientes, com login)** | https://sifra-saas.vercel.app |
 | API (compartilhada pelos dois acima) | https://sifp-20-production.up.railway.app |
 | Repositório | https://github.com/danilocaldin/SIFP-2.0 |
 
 Duas frentes, mesmo código-fonte e mesma API: o app pessoal do Danilo continua sem login (SQLite, rotas `/api/...`); o SaaS multiusuário exige login (Supabase Postgres + Row Level Security, rotas `/api/v2/...`). Uma única variável de ambiente no frontend (`NEXT_PUBLIC_SAAS_MODE`) decide qual modo cada deploy roda — nenhuma tela foi duplicada. Ver [`DECISOES_E_LICOES.md`](DECISOES_E_LICOES.md) e a memória do projeto para o processo completo de migração.
 
+> **Incidente real (17/09/2026)**: o projeto Vercel do app pessoal (então chamado `frontend`) foi apagado por engano ao tentar limpar um projeto duplicado criado sem querer no mesmo dia. Os dados nunca correram risco de verdade — vivem no volume do Railway, não no Vercel — mas o site pessoal ficou fora do ar (`DEPLOYMENT_NOT_FOUND`) até recriar o projeto do zero (`sifra-pessoal`). Recriar um projeto novo do zero no Vercel via CLI exige atenção a 3 coisas que um projeto antigo já tem configuradas e um novo não vem com elas por padrão: (1) **framework preset** — sem `framework: "nextjs"` setado no projeto, a Vercel não roteia nenhuma URL corretamente (404 em tudo, mesmo com build 100% ok); (2) **Deployment Protection (SSO)** — vem ligado por padrão em projetos novos, bloqueando acesso sem login na Vercel; (3) **variáveis de ambiente** — não são copiadas automaticamente, precisam ser recriadas (incluindo `SIFP_API_KEY`, sem o prefixo `NEXT_PUBLIC_`, usada só no servidor — fácil de esquecer porque o app parece funcionar mas a tela de Resumo quebra com "Algo deu errado por aqui"). E não esquecer de atualizar `CORS_ORIGINS` no Railway com o novo domínio.
+
 ## Como está montado
 
-- **Frontend pessoal** (Next.js) → **Vercel**, projeto `danilocaldins-projects/frontend`, deploy a partir da pasta `frontend/` do repositório. `NEXT_PUBLIC_SAAS_MODE` não definida.
+- **Frontend pessoal** (Next.js) → **Vercel**, projeto `danilocaldins-projects/sifra-pessoal`, deploy a partir da pasta `frontend/` do repositório. `NEXT_PUBLIC_SAAS_MODE` não definida. (Nome anterior do projeto era `frontend` — recriado em 17/09/2026 depois de apagado por engano; ver nota abaixo.)
 - **Frontend SaaS** (mesmo código) → **Vercel**, projeto `danilocaldins-projects/sifra-saas`. `NEXT_PUBLIC_SAAS_MODE=true`.
 - **API** (FastAPI) → **Railway**, projeto `zooming-motivation`, serviço `SIFP-2.0`, buildado a partir do `Dockerfile` na raiz do repositório. Serve os dois frontends ao mesmo tempo.
 - **Banco de dados do app pessoal** (SQLite) → arquivo num **volume persistente** do Railway, montado em `/data`. Sobrevive a redeploys porque fica fora da imagem Docker.
@@ -25,7 +27,7 @@ Duas frentes, mesmo código-fonte e mesma API: o app pessoal do Danilo continua 
 | Onde | Variável | Valor |
 |---|---|---|
 | Railway | `SIFP_DB_PATH` | `/data/financas.db` |
-| Railway | `CORS_ORIGINS` | `https://frontend-seven-virid-91.vercel.app,https://sifra-saas.vercel.app` (lista separada por vírgula — **precisa incluir os dois domínios**, senão qualquer chamada que o navegador faz direto da API a partir do domínio que faltar é bloqueada silenciosamente pelo CORS) |
+| Railway | `CORS_ORIGINS` | `https://sifra-pessoal.vercel.app,https://sifra-saas.vercel.app` (lista separada por vírgula — **precisa incluir os dois domínios**, senão qualquer chamada que o navegador faz direto da API a partir do domínio que faltar é bloqueada silenciosamente pelo CORS) |
 | Railway | `ANTHROPIC_API_KEY` | chave da Anthropic (console.anthropic.com) — sem ela, o botão "Explicar este mês" fica indisponível, mas o resto do sistema funciona normalmente |
 | Railway | `SUPABASE_URL` | `https://nkusahedzogplsjknijj.supabase.co` |
 | Railway | `SUPABASE_PUBLISHABLE_KEY` | chave pública do Supabase (safe, não é segredo) |
